@@ -3,7 +3,7 @@ import * as maplibregl from 'maplibre-gl'
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import {
   Activity, CircleHelp, CloudSun, Download, Flame, Gauge, Info,
-  Layers3, MapPin, Menu, Mountain, Pause, Play, Radar, RefreshCw, Satellite,
+  Layers3, Map as MapIcon, MapPin, Menu, Mountain, Pause, Play, Radar, RefreshCw, Satellite,
   Scan, ShieldAlert, SlidersHorizontal, ThermometerSun, Trash2, X,
 } from 'lucide-react'
 import cuscoBoundaryRaw from './data/cusco-boundary.json'
@@ -726,8 +726,8 @@ function FireMapApp() {
         <div className="fw-basemap-switch" role="group" aria-label="Fondo cartográfico">
           <span>FONDO CARTOGRÁFICO</span>
           <div>
-            <button className={baseMap === 'standard' ? 'is-active' : ''} onClick={() => setBaseMap('standard')}>Estándar</button>
-            <button className={baseMap === 'relief' ? 'is-active' : ''} onClick={() => setBaseMap('relief')}><Mountain size={13}/>Relieve</button>
+            <button aria-label="Mapa estándar" title="Mapa estándar" className={baseMap === 'standard' ? 'is-active' : ''} onClick={() => setBaseMap('standard')}><MapIcon size={16}/><b>Estándar</b></button>
+            <button aria-label="Mapa con relieve" title="Mapa con relieve" className={baseMap === 'relief' ? 'is-active' : ''} onClick={() => setBaseMap('relief')}><Mountain size={16}/><b>Relieve</b></button>
           </div>
         </div>
         <LayerButton active={activeLayer === 'surface'} icon={ThermometerSun} label="Superficie" tone="heat" onClick={() => setActiveLayer('surface')}/>
