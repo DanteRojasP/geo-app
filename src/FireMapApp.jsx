@@ -173,7 +173,7 @@ function createPopupContent(title, lines) {
 }
 
 function RiskBadge({ level }) {
-  return <span className={`fw-risk fw-risk--${level.toLowerCase()}`}><i />Riesgo {level}</span>
+  return <span className={`fw-risk fw-risk--${level.toLowerCase()}`}><i />Actividad {level}</span>
 }
 
 function LayerButton({ active, icon, label, onClick, tone }) {
@@ -444,14 +444,14 @@ function FireMapApp() {
         id: 'fire-heat', type: 'heatmap', source: 'fire-hotspots', maxzoom: 12,
         layout: { visibility: 'visible' },
         paint: {
-          'heatmap-weight': ['interpolate', ['linear'], ['get', 'frp'], 0, 0.12, 15, 0.32, 45, 0.65, 110, 1],
-          'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 3.5, 0.8, 6, 1.15, 10, 1.7],
+          'heatmap-weight': ['interpolate', ['linear'], ['get', 'frp'], 0, 0.04, 15, 0.16, 45, 0.38, 110, 0.72],
+          'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 3.5, 0.42, 6, 0.68, 10, 1.15],
           'heatmap-color': ['interpolate', ['linear'], ['heatmap-density'],
-            0, 'rgba(43,131,186,0)', 0.08, 'rgba(43,131,186,.34)', 0.2, '#66c2a5',
-            0.36, '#d9ef8b', 0.52, '#fee08b', 0.68, '#fdae61', 0.82, '#f46d43',
-            0.93, '#d73027', 1, '#7f003b'],
-          'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 3.5, 34, 5, 48, 7, 68, 10, 104],
-          'heatmap-opacity': ['interpolate', ['linear'], ['zoom'], 3.5, 0.82, 8, 0.76, 11, 0.52],
+            0, 'rgba(43,131,186,0)', 0.16, 'rgba(43,131,186,0)', 0.24, 'rgba(43,131,186,.28)',
+            0.34, '#66c2a5', 0.48, '#fee08b', 0.64, '#fdae61', 0.8, '#e34a33',
+            0.92, '#b3003b', 1, '#6a003a'],
+          'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 3.5, 15, 5, 22, 7, 32, 10, 52],
+          'heatmap-opacity': ['interpolate', ['linear'], ['zoom'], 3.5, 0.72, 8, 0.68, 11, 0.48],
         },
       })
       map.addLayer({
@@ -675,7 +675,7 @@ function FireMapApp() {
         <button title="Información" onClick={() => setDetailsOpen((value) => !value)}><Info size={20}/><span>Info</span></button>
       </nav>
       {detailsOpen && <aside className="fw-summary">
-        <div className="fw-summary-head"><div><p>{activeScope === 'peru' ? 'MONITOREO NACIONAL' : 'ZONA PILOTO'}</p><h1>Posibles incendios</h1><span>{activeScope === 'peru' ? 'Perú' : 'Cusco'} · {formatDate(selectedDate === 'all' ? null : selectedDate)}</span></div><button onClick={() => setDetailsOpen(false)}><X size={17}/></button></div>
+        <div className="fw-summary-head"><div><p>{activeScope === 'peru' ? 'MONITOREO NACIONAL' : 'ZONA PILOTO'}</p><h1>Actividad térmica</h1><span>{activeScope === 'peru' ? 'Perú' : 'Cusco'} · {formatDate(selectedDate === 'all' ? null : selectedDate)}</span></div><button onClick={() => setDetailsOpen(false)}><X size={17}/></button></div>
         <div className="fw-summary-status"><RiskBadge level={stats.risk}/><span>{loading ? 'Actualizando satélites…' : `${visibleHotspots.length} detecciones visibles`}</span></div>
         {error && <div className="fw-error"><ShieldAlert size={16}/>{error}</div>}
         <div className="fw-metrics">
@@ -686,7 +686,7 @@ function FireMapApp() {
         </div>
         <div className="fw-sensor-row"><span><i className="modis"/>MODIS · 1 km</span><span><i className="viirs"/>VIIRS · 375 m</span></div>
         <div className="fw-summary-actions"><button onClick={loadData} disabled={loading}><RefreshCw className={loading ? 'spin' : ''} size={16}/>Actualizar</button><button onClick={() => downloadCsv(visibleHotspots, selectedDate)}><Download size={16}/>CSV</button></div>
-        <p className="fw-disclaimer">Superficie interpolada desde detecciones FIRMS para exploración. No representa por sí sola incendios confirmados ni un pronóstico.</p>
+        <p className="fw-disclaimer">Superficie localizada alrededor de detecciones FIRMS. Las zonas sin evidencia suficiente permanecen transparentes; no es un pronóstico.</p>
       </aside>}
       {layersOpen && !selectionBounds && <aside className="fw-layers">
         <div className="fw-layers-title"><span>CAPAS DEL MAPA</span><SlidersHorizontal size={15}/></div>
@@ -709,7 +709,7 @@ function FireMapApp() {
           <article><span>Confianza</span><b>{selectionStats.confidence}%</b></article>
           <article><span>MODIS / VIIRS</span><b>{selectionStats.modis} / {selectionStats.viirs}</b></article>
           <article><span>Superficie del cuadro</span><b>{selectionArea >= 1000 ? `${(selectionArea / 1000).toFixed(1)} mil km²` : `${selectionArea.toFixed(0)} km²`}</b></article>
-          <article><span>Nivel estimado</span><b className={`risk-${selectionStats.risk.toLowerCase()}`}>{selectionStats.risk}</b></article>
+          <article><span>Nivel observado</span><b className={`risk-${selectionStats.risk.toLowerCase()}`}>{selectionStats.risk}</b></article>
         </div>
         <div className="fw-selection-actions"><button onClick={toggleSelectionMode}><Scan size={15}/>Redibujar</button><button onClick={() => downloadCsv(selectedHotspots, 'area-seleccionada')} disabled={!selectedHotspots.length}><Download size={15}/>CSV</button></div>
       </aside>}
