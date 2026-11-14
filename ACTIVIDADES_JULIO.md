@@ -16,17 +16,12 @@ Fuente: [PLAN.md](PLAN.md)
 
 ## Endpoints (contrato con Dante)
 
-| Endpoint | Entrada | Salida |
-|---|---|---|
-| `GET /api/calendario` | AOI (departamento de Perú; alternativa: bbox o centro + radio), fecha inicio y fin | Matriz mes × año |
-| `GET /api/anomalias` | AOI y mes consultado | Comparación con la mediana histórica |
-| `GET /api/hotspots.csv` | AOI y rango de fechas | CSV de eventos del rango |
-| `GET /api/metadatos` | — | Versión del armonizador, umbral de confianza y advertencias |
+Los 4 endpoints del PLAN (`/api/calendario`, `/api/anomalias`, `/api/hotspots.csv`, `/api/metadatos`) están
+implementados, más `/api/departamentos.geojson` y `/api/focos.geojson`. El contrato vigente está en
+**[Protocolo de llamadas a la API](#protocolo-de-llamadas-a-la-api-contrato-con-la-interfaz)**, más abajo.
 
-Formatos de referencia:
-- **Evento armonizado:** `fecha_utc, hora, lat, lon, celda_1km, sensor, confianza_norm (0–1), frp_mw, dia_noche`
-- **Agregado mensual:** `anio, mes, n_eventos, frp_total, mediana_hist, anomalia`
-- **Hacia la web:** JSON; GeoJSON solo para el AOI y puntos de rangos pequeños.
+> Los formatos del plan original ("eventos", FRP, `confianza_norm`) quedaron reemplazados por el contrato de datos
+> de Antonio (MAESTRO.md): la unidad es **focos armonizados** y no se usa FRP.
 
 ## Dependencias
 
@@ -163,6 +158,78 @@ se llama `focos_armonizados`, sin FRP y Dockerfile según el de Antonio.
 - [x] 142 pruebas del backend en verde y ESLint sin errores en la interfaz.
 - [x] Desplegado en la plataforma local (http://localhost:8000).
 - [ ] Siguiente: desplegar en Cloud Run (`docs/DESPLIEGUE_Y_FALENCIAS.md`, opción B) cuando el equipo lo decida.
+
+## Protocolo de llamadas a la API (contrato con la interfaz)
+
+**Base:** la misma dirección que sirve la página (`http://localhost:8000` en local; la URL de Cloud Run al
+publicar). Si la interfaz se publica en otro dominio (p. ej. Vercel), se compila con
+`VITE_API_BASE_URL=https://<api>` y en la API se define `FIRECAL_CORS_ORIGINS=https://<dominio-de-la-interfaz>`.
+Todas las llamadas son **GET** y no llevan credenciales: los datos son públicos e históricos.
+
+### 1. Qué llama la interfaz y cuándo
+
+| Momento | Llamada | Para qué |
+| --- | --- | --- |
+| Al abrir | `GET /api/departamentos.geojson` | Contorno de Cusco para el mapa |
+| Al abrir | `GET /api/metadatos` | Unidad, método, créditos |
+| Al abrir | `GET /api/calendario?departamento=PE-CUS` | Calendario completo 2000-11 a 2025-12 |
+| Al elegir año o mes | `GET /api/focos.geojson?departamento=PE-CUS&fecha_inicio=AAAA-MM&fecha_fin=AAAA-MM` | Puntos del mapa de ese periodo |
+| Al elegir un mes | `GET /api/anomalias?departamento=PE-CUS&mes=AAAA-MM` | Detalle del mes (mediana, anomalía, margen, días) |
+| Al dibujar un rectángulo | `GET /api/calendario?bbox=O,S,E,N&...` y `GET /api/focos.geojson?bbox=O,S,E,N&...` | Total y puntos del área |
+| Botón CSV | `GET /api/hotspots.csv?<AOI>&fecha_inicio=AAAA-MM&fecha_fin=AAAA-MM` | Descarga de focos |
+
+Ninguna llamada sale a FIRMS ni a Google: los datos son los CSV de Antonio, cargados en el servidor. Las únicas
+conexiones externas del navegador son el mapa base (OpenFreeMap), la vista satelital (Esri) y las fuentes tipográficas.
+
+### 2. Parámetros comunes
+
+- **AOI (uno solo):** `departamento=PE-CUS` · `bbox=oeste,sur,este,norte` (grados WGS84, máx. 50 000 km²) ·
+  `lat`, `lon` y `radio_km` (máx. 100 km). Debe tocar Cusco.
+- **Fechas:** `AAAA-MM`, dentro de 2000-11 a 2025-12. En `/api/calendario` son opcionales (por defecto, toda la
+  serie).
+
+### 3. Respuestas
+
+| Ruta | Campos principales |
+| --- | --- |
+| `/api/calendario` | `unidad{nombre, definicion}`, `anios`, `matriz_focos_armonizados[año][mes]`, `matriz_anomalia`, `total_focos_armonizados`, `cortes_color` (cuantiles 50/75/90/99), `celdas[]`, `notes[]` |
+| celda de `celdas[]` | `anio`, `mes`, `sin_dato`, `focos_armonizados`, `celdas_dia`, `focos_modis`, `focos_viirs`, `mediana_hist`, `anomalia`, `categoria`, `calidad`, `fraccion_extrapolada`, `incertidumbre`, `rango[min,max]`, `anomalia_rango`, `fuente_serie`, `parcial` |
+| `/api/anomalias` | los campos de la celda + `p25`, `p75`, `n_anios_hist`, `historial[{anio, focos_armonizados}]`, `dias[{fecha_local, focos_armonizados}]` |
+| `/api/focos.geojson` | `FeatureCollection` de puntos con `fecha_local`, `hora_utc`, `sensor`, `satelite`, `eq_foco`, `en_serie`, `calidad` (sin FRP); `n_focos`, `total_focos_armonizados`. Máx. 50 000 focos por llamada |
+| `/api/hotspots.csv` | CSV UTF-8 con BOM, **18 columnas del contrato** de Antonio; cabeceras `X-Row-Count` y `X-Total-Eq-Foco` |
+| `/api/metadatos` | `unidad`, `armonizacion` (k, kT, margen, filtros), `cobertura`, `controles_maestro`, `creditos`, `notes` |
+
+Reglas de pantalla:
+- El número que se muestra es `focos_armonizados`, con la etiqueta "Focos armonizados". En pantalla se puede
+  redondear; en la descarga va sin redondear.
+- `sin_dato: true` se muestra en gris y **nunca como 0**.
+- Si la `calidad` es `extrapolado`, el mes va atenuado y con su `rango`.
+- Si la `categoria` es `incierta`, la anomalía no se muestra como si fuera firme.
+- Los focos MODIS y VIIRS se muestran por separado y no se suman.
+
+### 4. Errores y límites (protocolo de solicitudes)
+
+| Código | Cuándo | Qué hace la interfaz |
+| --- | --- | --- |
+| **422** | Consulta mal formada: AOI vacío, dos AOI a la vez, fecha mal escrita, rango invertido, área > 50 000 km², > 50 000 focos para el mapa, CSV > 200 000 filas | Muestra `detail` (texto en español) |
+| **404** | **Sin datos:** otra región, área fuera de Cusco o fechas fuera de la serie | Muestra `detail`; nunca ceros |
+| **429** | La misma IP superó **120 solicitudes/min** (ráfaga de 40) o **10 pesadas/min** (ráfaga de 5) | Esperar `Retry-After` segundos |
+| **503** | Ya hay **2 consultas pesadas** en curso en el servidor y no se liberó turno en 2 s; o los datos no están cargados | Reintentar tras `Retry-After` |
+
+- **Pesadas:** `/api/hotspots.csv` y cualquier llamada con `bbox` o `lat/lon`. Las de `departamento=PE-CUS` son
+  livianas y se guardan en caché (~7 ms al repetirlas).
+- **Cabeceras útiles:** `X-Process-Time-ms` (latencia), `X-RateLimit-Remaining` y `Retry-After`.
+- **Estado:** `GET /health` (datos listos) y `GET /health/limits` (clientes y rechazos 429/503).
+- Detrás de la nube se define `FIRECAL_TRUST_PROXY=1` para limitar por la IP real del visitante.
+
+Ejemplo:
+```
+GET /api/calendario?departamento=PE-CUS&fecha_inicio=2020-01&fecha_fin=2020-12
+-> 200 {"total_focos_armonizados": 1205.65, "celdas": [...], ...}
+GET /api/calendario?departamento=PE-PUN
+-> 404 {"detail": "Sin datos para 'PE-PUN': el prototipo solo tiene datos armonizados y validados de Cusco (PE-CUS)."}
+```
+Documentación interactiva (probar las llamadas desde el navegador): `http://localhost:8000/docs`.
 
 ## Pendientes que me afectan
 
