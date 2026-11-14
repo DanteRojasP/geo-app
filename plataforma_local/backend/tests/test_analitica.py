@@ -130,3 +130,18 @@ def test_area_dibujada_cuadra_con_el_calendario(api):
     assert sum(b["focos_armonizados"] for b in alt["bandas"]) == pytest.approx(todo, abs=0.5)
     acum = api.get("/api/analitica/acumulado", params={**caja, "anio": 2020}).json()
     assert acum["total"] == pytest.approx(cal["total_focos_armonizados"], abs=0.1)
+
+
+def test_fecha_de_cruce_en_anio_bisiesto(api):
+    """2020 (bisiesto) superó lo de un año típico el 24 de agosto (verificado con los CSV)."""
+    r = api.get("/api/analitica/acumulado", params={"departamento": "PE-CUS", "anio": 2020})
+    assert "El 24 de agosto" in r.json()["en_simple"]
+
+
+def test_nota_de_2025(api):
+    r = api.get("/api/analitica/acumulado", params={"departamento": "PE-CUS", "anio": 2025}).json()
+    assert any(n.startswith("2025:") for n in r["notes"])
+    assert any(n.startswith("2025:") for n in api.get(
+        "/api/resumen", params={"departamento": "PE-CUS"}).json()["notes"])
+    otro = api.get("/api/analitica/acumulado", params={"departamento": "PE-CUS", "anio": 2019})
+    assert not any(n.startswith("2025:") for n in otro.json()["notes"])

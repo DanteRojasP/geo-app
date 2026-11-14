@@ -122,7 +122,8 @@ def test_api_returns_429_with_retry_after(plan_home):
     r = api.get("/api/departamentos")
     assert int(r.headers["Retry-After"]) >= 1 and "Demasiadas solicitudes" in r.json()["detail"]
     # /health y la web no cuentan para el límite.
-    assert api.get("/health").status_code == 200 and api.get("/").status_code == 200
+    assert api.get("/health").status_code == 200
+    assert api.get("/").status_code in (200, 404)     # 404 si la interfaz no está compilada
     assert api.get("/health/limits").json()["rechazadas_429"] >= 3
 
 

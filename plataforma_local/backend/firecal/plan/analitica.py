@@ -20,7 +20,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from firecal.plan.query import AOI, UNIDAD, PlanError, PlanNoData, PlanStore
+from firecal.plan.query import AOI, NOTE_2025, UNIDAD, PlanError, PlanNoData, PlanStore
 
 MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto",
          "septiembre", "octubre", "noviembre", "diciembre"]
@@ -159,6 +159,8 @@ def ranking(store: PlanStore, aoi: AOI) -> dict:
         notes.append("Los años con focos extrapolados (antes de julio de 2002) aparecen en la "
                      "lista con su margen, pero no se usan para el año típico ni para el primer "
                      "y último puesto de la frase.")
+    if any(f["anio"] == 2025 for f in filas):
+        notes.append(NOTE_2025)
     return _envoltura(
         aoi, "¿Qué años tuvieron más fuego?", en_simple,
         "Cada barra es un año. La línea punteada marca un año típico: las barras que la superan "
@@ -204,13 +206,17 @@ def acumulado(store: PlanStore, aoi: AOI, anio: int | None) -> dict:
                  f"cierra con {_n(normal)} (entre {_n(bajo)} y {_n(alto)}).")
     cruce = np.flatnonzero(curva.to_numpy() >= normal)
     if final > normal and len(cruce) and cruce[0] < 364:
-        fecha = pd.Timestamp(2001, 1, 1) + pd.Timedelta(days=int(cruce[0]))
+        # Fecha real del año consultado: con 2001 fijo, en los bisiestos salía un día después
+        # (2020 cruzó el 24 de agosto, no el 25).
+        fecha = pd.Timestamp(anio, 1, 1) + pd.Timedelta(days=int(cruce[0]))
         en_simple += (f" El {fecha.day} de {MESES[fecha.month - 1]} ya había alcanzado lo que "
                       "un año típico suma en doce meses.")
     dias = sorted({*range(7, 366, 7), 365})
     notes = []
     if anio not in ref:
         notes.append(f"{anio} tiene focos extrapolados: su curva es una referencia gruesa.")
+    if anio == 2025:
+        notes.append(NOTE_2025)                 # MAESTRO P2: el 2025 bajo lleva su nota
     return _envoltura(
         aoi, f"¿Cómo avanzó {anio} frente a lo normal?", en_simple,
         "La línea del año va sumando focos día a día. La banda es donde cae la mayoría de los "
@@ -305,7 +311,10 @@ def resumen(store: PlanStore, aoi: AOI) -> dict:
     """Las cinco frases juntas: la respuesta corta para quien no va a mirar gráficos."""
     partes = [estacionalidad(store, aoi), ranking(store, aoi), acumulado(store, aoi, None),
               altitud(store, aoi), recurrencia(store, aoi, limite=0)]
+    notes = [NOTA_NO_ES_PRONOSTICO]
+    if partes[2]["anio"] == 2025:               # la frase de la curva habla de 2025
+        notes.append(NOTE_2025)
     return {"aoi": aoi.info(), "titulo": f"El fuego en {aoi.label}, en simple",
             "unidad": UNIDAD,
             "frases": [{"pregunta": p["titulo"], "respuesta": p["en_simple"]} for p in partes],
-            "notes": [NOTA_NO_ES_PRONOSTICO]}
+            "notes": notes}

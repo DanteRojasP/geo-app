@@ -237,6 +237,16 @@ GET /api/calendario?departamento=PE-PUN
 ```
 Documentación interactiva (probar las llamadas desde el navegador): `http://localhost:8000/docs`.
 
+## Revisión del PR de analíticas de Antonio (sáb 14 nov 2026, noche)
+
+`antonio/analitica` unido a esta rama (sin conflictos). Verificado: 151 pruebas, ESLint y build, `verificar_datos.py`
+TODO OK, frases con los datos reales, sin FRP ni "riesgo/alerta", panel "En simple" probado en el navegador.
+Correcciones aplicadas en la revisión:
+- [x] Fecha de la frase de la curva en **años bisiestos** (salía un día después: 2020 cruzó el 24 de agosto, no el 25).
+- [x] **Nota de 2025** (MAESTRO P2) en la curva, el ranking y el resumen; el panel ahora muestra todas las notas.
+- [x] El panel muestra "Calculando…" al cambiar de área, en vez de los datos anteriores.
+- [x] Una prueba de límites dependía de tener la interfaz compilada.
+
 ## Pendientes que me afectan
 
 - [x] Datos reales de FIRMS (Cusco, de Antonio).
