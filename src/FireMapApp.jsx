@@ -3,7 +3,7 @@ import * as maplibregl from 'maplibre-gl'
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import {
   Activity, CalendarDays, CircleHelp, CloudSun, Download, Flame, Gauge, Info,
-  Layers3, MapPin, Menu, Pause, Play, Radar, RefreshCw, Satellite,
+  Layers3, MapPin, Menu, Mountain, Pause, Play, Radar, RefreshCw, Satellite,
   Scan, ShieldAlert, SlidersHorizontal, ThermometerSun, Trash2, X,
 } from 'lucide-react'
 import cuscoBoundaryRaw from './data/cusco-boundary.json'
@@ -258,6 +258,7 @@ function FireMapApp() {
   const [result, setResult] = useState({ hotspots: [], mode: 'demo', metadata: {} })
   const [departments, setDepartments] = useState(EMPTY_FEATURE_COLLECTION)
   const [activeScope, setActiveScope] = useState('peru')
+  const [baseMap, setBaseMap] = useState('standard')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [activeLayer, setActiveLayer] = useState('surface')
@@ -412,11 +413,32 @@ function FireMapApp() {
 
     map.on('load', () => {
       map.addSource('peru-departments', { type: 'geojson', data: departmentsRef.current, generateId: true })
+      map.addSource('relief-imagery', {
+        type: 'raster',
+        tiles: ['https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
+        tileSize: 256,
+        attribution: 'Esri, Vantor, Earthstar Geographics, and the GIS User Community',
+      })
+      map.addSource('relief-reference', {
+        type: 'raster',
+        tiles: ['https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}'],
+        tileSize: 256,
+      })
       map.addSource('cusco-area', { type: 'geojson', data: CUSCO_BOUNDARY })
       map.addSource('fire-hotspots', { type: 'geojson', data: hotspotsToGeoJson([]) })
       map.addSource('selection-area', { type: 'geojson', data: boundsToGeoJson(null) })
       map.addSource('selected-hotspots', { type: 'geojson', data: hotspotsToGeoJson([]) })
 
+      map.addLayer({
+        id: 'relief-imagery-layer', type: 'raster', source: 'relief-imagery',
+        layout: { visibility: 'none' },
+        paint: { 'raster-saturation': -0.12, 'raster-contrast': 0.08, 'raster-brightness-min': 0.08, 'raster-brightness-max': 0.92 },
+      })
+      map.addLayer({
+        id: 'relief-reference-layer', type: 'raster', source: 'relief-reference',
+        layout: { visibility: 'none' },
+        paint: { 'raster-opacity': 0.82 },
+      })
       map.addLayer({
         id: 'department-fill', type: 'fill', source: 'peru-departments',
         paint: {
@@ -609,6 +631,14 @@ function FireMapApp() {
       : ['case', ['boolean', ['feature-state', 'selected'], false], 0.22, ['boolean', ['feature-state', 'hover'], false], 0.16, 0.035])
   }, [activeLayer])
 
+  useEffect(() => {
+    const map = mapRef.current
+    if (!mapReadyRef.current || !map?.getLayer('relief-imagery-layer')) return
+    const visibility = baseMap === 'relief' ? 'visible' : 'none'
+    map.setLayoutProperty('relief-imagery-layer', 'visibility', visibility)
+    map.setLayoutProperty('relief-reference-layer', 'visibility', visibility)
+  }, [baseMap])
+
   const focusStudyArea = () => {
     const map = mapRef.current
     if (!mapReadyRef.current || !map) return
@@ -691,6 +721,13 @@ function FireMapApp() {
       </aside>}
       {layersOpen && !selectionBounds && <aside className="fw-layers">
         <div className="fw-layers-title"><span>CAPAS DEL MAPA</span><SlidersHorizontal size={15}/></div>
+        <div className="fw-basemap-switch" role="group" aria-label="Fondo cartográfico">
+          <span>FONDO CARTOGRÁFICO</span>
+          <div>
+            <button className={baseMap === 'standard' ? 'is-active' : ''} onClick={() => setBaseMap('standard')}>Estándar</button>
+            <button className={baseMap === 'relief' ? 'is-active' : ''} onClick={() => setBaseMap('relief')}><Mountain size={13}/>Relieve</button>
+          </div>
+        </div>
         <LayerButton active={activeLayer === 'surface'} icon={ThermometerSun} label="Superficie" tone="heat" onClick={() => setActiveLayer('surface')}/>
         <LayerButton active={activeLayer === 'activity'} icon={Gauge} label="Regiones" tone="activity" onClick={() => setActiveLayer('activity')}/>
         <LayerButton active={activeLayer === 'points'} icon={MapPin} label="Puntos" tone="points" onClick={() => setActiveLayer('points')}/>
