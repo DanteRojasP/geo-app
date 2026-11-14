@@ -96,10 +96,44 @@ Sin Docker: ver [`plataforma_local/README.md`](plataforma_local/README.md), secc
 - [`plataforma_local/docs/BENEFICIOS_NASA.md`](plataforma_local/docs/BENEFICIOS_NASA.md): qué beneficios de Space Apps
   sirven (Azure o Google Cloud + dominio de GoDaddy para publicar; Planetary Computer para validar).
 
+## Integración con Antonio (sáb 14 nov 2026, tarde)
+
+La plataforma ya **no usa datos sintéticos**: sirve los **datos reales de NASA FIRMS para Cusco** armonizados por
+Antonio ([MAESTRO.md](MAESTRO.md), `data/harmonized/`).
+
+### Hecho
+
+- [x] **Merge de `antonio/modelo` en esta rama** (sin conflictos). La rama de Antonio no se tocó.
+- [x] **`harmonizacion/verificar_datos.py` corre en Windows**: se caía con `UnicodeEncodeError` (`Δ` en la consola
+      cp1252, y `python -I` ignora `PYTHONUTF8`). Ahora fuerza la salida a UTF-8; da `TODO OK` con el comando de
+      MAESTRO §6. Registrado en MAESTRO §7 y §11.
+- [x] **Backend con los CSV de Antonio** (`plataforma_local/backend/firecal/plan/`): valida columnas, filas, sumas
+      y SHA-256 contra MAESTRO §6 en cada carga (~2 s) y escribe Parquet por año y mes.
+- [x] **Decisiones del equipo aplicadas:**
+  - Solo **Cusco**. Otra región, un área fuera de Cusco o fechas fuera de 2000-11-04 a 2025-12-31 dan
+    **"sin datos"** (nunca 0). Es una serie histórica: no incluye 2026.
+  - Unidad **"focos armonizados"** (Σ `eq_hotspots` / Σ `eq_foco`). Ya no se usa "evento": los datos son focos.
+  - **Sin FRP** en la API ni en la web. El CSV de descarga mantiene las 18 columnas del contrato de Antonio.
+  - El backend sintético anterior (`/api/v1`, 5 departamentos) quedó apagado.
+- [x] **Frontend según MAESTRO P2/P3:** rampa YlOrRd con cortes por cuantiles, cero gris, "sin dato" rayado,
+      2000-2002 extrapolado atenuado, nota de 2025, detalle diario por mes y total igual a la descarga.
+- [x] **Casos de prueba de MAESTRO §12 en pytest, todos en verde:** total 15 732 (36 260 celdas-día, 58 779 focos),
+      2005 = 1355, 2012 = 678, 2013 = 424, 2020 = 1206, 2025 = 385, "sin datos" fuera de cobertura y
+      Σ `eq_foco` de la descarga = total en pantalla. En total 136 pruebas pasan.
+- [x] **Docker:** `docker compose up --build` en `plataforma_local/` toma los datos de la raíz del repo y los
+      valida al construir (1,32 GB; ~170 MB de RAM).
+- [x] **Desplegado en la plataforma local** (`C:\Nubel\local base\local_plat`, http://localhost:8000).
+
+### Pendientes nuevos
+
+- [ ] Analíticas descargables (MAESTRO P4): serie anual por fuente, perfil estacional, bandas de altitud.
+- [ ] `harmonizacion/sequia_fuego/n_efectivo_potencia.py` tiene el mismo problema de Windows (`≈`); no se tocó.
+- [ ] Desplegar en Google Cloud (proyecto listo: `sonic-mile-514718-r5`), cuando el equipo lo decida.
+
 ## Pendientes que me afectan
 
-- [ ] Datos reales de FIRMS (hoy todo es sintético y la web lo avisa).
-- [ ] Confirmar con el equipo los departamentos del AOI.
+- [x] Datos reales de FIRMS (Cusco, de Antonio).
+- [x] Departamentos del AOI: solo Cusco (decisión del equipo).
 - [ ] Límite de latencia (ms) para la selección de muestras.
 - [ ] Objetivo de latencia para pruebas con APIs grandes y cómo se mide.
 - [ ] Umbral de confianza (hoy `nominal`; se expone en `/api/metadatos`).
