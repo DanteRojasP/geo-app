@@ -162,6 +162,10 @@ class RateLimiter:
         self.enabled = params.enabled
         env_trust = os.environ.get("FIRECAL_TRUST_PROXY") == "1"
         self.trust_proxy = params.trust_proxy_headers or env_trust
+        # Cuántos proxies agregan IP al final de X-Forwarded-For. En Cloud Run son 2 (el visitante
+        # queda penúltimo): con 1, todos los visitantes compartían el cupo del proxy de Google
+        # (comprobado en producción el 14-nov). FIRECAL_PROXY_HOPS lo fija sin reconstruir.
+        self.proxy_hops = int(os.environ.get("FIRECAL_PROXY_HOPS") or params.proxy_hops)
         self.general = TokenBuckets(params.requests_per_minute, params.burst, params.max_clients)
         self.heavy = TokenBuckets(params.heavy_per_minute, params.heavy_burst, params.max_clients)
         self._lock = threading.Lock()
@@ -171,7 +175,7 @@ class RateLimiter:
         """None si pasa; si no, la respuesta 429 lista para devolver."""
         if not self.enabled or not request.url.path.startswith("/api/"):
             return None
-        key = client_key(request, self.trust_proxy, self.params.proxy_hops)
+        key = client_key(request, self.trust_proxy, self.proxy_hops)
         ok, wait, remaining = self.general.take(key)
         limit = self.params.burst
         if ok and is_heavy(request):

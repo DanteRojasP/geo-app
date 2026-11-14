@@ -79,7 +79,8 @@ $IMG = "southamerica-east1-docker.pkg.dev/sonic-mile-514718-r5/firecal/firecal-c
 docker build -f plataforma_local/Dockerfile -t $IMG .
 docker push $IMG
 gcloud run deploy firecal --image $IMG --region southamerica-east1 --memory 1Gi `
-  --min-instances 1 --max-instances 2 --allow-unauthenticated --set-env-vars FIRECAL_TRUST_PROXY=1
+  --min-instances 1 --max-instances 2 --allow-unauthenticated `
+  --set-env-vars FIRECAL_TRUST_PROXY=1,FIRECAL_PROXY_HOPS=2
 ```
 Cloud Run define `PORT` y la imagen lo respeta. Después de la evaluación: `--min-instances 0` o borrar el servicio.
 

@@ -97,7 +97,7 @@ api:
     max_concurrent_heavy: 2
     queue_timeout_s: 2.0
     trust_proxy_headers: false         # true SOLO detrás de Azure/Cloud Run (FIRECAL_TRUST_PROXY=1)
-    proxy_hops: 1                      # IP real = la proxy_hops-ésima desde la derecha de X-Forwarded-For
+    proxy_hops: 1                      # IP real = la proxy_hops-ésima desde la derecha (Cloud Run: 2, con FIRECAL_PROXY_HOPS)
     max_clients: 10000
 
 synthetic:
