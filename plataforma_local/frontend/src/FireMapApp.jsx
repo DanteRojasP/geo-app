@@ -7,9 +7,10 @@ import * as maplibregl from 'maplibre-gl'
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import {
   CalendarDays, ChevronLeft, ChevronRight, CircleHelp, Download, Flame, Gauge, Info,
-  Layers3, MapPin, Pause, Play, Radar, Satellite, Scan, ShieldAlert, SlidersHorizontal,
+  Layers3, MapPin, MessageCircleQuestion, Pause, Play, Radar, Satellite, Scan, ShieldAlert, SlidersHorizontal,
   ThermometerSun, Trash2, X,
 } from 'lucide-react'
+import SimplePanel from './SimplePanel.jsx'
 import { CUSCO, downloadCsv, getCalendar, getFocos, getMetadata, getMonth, getRegion } from './services/api.js'
 
 maplibregl.setWorkerUrl(maplibreWorkerUrl)
@@ -258,6 +259,7 @@ function FireMapApp() {
   const [calendarOpen, setCalendarOpen] = useState(window.innerWidth >= 650
     && new URLSearchParams(window.location.search).get('calendario') !== '0')
   const [playing, setPlaying] = useState(false)
+  const [simpleOpen, setSimpleOpen] = useState(false)
   const [detailsOpen, setDetailsOpen] = useState(true)
   const [layersOpen, setLayersOpen] = useState(true)
   const [selectionMode, setSelectionMode] = useState(false)
@@ -534,6 +536,7 @@ function FireMapApp() {
         <button className="is-active" title="Focos"><Flame size={20}/><span>Focos</span></button>
         <button className={calendarOpen ? 'is-active' : ''} title="Calendario" onClick={() => setCalendarOpen((v) => !v)}><CalendarDays size={20}/><span>Calendario</span></button>
         <button className={selectionMode ? 'is-active select' : ''} title="Seleccionar área" onClick={toggleSelectionMode}><Scan size={20}/><span>Área</span></button>
+        <button className={simpleOpen ? 'is-active' : ''} title="El fuego en simple: respuestas y gráficos" onClick={() => setSimpleOpen((v) => !v)}><MessageCircleQuestion size={20}/><span>En simple</span></button>
         <button title="Capas" onClick={() => setLayersOpen((v) => !v)}><Layers3 size={20}/><span>Capas</span></button>
         <button title="Información" onClick={() => setDetailsOpen((v) => !v)}><Info size={20}/><span>Info</span></button>
       </nav>
@@ -579,6 +582,7 @@ function FireMapApp() {
         </div>}
         <div className="fw-selection-actions"><button onClick={toggleSelectionMode}><Scan size={15}/>Redibujar</button><button onClick={() => selection?.bbox && runDownload(selection.bbox, 'del área')} disabled={!selection?.calendar}><Download size={15}/>CSV</button></div>
       </aside>}
+      {simpleOpen && <SimplePanel aoi={selection?.bbox || aoi} etiqueta={selection?.bbox ? 'area' : 'cusco'} onClose={() => setSimpleOpen(false)}/>}
       {calendarOpen && <CalendarPanel calendar={calendar} mode={calendarMode} setMode={setCalendarMode} selected={selected} onSelect={selectMonth} onClose={() => setCalendarOpen(false)}/>}
       <section className="fw-timeline">
         <button className="fw-play" onClick={() => setPlaying((v) => !v)} title={playing ? 'Pausar' : 'Recorrer los meses del año'}>{playing ? <Pause size={20}/> : <Play size={20}/>}</button>

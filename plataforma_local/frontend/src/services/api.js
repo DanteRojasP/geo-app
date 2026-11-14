@@ -33,6 +33,9 @@ export const getMetadata = () => request('/api/metadatos')
 export const getCalendar = (aoi, fechaInicio, fechaFin) =>
   request('/api/calendario', { ...aoi, fecha_inicio: fechaInicio, fecha_fin: fechaFin })
 export const getMonth = (aoi, mes) => request('/api/anomalias', { ...aoi, mes })
+// Analíticas "en simple": cada respuesta trae titulo, en_simple, como_leerlo y los datos.
+export const getResumen = (aoi) => request('/api/resumen', aoi)
+export const getAnalitica = (nombre, aoi, extra = {}) => request(`/api/analitica/${nombre}`, { ...aoi, ...extra })
 export const getFocos = (aoi, fechaInicio, fechaFin) =>
   request('/api/focos.geojson', { ...aoi, fecha_inicio: fechaInicio, fecha_fin: fechaFin })
 

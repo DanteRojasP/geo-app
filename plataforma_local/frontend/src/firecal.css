@@ -34,3 +34,25 @@
 .fw-summary{max-height:calc(100dvh - 230px);overflow-y:auto}
 @media(max-width:950px){.fc-calendar{left:18px;right:18px;bottom:112px}}
 @media(max-width:650px){.fc-calendar{left:10px;right:10px;bottom:100px;max-height:45dvh}}
+/* Panel "En simple": frases y gráficos descargables (SimplePanel.jsx). */
+.fs-panel{position:absolute;z-index:700;left:88px;right:18px;top:80px;bottom:112px;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:16px;backdrop-filter:blur(20px);box-shadow:0 22px 60px rgba(0,0,0,.3);overflow:hidden}
+.fs-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:14px 18px 10px;border-bottom:1px solid var(--line)}
+.fs-head p{margin:0;font:8px var(--mono);letter-spacing:.12em;color:var(--green)}
+.fs-head h2{margin:4px 0 0;font-size:16px;font-weight:600}
+.fs-head button,.fs-actions button{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);border-radius:8px;background:transparent;color:inherit;font:inherit;font-size:12px;padding:6px 9px;cursor:pointer}
+.fs-body{overflow:auto;padding:14px 18px 18px}
+.fs-frases{margin:0 0 16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px 22px}
+.fs-frases dt{font-size:12px;font-weight:600;color:var(--green)}
+.fs-frases dd{margin:3px 0 0;font-size:14px;line-height:1.45}
+.fs-charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:14px;margin-bottom:12px}
+.fs-chart{border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.fs-chart header{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px}
+.fs-chart h3{margin:0;font-size:13px;font-weight:600}
+.fs-chart select{font:inherit;font-size:12px;padding:4px 8px;border-radius:8px;border:1px solid var(--line);background:#fff;color:#1d2330}
+.fs-svg{background:#fff;border-radius:8px;padding:4px}
+.fs-svg svg{display:block;width:100%;height:auto}
+.fs-answer{margin:10px 0 4px;font-size:13.5px;line-height:1.45}
+.fs-how{margin:0;font-size:11.5px;color:var(--muted);line-height:1.4}
+.fs-error{margin:0 0 10px;color:#f87171;font-size:13px}
+.fs-actions{display:flex;gap:8px;margin-top:10px}
+@media(max-width:650px){.fs-panel{left:10px;right:10px;top:70px;bottom:100px}}
