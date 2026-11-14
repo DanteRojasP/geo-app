@@ -1,8 +1,9 @@
 """Consultas sobre los datos armonizados de Cusco (Parquet + DuckDB).
 
 Unidad (MAESTRO §1.2 y §12): **focos armonizados** = celdas de ~1 km con fuego por día, en escala
-equivalente a MODIS. El valor de un periodo es la suma de ``eq_hotspots`` (celda-día) o de
-``eq_foco`` (focos): nunca se cuentan filas ni se suma ``n_modis + n_viirs``. El FRP no se usa.
+equivalente a MODIS. En la API el campo es ``focos_armonizados`` (decisión del equipo): la suma
+de ``eq_hotspots`` (celda-día) o de ``eq_foco`` (focos); nunca se cuentan filas ni se suma
+``n_modis + n_viirs``. El FRP no se usa.
 
 AOI:
 - ``departamento=PE-CUS``: todo Cusco; el calendario suma ``eq_hotspots`` del CSV de celda-día.
@@ -42,13 +43,19 @@ FUENTE = {"extrapolado": "Terra*kT", "mixto": "Terra*kT + MODIS", "referencia": 
 CATEGORY_EDGES = [(-1.0, "muy por debajo"), (-0.5, "por debajo"), (0.5, "normal"),
                   (1.0, "por encima"), (math.inf, "muy por encima")]
 EARTH_KM = 6371.0088
-UNIDAD = ("Focos armonizados: celdas de ~1 km con fuego por día, en escala equivalente a MODIS. "
-          "Combina MODIS (2000–2012) y VIIRS (2013 en adelante).")
+UNIDAD = {"nombre": "Focos armonizados", "nombre_en": "Harmonized hotspots",
+          "definicion": "Focos armonizados: celdas de ~1 km con fuego por día, en escala "
+                        "equivalente a MODIS. Combina MODIS (2000–2012) y VIIRS (2013 en "
+                        "adelante)."}
+# Error mensual de kT (MAESTRO §7) por estrato: margen de los focos extrapolados.
+ERROR_EXTRAPOLADO = {"alto": 0.41, "bajo": 0.45}
+CATEGORIA_INCIERTA = "incierta"
 NOTE_2025 = ("2025: el valor es el que registra VIIRS. MODIS cae más que VIIRS ese año (posible "
              "deriva orbital, no verificada), pero no afecta a la serie, que usa VIIRS desde 2013. "
              "El último día (31-dic) puede estar incompleto.")
 NOTE_EXTRAPOLADO = ("2000-11 a 2002-06: solo Terra, escalado con kT (calidad 'extrapolado', error "
-                    "mensual ~41–45 %). Se muestra atenuado.")
+                    "mensual ~41–45 %). Se muestra atenuado y con su margen ('rango'); si el "
+                    "margen cruza de categoría, la anomalía se marca 'incierta'.")
 NOTE_CUSTOM = ("Área dibujada: el total es la suma de eq_foco de los focos dentro del área "
                "(igual a la suma de la descarga CSV).")
 
@@ -287,46 +294,84 @@ class PlanStore:
         return self._flight.run(key, lambda: self._monthly_cache.get(key), compute)
 
     def _monthly(self, aoi: AOI) -> pd.DataFrame:
+        """Σ focos armonizados por mes (con ceros), calidad, margen, mediana y anomalía.
+
+        Margen de los meses con focos extrapolados (método de Antonio, antonio/backend-modelo):
+        ``incertidumbre`` = error mensual del estrato (41 % sobre 2500 m, 45 % debajo, MAESTRO §7)
+        x focos armonizados extrapolados; ``rango`` = valor ± incertidumbre (mínimo 0) y
+        ``anomalia_rango`` su efecto en la anomalía. Si el rango cruza de categoría, la categoría
+        es ``incierta``.
+        """
         cur = self.cursor()
         if aoi.whole_region:
             df = cur.execute(
-                "SELECT anio, mes, sum(eq_hotspots) AS eq_hotspots, count(*) AS celdas_dia, "
+                "SELECT anio, mes, sum(eq_hotspots) AS focos_armonizados, count(*) AS celdas_dia, "
                 "sum(n_modis) AS focos_modis, sum(n_viirs) AS focos_viirs, "
-                "sum(CASE WHEN calidad = 'extrapolado' THEN eq_hotspots ELSE 0 END) AS eq_ext "
+                "sum(CASE WHEN calidad = 'extrapolado' AND alt_m >= 2500 THEN eq_hotspots "
+                "ELSE 0 END) AS ext_alto, "
+                "sum(CASE WHEN calidad = 'extrapolado' AND NOT coalesce(alt_m >= 2500, false) "
+                "THEN eq_hotspots ELSE 0 END) AS ext_bajo "
                 "FROM cd GROUP BY 1, 2").df()
         else:
             df = cur.execute(
-                "SELECT anio, mes, sum(eq_foco) AS eq_hotspots, "
+                "SELECT anio, mes, sum(eq_foco) AS focos_armonizados, "
                 "count(DISTINCT CASE WHEN en_serie = 1 THEN fecha_local || '|' || cell_lat || '|' "
                 "|| cell_lon END) AS celdas_dia, "
                 "count(*) FILTER (WHERE sensor = 'MODIS') AS focos_modis, "
                 "count(*) FILTER (WHERE sensor = 'VIIRS') AS focos_viirs, "
-                "sum(CASE WHEN calidad = 'extrapolado' THEN eq_foco ELSE 0 END) AS eq_ext "
+                "sum(CASE WHEN calidad = 'extrapolado' AND alt_m >= 2500 THEN eq_foco "
+                "ELSE 0 END) AS ext_alto, "
+                "sum(CASE WHEN calidad = 'extrapolado' AND NOT coalesce(alt_m >= 2500, false) "
+                "THEN eq_foco ELSE 0 END) AS ext_bajo "
                 f"FROM fo WHERE {aoi.sql} GROUP BY 1, 2", list(aoi.params)).df()
         cur.close()
         months = _month_range(COVER_FROM, COVER_TO)
         full = pd.DataFrame(months, columns=["anio", "mes"])
         full = full.merge(df.astype({"anio": int, "mes": int}), on=["anio", "mes"], how="left")
-        for c in ("eq_hotspots", "celdas_dia", "focos_modis", "focos_viirs", "eq_ext"):
-            full[c] = full[c].fillna(0)
-        con_focos = full["eq_hotspots"] > 0
-        full["fraccion_extrapolada"] = (full["eq_ext"] / full["eq_hotspots"].where(con_focos, 1.0)
+        for c in ("focos_armonizados", "celdas_dia", "focos_modis", "focos_viirs", "ext_alto",
+                  "ext_bajo"):
+            full[c] = full[c].fillna(0).astype(float)
+        ext = full["ext_alto"] + full["ext_bajo"]
+        con_focos = full["focos_armonizados"] > 0
+        full["fraccion_extrapolada"] = (ext / full["focos_armonizados"].where(con_focos, 1.0)
                                         ).clip(0, 1)
         q = [month_quality(y, m, f if tiene else None) for (y, m), f, tiene
              in zip(months, full["fraccion_extrapolada"], con_focos, strict=True)]
         full["calidad"] = [c for c, _ in q]
         full["fuente_serie"] = [f for _, f in q]
         full["parcial"] = [(y, m) == COVER_FROM for y, m in months]   # empieza el 2000-11-04
+        full["incertidumbre"] = (ERROR_EXTRAPOLADO["alto"] * full["ext_alto"]
+                                 + ERROR_EXTRAPOLADO["bajo"] * full["ext_bajo"])
+        full["n_min"] = (full["focos_armonizados"] - full["incertidumbre"]).clip(lower=0.0)
+        full["n_max"] = full["focos_armonizados"] + full["incertidumbre"]
 
+        # Historia de la mediana: solo meses completos sin focos extrapolados.
         base = full[full["calidad"].isin(["referencia", "calibrado"]) & ~full["parcial"]]
-        stats = base.groupby("mes")["eq_hotspots"].agg(
+        stats = base.groupby("mes")["focos_armonizados"].agg(
             mediana_hist="median", p25=lambda s: s.quantile(0.25),
             p75=lambda s: s.quantile(0.75), n_anios="size").reset_index()
         full = full.merge(stats, on="mes", how="left")
         iqr = np.maximum(full["p75"] - full["p25"], 1.0)
-        anom = (full["eq_hotspots"] - full["mediana_hist"]) / iqr
-        full["anomalia"] = anom.where((full["n_anios"] >= MIN_YEARS) & ~full["parcial"])
+        ok = (full["n_anios"] >= MIN_YEARS) & ~full["parcial"]
+        for col, src in (("anomalia", "focos_armonizados"), ("anomalia_min", "n_min"),
+                         ("anomalia_max", "n_max")):
+            full[col] = ((full[src] - full["mediana_hist"]) / iqr).where(ok)
         return full
+
+    @staticmethod
+    def _row_category(r) -> str | None:
+        """Categoría de la anomalía; ``incierta`` si el margen la hace cruzar de categoría."""
+        cat = category(_num(r.anomalia))
+        if cat is None or not r.incertidumbre:
+            return cat
+        lo, hi = category(_num(r.anomalia_min)), category(_num(r.anomalia_max))
+        return cat if lo == hi else CATEGORIA_INCIERTA
+
+    @staticmethod
+    def _margin(r) -> dict:
+        return {"incertidumbre": _num(r.incertidumbre, 1),
+                "rango": [_num(r.n_min, 1), _num(r.n_max, 1)],
+                "anomalia_rango": [_num(r.anomalia_min), _num(r.anomalia_max)]}
 
     def _range(self, inicio: str | None, fin: str | None) -> tuple[tuple, tuple]:
         a = parse_month(inicio, "fecha_inicio") or COVER_FROM
@@ -338,6 +383,11 @@ class PlanStore:
             raise PlanNoData(f"Sin datos: la serie cubre de {COVER_FROM[0]}-{COVER_FROM[1]:02d} "
                              f"(desde el 2000-11-04) a {COVER_TO[0]}-{COVER_TO[1]:02d}.")
         return a, b
+
+    def _row(self, aoi: AOI, ym: tuple[int, int]):
+        full = self.monthly(aoi)
+        return full, next(full[(full["anio"] == ym[0]) & (full["mes"] == ym[1])]
+                          .itertuples(index=False))
 
     def calendar(self, aoi: AOI, inicio: str | None, fin: str | None) -> dict:
         a, b = self._range(inicio, fin)
@@ -356,15 +406,17 @@ class PlanStore:
             if r is None:                       # fuera de la cobertura: sin dato, no cero
                 cells.append({"anio": y, "mes": m, "sin_dato": True})
                 continue
-            v, anom = _num(r.eq_hotspots, 2), _num(r.anomalia)
+            v, anom = _num(r.focos_armonizados, 2), _num(r.anomalia)
             mat_v[i][j], mat_a[i][j] = v, anom
             values.append(v)
-            total += float(r.eq_hotspots)
-            cells.append({"anio": y, "mes": m, "sin_dato": False, "eq_hotspots": v,
+            total += float(r.focos_armonizados)
+            cells.append({"anio": y, "mes": m, "sin_dato": False, "focos_armonizados": v,
                           "celdas_dia": int(r.celdas_dia), "focos_modis": int(r.focos_modis),
                           "focos_viirs": int(r.focos_viirs), "mediana_hist": _num(r.mediana_hist),
-                          "anomalia": anom, "categoria": category(anom), "calidad": r.calidad,
+                          "anomalia": anom, "categoria": self._row_category(r),
+                          "calidad": r.calidad,
                           "fraccion_extrapolada": _num(r.fraccion_extrapolada, 3),
+                          **self._margin(r),
                           "fuente_serie": r.fuente_serie, "parcial": bool(r.parcial)})
         notes = []
         if any(c.get("calidad") in ("extrapolado", "mixto") for c in cells):
@@ -377,8 +429,8 @@ class PlanStore:
             notes.append(NOTE_CUSTOM)
         return {"aoi": aoi.info(), "unidad": UNIDAD, "fecha_inicio": f"{a[0]}-{a[1]:02d}",
                 "fecha_fin": f"{b[0]}-{b[1]:02d}", "anios": years, "meses": list(range(1, 13)),
-                "matriz_eq_hotspots": mat_v, "matriz_anomalia": mat_a,
-                "total_eq_hotspots": round(total, 2), "cortes_color": color_breaks(values),
+                "matriz_focos_armonizados": mat_v, "matriz_anomalia": mat_a,
+                "total_focos_armonizados": round(total, 2), "cortes_color": color_breaks(values),
                 "celdas": cells, "notes": notes}
 
     def anomaly(self, aoi: AOI, mes: str) -> dict:
@@ -387,8 +439,7 @@ class PlanStore:
             raise PlanError("Indica 'mes' con el formato AAAA-MM.")
         if not COVER_FROM <= ym <= COVER_TO:
             raise PlanNoData(f"Sin datos para {mes}: la serie cubre de 2000-11 a 2025-12.")
-        full = self.monthly(aoi)
-        r = full[(full["anio"] == ym[0]) & (full["mes"] == ym[1])].iloc[0]
+        full, r = self._row(aoi, ym)
         hist = full[(full["mes"] == ym[1]) & full["calidad"].isin(["referencia", "calibrado"])
                     & ~full["parcial"]]
         cur = self.cursor()
@@ -400,27 +451,61 @@ class PlanStore:
                                "anio = ? AND mes = ? AND en_serie = 1 GROUP BY 1 ORDER BY 1",
                                [*aoi.params, ym[0], ym[1]]).fetchall()
         cur.close()
-        anom = _num(r["anomalia"])
+        anom = _num(r.anomalia)
         notes = []
-        if r["calidad"] in ("extrapolado", "mixto"):
+        if r.calidad in ("extrapolado", "mixto"):
             notes.append(NOTE_EXTRAPOLADO)
         if ym[0] == 2025:
             notes.append(NOTE_2025)
-        if anom is None and not bool(r["parcial"]):
+        if anom is None and not bool(r.parcial):
             notes.append(f"Sin anomalía: hay menos de {MIN_YEARS} años de historia.")
-        if bool(r["parcial"]):
+        if bool(r.parcial):
             notes.append("Mes parcial (la serie empieza el 2000-11-04): sin anomalía.")
         return {"aoi": aoi.info(), "unidad": UNIDAD, "mes": f"{ym[0]}-{ym[1]:02d}",
-                "eq_hotspots": _num(r["eq_hotspots"]), "celdas_dia": int(r["celdas_dia"]),
-                "focos_modis": int(r["focos_modis"]), "focos_viirs": int(r["focos_viirs"]),
-                "calidad": r["calidad"], "fuente_serie": r["fuente_serie"],
-                "mediana_hist": _num(r["mediana_hist"]), "p25": _num(r["p25"]),
-                "p75": _num(r["p75"]), "n_anios_hist": int(r["n_anios"] or 0),
-                "anomalia": anom, "categoria": category(anom), "parcial": bool(r["parcial"]),
-                "historial": [{"anio": int(x.anio), "eq_hotspots": _num(x.eq_hotspots)}
+                "focos_armonizados": _num(r.focos_armonizados),
+                "celdas_dia": int(r.celdas_dia),
+                "focos_modis": int(r.focos_modis), "focos_viirs": int(r.focos_viirs),
+                "calidad": r.calidad, "fuente_serie": r.fuente_serie,
+                "fraccion_extrapolada": _num(r.fraccion_extrapolada, 3), **self._margin(r),
+                "mediana_hist": _num(r.mediana_hist), "p25": _num(r.p25),
+                "p75": _num(r.p75), "n_anios_hist": int(r.n_anios or 0),
+                "anomalia": anom, "categoria": self._row_category(r),
+                "parcial": bool(r.parcial),
+                "historial": [{"anio": int(x.anio), "focos_armonizados": _num(x.focos_armonizados)}
                               for x in hist.itertuples(index=False)],
-                "dias": [{"fecha_local": d, "eq_hotspots": _num(v, 3)} for d, v in days],
+                "dias": [{"fecha_local": d, "focos_armonizados": _num(v, 3)} for d, v in days],
                 "notes": notes}
+
+    # ---------------------------------------------------------------- puntos para el mapa
+    def focos_geojson(self, aoi: AOI, inicio: str | None, fin: str | None) -> dict:
+        """Focos del rango como GeoJSON para el mapa. Peso = ``eq_foco`` (sin FRP)."""
+        if inicio in (None, "") or fin in (None, ""):
+            raise PlanError("Para el mapa indica 'fecha_inicio' y 'fecha_fin' (AAAA-MM).")
+        a, b = self._range(inicio, fin)
+        where = f"WHERE {aoi.sql} AND (anio * 100 + mes) BETWEEN ? AND ?"
+        params = [*aoi.params, a[0] * 100 + a[1], b[0] * 100 + b[1]]
+        limit = self.settings.params.api.max_geojson_features
+        cur = self.cursor()
+        n = cur.execute(f"SELECT count(*) FROM fo {where}", params).fetchall()[0][0]
+        if n > limit:
+            cur.close()
+            raise PlanError(f"El mapa tendría {n:,} focos; el máximo es {limit:,}. Usa un rango "
+                            "de fechas menor (la descarga CSV no tiene este límite).")
+        rows = cur.execute(
+            "SELECT longitude, latitude, fecha_local, hora_utc, sensor, satelite, eq_foco, "
+            f"en_serie, calidad FROM fo {where} ORDER BY fecha_local, hora_utc", params).fetchall()
+        cur.close()
+        feats = [{"type": "Feature",
+                  "geometry": {"type": "Point", "coordinates": [round(x, 5), round(y, 5)]},
+                  "properties": {"fecha_local": f, "hora_utc": h, "sensor": s, "satelite": sat,
+                                 "eq_foco": round(float(w), 4), "en_serie": int(e),
+                                 "calidad": c or ""}}
+                 for x, y, f, h, s, sat, w, e, c in rows]
+        total = round(sum(f["properties"]["eq_foco"] for f in feats), 2)
+        return {"type": "FeatureCollection", "aoi": aoi.info(),
+                "fecha_inicio": f"{a[0]}-{a[1]:02d}", "fecha_fin": f"{b[0]}-{b[1]:02d}",
+                "n_focos": len(feats), "total_focos_armonizados": total,
+                "features": feats, "notes": []}
 
     # ---------------------------------------------------------------- CSV
     def hotspots_query(self, aoi: AOI, inicio: str | None, fin: str | None

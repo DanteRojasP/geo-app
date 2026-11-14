@@ -143,6 +143,27 @@ Detalle en [`plataforma_local/README.md`](plataforma_local/README.md), sección 
       producto respecto al PLAN (Leaflet, calendario histórico de Cusco). Definir si se adapta al contrato de
       `/api/*` o si queda como una vista aparte de "actividad reciente".
 
+## Interfaz de Dante y decisiones del equipo (sáb 14 nov 2026, noche)
+
+Decisiones: MapLibre se queda, solo Cusco, los datos de Dante eran de prueba, se usa el margen de Antonio, el campo
+se llama `focos_armonizados`, sin FRP y Dockerfile según el de Antonio.
+
+- [x] **Interfaz de Dante adaptada** (`plataforma_local/frontend`, React + Vite + MapLibre):
+  - **Se mantuvo:** su diseño, paneles, capas, selección de área con vista satelital y barra temporal.
+  - **Se conectó** a `/api/*`.
+  - **Se quitó:** los datos demo, la función FIRMS en vivo de Vercel, los otros departamentos, el FRP y el
+    "riesgo" calculado con FRP.
+  - **Se agregó:** el calendario mes × año del PLAN.
+- [x] **Margen de los meses extrapolados** (método de Antonio): `incertidumbre`, `rango`, `anomalia_rango` y
+      categoría `incierta`. Reproduce exactamente su ejemplo de agosto de 2001 (176,02; rango 98,6–253,4).
+- [x] **API con `focos_armonizados`** (`total_focos_armonizados`, `matriz_focos_armonizados`, `unidad` con nombre y
+      definición) y nuevo `GET /api/focos.geojson` para el mapa (peso `eq_foco`, sin FRP).
+- [x] **Dockerfile basado en el de Antonio:** contexto en la raíz del repo, etapa Node para la interfaz y
+      validación MAESTRO §6. Probado desde el repo y desde la copia local (1,33 GB, ~130 MB de RAM).
+- [x] 142 pruebas del backend en verde y ESLint sin errores en la interfaz.
+- [x] Desplegado en la plataforma local (http://localhost:8000).
+- [ ] Siguiente: desplegar en Cloud Run (`docs/DESPLIEGUE_Y_FALENCIAS.md`, opción B) cuando el equipo lo decida.
+
 ## Pendientes que me afectan
 
 - [x] Datos reales de FIRMS (Cusco, de Antonio).

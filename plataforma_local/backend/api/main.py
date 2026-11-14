@@ -22,8 +22,9 @@ from firecal.plan.query import PlanStore
 from firecal.settings import PROJECT_ROOT, Settings, get_settings
 
 API_PREFIX = "/api/v1"
-# Frontend estático (Leaflet). FIRECAL_FRONTEND_DIR lo cambia (p. ej. en Docker); vacío = no servir.
-DEFAULT_FRONTEND = PROJECT_ROOT.parent / "frontend"
+# Frontend (React + MapLibre, base de Dante) ya compilado con `npm run build` en frontend/dist.
+# FIRECAL_FRONTEND_DIR lo cambia (p. ej. en Docker); vacío = no servir.
+DEFAULT_FRONTEND = PROJECT_ROOT.parent / "frontend" / "dist"
 
 
 class UTF8JSONResponse(JSONResponse):

@@ -1,90 +1,14 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>FireCal Cusco · Calendario de focos armonizados MODIS + VIIRS</title>
-  <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-  <link rel="stylesheet" href="app.css">
-</head>
-<body>
-  <header>
-    <div>
-      <h1>FireCal Cusco</h1>
-      <p class="sub">Calendario armonizado de focos de calor MODIS + VIIRS · NASA Space Apps 2026</p>
-    </div>
-    <div id="badge" class="badge">Datos NASA FIRMS · Cusco · 2000-11 a 2025-12</div>
-  </header>
-
-  <main>
-    <aside id="panel">
-      <section>
-        <h2>1. Área de interés</h2>
-        <div class="tabs" role="tablist">
-          <button type="button" class="tab active" data-mode="departamento">Todo Cusco</button>
-          <button type="button" class="tab" data-mode="bbox">Dibujar rectángulo</button>
-        </div>
-        <div id="mode-departamento">
-          <p class="hint">El prototipo cubre <b>solo Cusco</b>, la única región con armonización
-            validada.</p>
-        </div>
-        <div id="mode-bbox" hidden>
-          <p class="hint">Arrastra sobre el mapa, dentro de Cusco (máx. 50 000 km²).</p>
-          <p id="bbox-text" class="mono">Sin rectángulo</p>
-        </div>
-      </section>
-
-      <section>
-        <h2>2. Rango de fechas</h2>
-        <div class="row">
-          <div><label for="ini">Desde</label><input type="month" id="ini" min="2000-11" max="2025-12"></div>
-          <div><label for="fin">Hasta</label><input type="month" id="fin" min="2000-11" max="2025-12"></div>
-        </div>
-        <p class="hint">Serie histórica: 2000-11-04 a 2025-12-31.</p>
-      </section>
-
-      <section>
-        <h2>3. Color del calendario</h2>
-        <div class="tabs">
-          <button type="button" class="tab active" data-color="valor">Focos armonizados</button>
-          <button type="button" class="tab" data-color="anomalia">Anomalía</button>
-        </div>
-        <p class="hint" id="unit-def">Focos armonizados: celdas de ~1 km con fuego por día, en
-          escala equivalente a MODIS.</p>
-      </section>
-
-      <button id="go" class="primary" type="button">Consultar</button>
-      <div id="total" class="total" hidden></div>
-      <button id="csv" class="secondary" type="button">Descargar CSV de focos</button>
-      <div id="msg" class="msg" role="status" aria-live="polite"></div>
-    </aside>
-
-    <div id="content">
-      <div id="map" aria-label="Mapa"></div>
-      <section id="cal-wrap">
-        <div class="cal-head">
-          <h2 id="cal-title">Calendario</h2>
-          <span id="latency" class="mono"></span>
-        </div>
-        <div id="cal" class="cal"><p class="hint">Cargando…</p></div>
-        <div id="legend" class="legend"></div>
-        <div id="notes" class="notes"></div>
-        <div id="detail" class="detail" hidden></div>
-      </section>
-    </div>
-  </main>
-
-  <footer>
-    <details>
-      <summary>Metodología y créditos</summary>
-      <div id="method"></div>
-    </details>
-    <p>We acknowledge the use of data and/or imagery from NASA's FIRMS
-      (<a href="https://earthdata.nasa.gov/firms" target="_blank" rel="noopener">earthdata.nasa.gov/firms</a>).
-      Límite de Cusco: FAO GAUL 2015. Altitud: SRTM. Mapa base © OpenStreetMap.</p>
-  </footer>
-
-  <script src="vendor/leaflet/leaflet.js"></script>
-  <script src="app.js"></script>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#081713" />
+    <meta name="description" content="Calendario armonizado de focos de calor MODIS + VIIRS para Cusco (NASA FIRMS, 2000-2025)." />
+    <title>FireCal Cusco · Calendario armonizado MODIS + VIIRS</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
 </html>

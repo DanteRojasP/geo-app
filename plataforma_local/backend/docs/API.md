@@ -181,8 +181,9 @@ Desde el 14-nov sirven los **datos reales de Cusco** (MAESTRO.md) y la documenta
 | Ruta | Respuesta principal |
 | --- | --- |
 | `GET /api/departamentos` | `departamentos: [{code: "PE-CUS", ...}]`, `geojson` (límite FAO GAUL) |
-| `GET /api/calendario` | `matriz_eq_hotspots`, `matriz_anomalia`, `total_eq_hotspots`, `cortes_color`, `celdas[]` |
-| `GET /api/anomalias` | `eq_hotspots`, `mediana_hist`, `anomalia`, `calidad`, `historial[]`, `dias[]` |
+| `GET /api/calendario` | `matriz_focos_armonizados`, `matriz_anomalia`, `total_focos_armonizados`, `cortes_color`, `celdas[]` (con `rango` e `incertidumbre`) |
+| `GET /api/anomalias` | `focos_armonizados`, `rango`, `mediana_hist`, `anomalia`, `categoria`, `calidad`, `historial[]`, `dias[]` |
+| `GET /api/focos.geojson` | focos como puntos para el mapa (`eq_foco`, sensor, fecha, calidad) |
 | `GET /api/hotspots.csv` | CSV con las 18 columnas del contrato de focos (`harmonizacion/docs/CONTRATO_focos.md`) |
 | `GET /api/metadatos` | unidad, factores k y kT, calidad, cobertura, sumas de control, créditos |
 

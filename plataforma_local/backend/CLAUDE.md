@@ -140,6 +140,9 @@ models/artifacts/  reports/  docs/  tests/
   + `cusco_limite.geojson` + `plan_meta.json`. Falla si los datos no coinciden (DataContractError).
 - Reglas del equipo (MAESTRO §1 y §12): solo Cusco; unidad "focos armonizados" = Σ eq_hotspots / Σ eq_foco; no contar
   filas; no usar FRP; no usar la palabra "evento"; fuera de cobertura = "sin datos" (404), nunca 0.
+- Campo de la API: `focos_armonizados` (decisión del equipo). Margen de extrapolados (Antonio): 41 % / 45 % por
+  estrato -> `incertidumbre`, `rango`, `anomalia_rango`, categoría `incierta`.
+- Interfaz: `../frontend` (React + MapLibre, base de Dante); se sirve compilada desde `frontend/dist`.
 - `firecal.plan.query.PlanStore`: departamento -> tabla celda-día; bbox/punto -> focos por latitude/longitude (el total
   coincide con la descarga). Anomalía C sobre meses referencia/calibrado.
 - `/api/v1` (sintético) apagado: `api.legacy_v1: false`. Los tests del backend anterior lo activan en `pipeline_home`.

@@ -64,12 +64,24 @@ az containerapp up -n firecal -g firecal-rg --image firecalacr<sufijo>.azurecr.i
 az containerapp update -n firecal -g firecal-rg --min-replicas 1 --max-replicas 2 --cpu 0.5 --memory 1.0Gi
 ```
 
-### Opción B: Google Cloud Run (beneficio Google Cloud)
+### Opción B: Google Cloud Run (beneficio Google Cloud; proyecto `sonic-mile-514718-r5` listo)
+
+El `Dockerfile` está en `plataforma_local/` y usa la **raíz del repositorio** como contexto. Por eso se
+construye en local y se sube la imagen, en lugar de usar `--source`:
 
 ```powershell
-gcloud run deploy firecal --source . --region southamerica-east1 --memory 1Gi --min-instances 1 --max-instances 2 --allow-unauthenticated
+# Desde la raíz del repositorio (una sola vez: crear el repositorio de imágenes)
+gcloud artifacts repositories create firecal --repository-format=docker --location=southamerica-east1
+gcloud auth configure-docker southamerica-east1-docker.pkg.dev
+
+# Construir, subir y desplegar
+$IMG = "southamerica-east1-docker.pkg.dev/sonic-mile-514718-r5/firecal/firecal-cusco:v1"
+docker build -f plataforma_local/Dockerfile -t $IMG .
+docker push $IMG
+gcloud run deploy firecal --image $IMG --region southamerica-east1 --memory 1Gi `
+  --min-instances 1 --max-instances 2 --allow-unauthenticated --set-env-vars FIRECAL_TRUST_PROXY=1
 ```
-Cloud Run define `PORT`; el `Dockerfile` ya lo respeta.
+Cloud Run define `PORT` y la imagen lo respeta. Después de la evaluación: `--min-instances 0` o borrar el servicio.
 
 ### Dominio (beneficio GoDaddy Registry)
 
@@ -121,3 +133,12 @@ Parámetros: `config/settings.yaml → api.rate_limit` y `api.max_csv_rows`.
 - Para Cloud Run o Azure: construir desde la raíz del repo (para que los contextos existan) o usar la imagen ya
   construida (`docker compose build`, luego `docker push` al registro de la nube).
 - El backend anterior sintético (`/api/v1`) quedó apagado (`api.legacy_v1: false`): no hay datos simulados expuestos.
+
+## 7. Cambios del 14-nov (noche): interfaz de Dante y Dockerfile de Antonio
+
+- **Dockerfile** basado en `Dockerfile.modelo` de Antonio: contexto = raíz del repositorio y datos dentro de la
+  imagen. Se agregaron una etapa Node que compila la interfaz y la validación con `firecal plan-events`.
+  Imagen de 1,33 GB, ~130 MB de RAM y construcción de ~2 min.
+- **Interfaz** de Dante (React + MapLibre) servida por la misma API: no hace falta CORS mientras vayan juntas.
+- **Tiles externos:** el mapa base usa OpenFreeMap y la vista satelital Esri World Imagery. Ambos son gratuitos
+  con atribución; para tráfico alto, revisar sus condiciones de uso (falencia 5).

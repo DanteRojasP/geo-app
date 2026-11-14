@@ -78,17 +78,18 @@ def test_health_and_departamentos(api):
 
 def test_maestro_case_whole_period(api):
     b = _cal(api)
-    assert abs(b["total_eq_hotspots"] - 15732) <= 1
+    assert abs(b["total_focos_armonizados"] - 15732) <= 1
     assert sum(c.get("celdas_dia", 0) for c in b["celdas"]) == 36260
     assert b["fecha_inicio"] == "2000-11" and b["fecha_fin"] == "2025-12"
-    assert "Focos armonizados" in b["unidad"]
+    assert b["unidad"]["nombre"] == "Focos armonizados"
+    assert "eq_hotspots" not in b["celdas"][5]          # el campo de la API es focos_armonizados
 
 
 @pytest.mark.parametrize(("year", "expected"), [(2005, 1355), (2012, 678), (2013, 424),
                                                 (2020, 1206), (2025, 385)])
 def test_maestro_cases_by_year(api, year, expected):
     b = _cal(api, fecha_inicio=f"{year}-01", fecha_fin=f"{year}-12")
-    assert abs(b["total_eq_hotspots"] - expected) <= 1
+    assert abs(b["total_focos_armonizados"] - expected) <= 1
 
 
 @pytest.mark.parametrize("params", [
@@ -105,10 +106,10 @@ def test_maestro_sin_datos_not_zero(api, params):
 def test_months_outside_coverage_are_sin_dato(api):
     b = _cal(api, fecha_inicio="2000-01", fecha_fin="2001-12")
     by = {(c["anio"], c["mes"]): c for c in b["celdas"]}
-    assert by[(2000, 10)]["sin_dato"] and "eq_hotspots" not in by[(2000, 10)]
+    assert by[(2000, 10)]["sin_dato"] and "focos_armonizados" not in by[(2000, 10)]
     assert not by[(2000, 11)]["sin_dato"] and by[(2000, 11)]["parcial"]
     assert by[(2001, 1)]["calidad"] == "extrapolado"
-    assert b["matriz_eq_hotspots"][0][9] is None                     # 2000-10: null, no 0
+    assert b["matriz_focos_armonizados"][0][9] is None                     # 2000-10: null, no 0
     assert any("extrapolado" in n for n in b["notes"])
 
 
@@ -139,15 +140,15 @@ def test_screen_total_equals_download_sum(api, aoi):
     q = {**aoi, "fecha_inicio": "2019-01", "fecha_fin": "2021-12"}
     cal = api.get("/api/calendario", params=q).json()
     rows = _csv_rows(api.get("/api/hotspots.csv", params=q))
-    assert abs(sum(float(x["eq_foco"]) for x in rows) - cal["total_eq_hotspots"]) <= 1
+    assert abs(sum(float(x["eq_foco"]) for x in rows) - cal["total_focos_armonizados"]) <= 1
 
 
 def test_anomalias_with_daily_detail(api):
     b = api.get("/api/anomalias", params={"departamento": "PE-CUS", "mes": "2020-09"}).json()
     assert b["calidad"] == "calibrado" and b["mediana_hist"] is not None
-    assert abs(sum(d["eq_hotspots"] for d in b["dias"]) - b["eq_hotspots"]) < 0.05
+    assert abs(sum(d["focos_armonizados"] for d in b["dias"]) - b["focos_armonizados"]) < 0.05
     assert len(b["historial"]) >= 20
-    vals = sorted(h["eq_hotspots"] for h in b["historial"])
+    vals = sorted(h["focos_armonizados"] for h in b["historial"])
     assert b["mediana_hist"] == pytest.approx(vals[len(vals) // 2] if len(vals) % 2 else
                                               (vals[len(vals) // 2 - 1] + vals[len(vals) // 2]) / 2,
                                               abs=0.01)
@@ -183,6 +184,10 @@ def test_metadatos(api):
 
 
 def test_frontend_served(api):
+    from api.main import DEFAULT_FRONTEND
+
+    if not (DEFAULT_FRONTEND / "index.html").is_file():
+        pytest.skip("frontend sin compilar: cd frontend && npm run build")
     r = api.get("/")
     assert r.status_code == 200 and "FireCal Cusco" in r.text
 
@@ -212,3 +217,36 @@ def test_cors_extra_origins_from_env(plan_home, monkeypatch):
     assert r.headers.get("access-control-allow-origin") == "https://demo.vercel.app"
     r = c.get("/api/metadatos", headers={"Origin": "https://malo.example"})
     assert "access-control-allow-origin" not in r.headers
+
+
+def test_margin_matches_antonio_example(api):
+    """Ejemplo de antonio/backend-modelo (docs/DESPLIEGUE_MODELO.md): agosto de 2001."""
+    b = _cal(api, fecha_inicio="2001-08", fecha_fin="2001-08")
+    c = b["celdas"][0]
+    assert c["calidad"] == "extrapolado" and c["fraccion_extrapolada"] == 1
+    assert c["focos_armonizados"] == pytest.approx(176.02, abs=0.01)
+    assert c["mediana_hist"] == 151.5 and c["anomalia"] == pytest.approx(0.21, abs=0.01)
+    assert c["incertidumbre"] == pytest.approx(77.4, abs=0.1)
+    assert c["rango"] == [pytest.approx(98.6, abs=0.1), pytest.approx(253.4, abs=0.1)]
+    assert c["anomalia_rango"] == [pytest.approx(-0.45, abs=0.01), pytest.approx(0.87, abs=0.01)]
+    assert c["categoria"] == "incierta"
+
+
+def test_no_margin_outside_extrapolated(api):
+    c = _cal(api, fecha_inicio="2020-09", fecha_fin="2020-09")["celdas"][0]
+    assert c["incertidumbre"] == 0 and c["rango"][0] == c["rango"][1]
+    assert c["rango"][0] == pytest.approx(c["focos_armonizados"], abs=0.06)
+    assert c["categoria"] != "incierta"
+
+
+def test_focos_geojson_for_map(api):
+    q = {"departamento": "PE-CUS", "fecha_inicio": "2020-09", "fecha_fin": "2020-09"}
+    g = api.get("/api/focos.geojson", params=q).json()
+    cal = api.get("/api/calendario", params=q).json()
+    assert g["type"] == "FeatureCollection" and g["n_focos"] == len(g["features"]) > 0
+    assert abs(g["total_focos_armonizados"] - cal["total_focos_armonizados"]) < 0.05
+    props = g["features"][0]["properties"]
+    assert "frp" not in props and {"eq_foco", "sensor", "fecha_local"} <= set(props)
+    big = api.get("/api/focos.geojson", params={"departamento": "PE-CUS",
+                                                "fecha_inicio": "2000-11", "fecha_fin": "2025-12"})
+    assert big.status_code == 422 and "máximo" in big.json()["detail"]

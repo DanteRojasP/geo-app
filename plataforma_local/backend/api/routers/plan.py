@@ -5,11 +5,12 @@
 - ``GET /api/calendario``     AOI + rango -> matriz mes x año de focos armonizados y anomalía.
 - ``GET /api/anomalias``      un mes frente a la mediana del mismo mes + detalle diario.
 - ``GET /api/hotspots.csv``   focos del rango con las 18 columnas del contrato (CSV UTF-8 con BOM).
+- ``GET /api/focos.geojson``   focos del rango como puntos para el mapa (peso = eq_foco, sin FRP).
 - ``GET /api/metadatos``      método, factores, calidad, cobertura, sumas de control y créditos.
 
 AOI: ``departamento=PE-CUS`` o ``bbox=oeste,sur,este,norte`` o ``lat`` + ``lon`` + ``radio_km``.
-Unidad: **focos armonizados** (MAESTRO §12); los campos conservan los nombres del contrato
-(``eq_hotspots``, ``eq_foco``).
+Unidad: **focos armonizados**; en la API el campo se llama ``focos_armonizados`` (decisión del
+equipo). La descarga CSV conserva las 18 columnas del contrato de focos (``eq_foco``).
 """
 
 from __future__ import annotations
@@ -106,7 +107,7 @@ def departamentos_geojson(request: Request) -> dict:
 def calendario(request: Request, departamento: Dep = None, bbox: BBox = None, lat: Lat = None,
                lon: Lon = None, radio_km: Radio = None, fecha_inicio: Inicio = None,
                fecha_fin: Fin = None) -> dict:
-    """Matriz mes x año de focos armonizados (Σ eq_hotspots), anomalía y cortes de color."""
+    """Matriz mes x año de focos armonizados, anomalía (con margen) y cortes de color."""
     store = _store(request)
     aoi = _call(store.resolve_aoi, departamento, bbox, lat, lon, radio_km)
     if _custom_aoi(bbox, lat):
@@ -126,6 +127,22 @@ def anomalias(request: Request, mes: Annotated[str, Query(description="AAAA-MM")
         with request.app.state.gate.turn():
             return _envelope(store, _call(store.anomaly, aoi, mes))
     return _envelope(store, _call(store.anomaly, aoi, mes))
+
+
+@router.get("/focos.geojson")
+def focos_geojson(request: Request, fecha_inicio: Annotated[str, Query(description="AAAA-MM")],
+                  fecha_fin: Annotated[str, Query(description="AAAA-MM")],
+                  departamento: Dep = None, bbox: BBox = None, lat: Lat = None, lon: Lon = None,
+                  radio_km: Radio = None) -> dict:
+    """Focos del rango como puntos GeoJSON (mapa de calor y puntos). Peso = ``eq_foco``.
+
+    Máximo ``api.max_geojson_features`` focos por consulta; para más, usar la descarga CSV."""
+    store = _store(request)
+    aoi = _call(store.resolve_aoi, departamento, bbox, lat, lon, radio_km)
+    if _custom_aoi(bbox, lat):
+        with request.app.state.gate.turn():
+            return _envelope(store, _call(store.focos_geojson, aoi, fecha_inicio, fecha_fin))
+    return _envelope(store, _call(store.focos_geojson, aoi, fecha_inicio, fecha_fin))
 
 
 @router.get("/hotspots.csv", response_class=StreamingResponse)
@@ -180,10 +197,9 @@ def metadatos(request: Request) -> dict:
     m = store.meta
     f = m["factores"]
     return _envelope(store, {
-        "unidad": {"nombre": "Focos armonizados", "nombre_en": "Harmonized hotspots",
-                   "definicion": UNIDAD,
-                   "campos": "eq_hotspots (celda-día) y eq_foco (foco); nunca contar filas ni "
-                             "sumar n_modis + n_viirs"},
+        "unidad": {**UNIDAD,
+                   "campos": "focos_armonizados en la API = suma de eq_hotspots (celda-día) o "
+                             "eq_foco (foco); nunca contar filas ni sumar n_modis + n_viirs"},
         "armonizacion": {
             "version_datos": PLAN_VERSION,
             "grilla": "celda de 0.01° (~1.1 km) × día local (UTC−5); presencia de fuego",
