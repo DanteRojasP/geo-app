@@ -10,3 +10,8 @@ __pycache__/
 .env
 *credentials*
 *.key
+
+# Frontend React / Vite
+node_modules/
+.vite/
+.vercel/
