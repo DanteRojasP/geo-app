@@ -8,6 +8,13 @@ import sys
 import numpy as np
 import pandas as pd
 
+# En Windows la consola usa cp1252 y no puede imprimir símbolos como "Δ": print() lanzaba
+# UnicodeEncodeError y el script se caía antes de terminar. Se fuerza UTF-8 aquí porque
+# `python -I` (modo aislado, como se ejecuta en el CI) ignora la variable PYTHONUTF8.
+for _flujo in (sys.stdout, sys.stderr):
+    if hasattr(_flujo, "reconfigure"):
+        _flujo.reconfigure(encoding="utf-8", errors="replace")
+
 COLS_CD = ["fecha_local", "cell_lat", "cell_lon", "alt_m", "n_modis", "n_viirs", "frp_modis", "frp_viirs",
            "eq_hotspots", "fuente_serie", "calidad"]
 COLS_FO = ["fecha_local", "fecha_utc", "hora_utc", "latitude", "longitude", "cell_lat", "cell_lon", "alt_m",
