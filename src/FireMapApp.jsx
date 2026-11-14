@@ -3,8 +3,8 @@ import * as maplibregl from 'maplibre-gl'
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import {
   Activity, CalendarDays, CircleHelp, CloudSun, Download, Flame, Gauge, Info,
-  Layers3, LocateFixed, MapPin, Menu, Pause, Play, Radar, RefreshCw, Satellite,
-  Scan, Search, ShieldAlert, SlidersHorizontal, ThermometerSun, Trash2, X,
+  Layers3, MapPin, Menu, Pause, Play, Radar, RefreshCw, Satellite,
+  Scan, ShieldAlert, SlidersHorizontal, ThermometerSun, Trash2, X,
 } from 'lucide-react'
 import cuscoBoundaryRaw from './data/cusco-boundary.json'
 import { getFireOverview } from './services/fireApi.js'
@@ -664,9 +664,9 @@ function FireMapApp() {
     <div className="fw-app">
       <div ref={mapContainerRef} className="fw-map" aria-label="Mapa nacional interactivo de focos térmicos en Perú" />
       <header className="fw-topbar">
-        <div className="fw-brand"><span><Radar size={21}/></span><div><b>FIREWATCH</b><small>PERÚ · MONITOREO</small></div></div>
-        <button className="fw-search" onClick={focusStudyArea}><Search size={18}/><div><b>{activeScope === 'peru' ? 'Perú nacional' : 'Cusco, Perú'}</b><small>{activeScope === 'peru' ? 'Abrir zona piloto de Cusco' : 'Volver a la vista nacional'}</small></div><LocateFixed size={18}/></button>
-        <div className="fw-top-actions"><span className="fw-live"><i/>{result.mode === 'api' ? 'NASA FIRMS EN VIVO' : 'VISTA DE DEMOSTRACIÓN'}</span><button title="Ayuda"><CircleHelp size={19}/></button><button title="Menú"><Menu size={20}/></button></div>
+        <div className="fw-brand"><span><Radar size={19}/></span><div><b>Firewatch Perú</b><small>Observatorio de actividad térmica</small></div></div>
+        <button className="fw-search" onClick={focusStudyArea}><MapPin size={17}/><div><small>Ámbito de monitoreo</small><b>{activeScope === 'peru' ? 'Perú nacional' : 'Cusco, Perú'}</b></div><span className="fw-scope-action">{activeScope === 'peru' ? 'Ver piloto Cusco' : 'Ver todo el país'}</span></button>
+        <div className="fw-top-actions"><span className="fw-live"><i/>{result.mode === 'api' ? 'FIRMS conectado' : 'Modo demostración'}</span><button title="Ayuda"><CircleHelp size={18}/></button><button title="Menú"><Menu size={19}/></button></div>
       </header>
       <nav className="fw-rail" aria-label="Herramientas del mapa">
         <button className="is-active" title="Monitoreo"><Flame size={20}/><span>Fuego</span></button>
