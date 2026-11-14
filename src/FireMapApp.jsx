@@ -421,7 +421,7 @@ function FireMapApp() {
         id: 'department-fill', type: 'fill', source: 'peru-departments',
         paint: {
           'fill-color': ['interpolate', ['linear'], ['coalesce', ['get', 'fireCount'], 0],
-            0, '#17362c', 1, '#d9ef8b', 5, '#fee08b', 15, '#fdae61', 35, '#f46d43', 70, '#a50026'],
+            0, '#e2e8f0', 1, '#fef3c7', 5, '#fde68a', 15, '#f59e0b', 35, '#ea580c', 70, '#991b1b'],
           'fill-opacity': ['case', ['boolean', ['feature-state', 'hover'], false], 0.18, 0.045],
         },
       })
@@ -431,15 +431,15 @@ function FireMapApp() {
       })
       map.addLayer({
         id: 'study-area-fill', type: 'fill', source: 'cusco-area',
-        paint: { 'fill-color': '#b8f36b', 'fill-opacity': ['case', ['boolean', ['feature-state', 'selected'], false], 0.22, ['boolean', ['feature-state', 'hover'], false], 0.16, 0.035] },
+        paint: { 'fill-color': '#0f766e', 'fill-opacity': ['case', ['boolean', ['feature-state', 'selected'], false], 0.18, ['boolean', ['feature-state', 'hover'], false], 0.12, 0.025] },
       })
       map.addLayer({
         id: 'study-area-glow', type: 'line', source: 'cusco-area',
-        paint: { 'line-color': '#b8f36b', 'line-width': ['case', ['boolean', ['feature-state', 'hover'], false], 8, 5], 'line-opacity': 0.25, 'line-blur': 5 },
+        paint: { 'line-color': '#0f766e', 'line-width': ['case', ['boolean', ['feature-state', 'hover'], false], 6, 4], 'line-opacity': 0.18, 'line-blur': 4 },
       })
       map.addLayer({
         id: 'study-area-border', type: 'line', source: 'cusco-area',
-        paint: { 'line-color': '#b8f36b', 'line-width': ['case', ['boolean', ['feature-state', 'selected'], false], 3, ['boolean', ['feature-state', 'hover'], false], 2.8, 1.8], 'line-opacity': 0.95, 'line-dasharray': [2, 1.6] },
+        paint: { 'line-color': '#0f766e', 'line-width': ['case', ['boolean', ['feature-state', 'selected'], false], 2.6, ['boolean', ['feature-state', 'hover'], false], 2.3, 1.5], 'line-opacity': 0.9, 'line-dasharray': [2, 1.6] },
       })
       map.addLayer({
         id: 'fire-heat', type: 'heatmap', source: 'fire-hotspots', maxzoom: 12,
@@ -448,9 +448,9 @@ function FireMapApp() {
           'heatmap-weight': ['interpolate', ['linear'], ['get', 'frp'], 0, 0.04, 15, 0.16, 45, 0.38, 110, 0.72],
           'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 3.5, 0.42, 6, 0.68, 10, 1.15],
           'heatmap-color': ['interpolate', ['linear'], ['heatmap-density'],
-            0, 'rgba(43,131,186,0)', 0.16, 'rgba(43,131,186,0)', 0.24, 'rgba(43,131,186,.28)',
-            0.34, '#66c2a5', 0.48, '#fee08b', 0.64, '#fdae61', 0.8, '#e34a33',
-            0.92, '#b3003b', 1, '#6a003a'],
+            0, 'rgba(245,158,11,0)', 0.16, 'rgba(245,158,11,0)', 0.24, 'rgba(245,158,11,.22)',
+            0.36, '#fde68a', 0.52, '#f59e0b', 0.68, '#ea580c', 0.84, '#dc2626',
+            1, '#7f1d1d'],
           'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 3.5, 15, 5, 22, 7, 32, 10, 52],
           'heatmap-opacity': ['interpolate', ['linear'], ['zoom'], 3.5, 0.72, 8, 0.68, 11, 0.48],
         },
