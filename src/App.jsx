@@ -71,7 +71,8 @@ function App() {
   useEffect(() => { loadData() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const stats = useMemo(() => {
-    const total = result.calendar.flatMap((row) => row.months ?? []).reduce((sum, value) => sum + value, 0)
+    const calendarTotal = result.calendar.flatMap((row) => row.months ?? []).reduce((sum, value) => sum + value, 0)
+    const total = result.mode === 'api' ? result.hotspots.length : calendarTotal
     const frp = result.hotspots.reduce((sum, item) => sum + item.frp, 0)
     const averageConfidence = result.hotspots.length ? Math.round(result.hotspots.reduce((sum, item) => sum + item.confidence, 0) / result.hotspots.length) : 0
     const anomaly = total ? Math.round(((total % 41) - 8)) : 0
@@ -127,7 +128,7 @@ function App() {
 
           <aside className="insights-panel">
             <div className="insights-title"><span>RESUMEN DEL PERIODO</span><b>{startYear} — {endYear}</b></div>
-            <MetricCard icon={Flame} label="Eventos armonizados" value={stats.total.toLocaleString('es-PE')} note={`${result.hotspots.length} visibles en el mapa`} accent />
+            <MetricCard icon={Flame} label={result.mode === 'api' ? 'Eventos recientes' : 'Eventos armonizados'} value={stats.total.toLocaleString('es-PE')} note={result.mode === 'api' ? 'Últimos 5 días · NASA FIRMS' : `${result.hotspots.length} visibles en el mapa`} accent />
             <MetricCard icon={Activity} label="Anomalía estimada" value={`${stats.anomaly >= 0 ? '+' : ''}${stats.anomaly}%`} note="Frente a la mediana histórica" />
             <MetricCard icon={Satellite} label="FRP observado" value={`${stats.frp.toLocaleString('es-PE')} MW`} note="Potencia radiativa acumulada" />
             <MetricCard icon={Radar} label="Confianza media" value={`${stats.averageConfidence}%`} note="Umbral actual ≥ 70%" />
@@ -136,7 +137,7 @@ function App() {
         </section>
 
         <section className="history-panel" id="data">
-          <div className="history-head"><div><p className="eyebrow dark"><CalendarDays size={14}/> PATRÓN HISTÓRICO</p><h2>Calendario de actividad</h2></div><p>Cada celda representa el número mensual de eventos armonizados. Pasa el cursor para consultar el valor exacto.</p></div>
+          <div className="history-head"><div><p className="eyebrow dark"><CalendarDays size={14}/> PATRÓN HISTÓRICO</p><h2>Calendario de actividad</h2></div><p>{result.mode === 'api' ? 'El mapa usa NASA FIRMS en vivo. El calendario continúa con datos de muestra hasta conectar el backend histórico.' : 'Cada celda representa el número mensual de eventos armonizados. Pasa el cursor para consultar el valor exacto.'}</p></div>
           {loading ? <div className="calendar-loader"><RefreshCw className="spin"/>Procesando serie temporal…</div> : <HeatCalendar rows={result.calendar} />}
         </section>
 

@@ -43,4 +43,10 @@ Endpoints esperados:
 - Diseño responsive
 - Modo demo y modo API
 
+## Datos FIRMS en Vercel
+
+La función `api/fire-overview.js` consulta detecciones recientes de MODIS y VIIRS, filtra confianza menor a 70 % y deduplica por fecha y celda aproximada de 1 km.
+
+Configura la variable secreta `FIRMS_MAP_KEY` en Vercel. La clave nunca debe usar el prefijo `VITE_`, porque eso la expondría al navegador.
+
 > We acknowledge the use of data and/or imagery from NASA's FIRMS.
