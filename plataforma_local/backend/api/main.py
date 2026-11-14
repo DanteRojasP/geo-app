@@ -18,6 +18,7 @@ from api.routers import anomaly, calendar, forecast, hotspots, map, meta, plan, 
 from api.schemas import HealthResponse
 from api.services.common import AOIError
 from firecal import __version__
+from firecal.i18n import reset_lang, set_lang, t
 from firecal.plan.query import PlanStore
 from firecal.settings import PROJECT_ROOT, Settings, get_settings
 
@@ -56,10 +57,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.middleware("http")
     async def _timing_and_limits(request: Request, call_next):
-        """Protocolo de solicitudes (429 por cliente) y latencia en X-Process-Time-ms."""
+        """Idioma (?lang=en|es), protocolo de solicitudes (429) y latencia en X-Process-Time-ms."""
         t0 = time.perf_counter()
-        rejected = app.state.limiter.check(request)
-        response = rejected or await call_next(request)
+        token = set_lang(request.query_params.get("lang"), settings.params.api.default_lang)
+        try:
+            rejected = app.state.limiter.check(request)
+            response = rejected or await call_next(request)
+        finally:
+            reset_lang(token)
         response.headers["X-Process-Time-ms"] = f"{(time.perf_counter() - t0) * 1000:.1f}"
         remaining = getattr(request.state, "rate_remaining", None)
         if remaining is not None:
@@ -85,7 +90,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         errors = [{"campo": ".".join(str(x) for x in e.get("loc", [])[1:]),
                    "error": e.get("msg", "")} for e in exc.errors()]
         return UTF8JSONResponse(status_code=422, content={
-            "detail": "Solicitud inválida: revisa los campos indicados en 'errors'.",
+            "detail": t(es="Solicitud inválida: revisa los campos indicados en 'errors'.",
+                        en="Invalid request: check the fields listed in 'errors'."),
             "errors": errors})
 
     legacy = settings.params.api.legacy_v1

@@ -165,6 +165,7 @@ class ApiParams(_Strict):
     region_simplify_deg: float = Field(ge=0)
     max_csv_rows: int = Field(default=200000, gt=0)         # filas máximas por descarga CSV
     legacy_v1: bool = False                                 # /api/v1 (pipeline sintético)
+    default_lang: str = Field(default="en", pattern="^(en|es)$")  # idioma si no llega ?lang=
     rate_limit: RateLimitParams = RateLimitParams()
 
 

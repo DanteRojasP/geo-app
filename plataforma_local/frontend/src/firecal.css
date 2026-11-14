@@ -56,3 +56,6 @@
 .fs-error{margin:0 0 10px;color:#f87171;font-size:13px}
 .fs-actions{display:flex;gap:8px;margin-top:10px}
 @media(max-width:650px){.fs-panel{left:10px;right:10px;top:70px;bottom:100px}}
+.fc-lang{display:flex;gap:2px;margin-right:6px;border:1px solid var(--line);border-radius:8px;padding:2px}
+.fc-lang button{border:0;background:transparent;color:#c8d6cf;font:600 10px var(--mono);padding:4px 7px;border-radius:6px;cursor:pointer}
+.fc-lang button.is-active{background:#223f35;color:#fff}

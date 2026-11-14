@@ -1,6 +1,8 @@
 // Cliente de la API de FireCal (backend FastAPI de plataforma_local).
 // Por defecto usa la misma dirección que sirve la página. Para un frontend publicado aparte
 // (p. ej. Vercel), define VITE_API_BASE_URL con la URL del backend.
+import { getLang } from '../i18n.js'
+
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
 
 export const CUSCO = 'PE-CUS'
@@ -10,6 +12,7 @@ function buildUrl(path, params = {}) {
   Object.entries(params).forEach(([key, value]) => {
     if (value !== null && value !== undefined && value !== '') url.searchParams.set(key, value)
   })
+  url.searchParams.set('lang', getLang())          // textos de la API en el idioma de la interfaz
   return url
 }
 

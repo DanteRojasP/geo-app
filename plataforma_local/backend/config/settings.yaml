@@ -85,6 +85,7 @@ api:
   region_simplify_deg: 0.005           # tolerancia de simplificación de /regions
   max_csv_rows: 200000                 # /api/hotspots.csv y /api/v1/hotspots: filas máximas
   legacy_v1: false                     # true = expone /api/v1 (backend anterior, datos SINTÉTICOS)
+  default_lang: en                     # idioma de los textos si la solicitud no trae ?lang=en|es
   # Protocolo de solicitudes (api/limits.py). Por cliente (IP): cubeta de fichas general y otra para
   # las pesadas (CSV, AOI dibujados). En todo el proceso: como mucho max_concurrent_heavy pesadas a la
   # vez; las demás esperan su turno hasta queue_timeout_s y luego reciben 503 con Retry-After.

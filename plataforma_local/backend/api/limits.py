@@ -30,6 +30,7 @@ from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from firecal.concurrency import SingleFlight  # noqa: F401 - reexportado
+from firecal.i18n import t
 from firecal.settings import RateLimitParams
 
 # Rutas pesadas siempre; /calendario y /anomalias solo si el AOI es dibujado (bbox o punto).
@@ -104,8 +105,10 @@ class HeavyGate:
                 self.rejected += 1
             raise HTTPException(
                 status_code=503,
-                detail="Servidor ocupado con otras descargas o consultas pesadas. Intenta de "
-                       "nuevo en unos segundos.",
+                detail=t(es="Servidor ocupado con otras descargas o consultas pesadas. "
+                            "Intenta de nuevo en unos segundos.",
+                         en="Server busy with other downloads or heavy queries. Try again in "
+                            "a few seconds."),
                 headers={"Retry-After": "5"})
         with self._lock:
             self.active += 1
@@ -189,8 +192,10 @@ class RateLimiter:
         retry = max(1, math.ceil(wait))
         return JSONResponse(
             status_code=429,
-            content={"detail": f"Demasiadas solicitudes desde tu conexión. Espera {retry} s y "
-                               "vuelve a intentar."},
+            content={"detail": t(es=f"Demasiadas solicitudes desde tu conexión. Espera "
+                                    f"{retry} s y vuelve a intentar.",
+                                 en=f"Too many requests from your connection. Wait {retry} s "
+                                    "and try again.")},
             headers={"Retry-After": str(retry), "X-RateLimit-Limit": str(limit),
                      "X-RateLimit-Remaining": "0"},
             media_type="application/json; charset=utf-8")

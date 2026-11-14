@@ -185,6 +185,9 @@ conexiones externas del navegador son el mapa base (OpenFreeMap), la vista satel
 
 ### 2. Parámetros comunes
 
+- **Idioma:** `lang=en|es` en cualquier ruta (por defecto `en`). La interfaz lo envía siempre según el selector
+  EN | ES. Solo cambian los textos (`detail`, `notes`, `unidad`, frases); los campos y códigos no.
+
 - **AOI (uno solo):** `departamento=PE-CUS` · `bbox=oeste,sur,este,norte` (grados WGS84, máx. 50 000 km²) ·
   `lat`, `lon` y `radio_km` (máx. 100 km). Debe tocar Cusco.
 - **Fechas:** `AAAA-MM`, dentro de 2000-11 a 2025-12. En `/api/calendario` son opcionales (por defecto, toda la

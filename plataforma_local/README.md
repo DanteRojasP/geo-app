@@ -38,6 +38,22 @@ Une el trabajo del equipo con `PLAN.md` (en `main`) como eje:
 - **Descarga CSV** con las **18 columnas del contrato** de Antonio; el total en pantalla es igual a Σ `eq_foco` del
   archivo.
 
+## 1b. Idiomas (i18n)
+
+- **Inglés por defecto**; español con el selector **EN | ES** de la barra superior o con `?lang=es` en la URL (la
+  elección se guarda en el navegador).
+- **API:** parámetro `?lang=en|es` en todas las rutas (por defecto `api.default_lang: en`). Se traducen los textos
+  libres: `detail` de los errores, `notes`, `unidad`, `titulo`, `en_simple`, `como_leerlo` y los textos de
+  `/api/metadatos`. **No se traducen** los nombres de campos ni los códigos (`categoria`, `calidad`, `veredicto`,
+  `fuente_serie`): son el contrato con la interfaz.
+- **Código:** `backend/firecal/i18n.py` (`t(es=..., en=...)`, idioma por solicitud) y `frontend/src/i18n.js`
+  (diccionarios `en`/`es`, función `tr`).
+- **Agregar un idioma** (p. ej. portugués o quechua):
+  - En la interfaz basta con un diccionario nuevo en `i18n.js`.
+  - En la API hay que pasar `pt="..."` en cada `t(...)`, unos 80 textos. Las frases de las analíticas tienen
+    gramática propia, así que conviene que las revise un hablante nativo.
+  - Lo que falte cae al inglés.
+
 ## 2. Estructura en el repositorio (rama `julio/actividades`)
 
 ```

@@ -10,6 +10,16 @@ from firecal.settings import EnvSettings, Settings, build_settings, get_settings
 
 
 @pytest.fixture(autouse=True)
+def _lang_es():
+    """Las aserciones de texto existentes están en español (fuera de una solicitud HTTP)."""
+    from firecal.i18n import reset_lang, set_lang
+
+    token = set_lang("es")
+    yield
+    reset_lang(token)
+
+
+@pytest.fixture(autouse=True)
 def _isolated_env(monkeypatch: pytest.MonkeyPatch):
     """Fuerza modo sintético y quita la MAP_KEY para que los tests no dependan del entorno."""
     monkeypatch.setenv("FIRECAL_DATA_MODE", "synthetic")
@@ -55,6 +65,7 @@ def pipeline_home(tmp_path_factory):
     raw["harmonization"]["bootstrap_reps"] = 200  # suficiente para probar la lógica
     raw["api"]["rate_limit"]["enabled"] = False  # se prueba aparte en test_limits.py
     raw["api"]["legacy_v1"] = True                # estos tests ejercitan /api/v1 (sintético)
+    raw["api"]["default_lang"] = "es"             # las aserciones de texto están en español
     env = EnvSettings(_env_file=None, FIRECAL_DATA_MODE="synthetic")
     settings = Settings(env=env, params=ScientificParams.model_validate(raw),
                         paths=Paths(home=home))
@@ -83,6 +94,7 @@ def plan_home(tmp_path_factory):
     shutil.copytree(PROJECT_ROOT / "config", home / "config")
     raw = load_params(home / "config" / "settings.yaml").model_dump()
     raw["api"]["rate_limit"]["enabled"] = False
+    raw["api"]["default_lang"] = "es"             # las aserciones de texto están en español
     env = EnvSettings(_env_file=None, FIRECAL_DATA_MODE="real")
     settings = Settings(env=env, params=ScientificParams.model_validate(raw),
                         paths=Paths(home=home))
