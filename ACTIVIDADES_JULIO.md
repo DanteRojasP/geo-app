@@ -130,6 +130,19 @@ Antonio ([MAESTRO.md](MAESTRO.md), `data/harmonized/`).
 - [ ] `harmonizacion/sequia_fuego/n_efectivo_potencia.py` tiene el mismo problema de Windows (`≈`); no se tocó.
 - [ ] Desplegar en Google Cloud (proyecto listo: `sonic-mile-514718-r5`), cuando el equipo lo decida.
 
+## Revisión de las ramas de Antonio y Dante (sáb 14 nov 2026, noche)
+
+Detalle en [`plataforma_local/README.md`](plataforma_local/README.md), sección 8.
+
+- [x] Integrado de `antonio/backend-modelo`: calidad del mes desde los datos (julio 2002 = referencia),
+      `FIRECAL_CORS_ORIGINS` y `GET /api/departamentos.geojson`. 139 pruebas en verde.
+- [x] `main` unido a esta rama (solo traía el PR #4, ya incluido).
+- [ ] **Por analizar con Antonio:** margen de los meses extrapolados (`rango`, categoría `incierta`), nombres de
+      campos para Dante (`eq_hotspots` frente a `focos_armonizados`) y `Dockerfile.modelo` para la nube.
+- [ ] **Por analizar con Dante:** su app (React + MapLibre, FIRMS NRT de 5 días, 6 departamentos, FRP) es otro
+      producto respecto al PLAN (Leaflet, calendario histórico de Cusco). Definir si se adapta al contrato de
+      `/api/*` o si queda como una vista aparte de "actividad reciente".
+
 ## Pendientes que me afectan
 
 - [x] Datos reales de FIRMS (Cusco, de Antonio).

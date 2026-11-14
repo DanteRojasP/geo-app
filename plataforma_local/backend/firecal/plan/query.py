@@ -35,8 +35,10 @@ from firecal.settings import Settings
 MIN_YEARS = 5
 COVER_FROM = (2000, 11)            # primer mes con datos (desde el 2000-11-04)
 COVER_TO = (2025, 12)              # último mes (datos hasta 2025-12-31 UTC)
-AQUA_MONTH = (2002, 7)             # mes de transición Terra*kT -> MODIS (2002-07-04)
+REFERENCIA_FROM = (2002, 7)        # Aqua desde 2002-07-04 (en Cusco, sus focos de julio son 19-27)
 VIIRS_FROM = (2013, 1)             # desde aquí la serie usa VIIRS*k
+FUENTE = {"extrapolado": "Terra*kT", "mixto": "Terra*kT + MODIS", "referencia": "MODIS",
+          "calibrado": "VIIRS*k"}
 CATEGORY_EDGES = [(-1.0, "muy por debajo"), (-0.5, "por debajo"), (0.5, "normal"),
                   (1.0, "por encima"), (math.inf, "muy por encima")]
 EARTH_KM = 6371.0088
@@ -45,7 +47,7 @@ UNIDAD = ("Focos armonizados: celdas de ~1 km con fuego por día, en escala equi
 NOTE_2025 = ("2025: el valor es el que registra VIIRS. MODIS cae más que VIIRS ese año (posible "
              "deriva orbital, no verificada), pero no afecta a la serie, que usa VIIRS desde 2013. "
              "El último día (31-dic) puede estar incompleto.")
-NOTE_EXTRAPOLADO = ("2000-11 a 2002-07: solo Terra, escalado con kT (calidad 'extrapolado', error "
+NOTE_EXTRAPOLADO = ("2000-11 a 2002-06: solo Terra, escalado con kT (calidad 'extrapolado', error "
                     "mensual ~41–45 %). Se muestra atenuado.")
 NOTE_CUSTOM = ("Área dibujada: el total es la suma de eq_foco de los focos dentro del área "
                "(igual a la suma de la descarga CSV).")
@@ -93,15 +95,25 @@ def parse_month(value: str | None, name: str) -> tuple[int, int] | None:
     return y, m
 
 
-def month_quality(y: int, m: int) -> tuple[str, str]:
-    """(calidad, fuente_serie) del mes según las reglas del contrato."""
-    if (y, m) < AQUA_MONTH:
-        return "extrapolado", "Terra*kT"
-    if (y, m) == AQUA_MONTH:
-        return "mixto", "Terra*kT + MODIS"
-    if (y, m) < VIIRS_FROM:
-        return "referencia", "MODIS"
-    return "calibrado", "VIIRS*k"
+def month_quality(y: int, m: int, fraccion_extrapolada: float | None = None) -> tuple[str, str]:
+    """(calidad, fuente_serie) del mes.
+
+    Con focos manda la columna ``calidad`` de los datos (fracción del valor que es extrapolada);
+    sin focos, la fecha. Idea de Antonio (rama antonio/backend-modelo): así julio de 2002, cuyos
+    focos son todos Terra + Aqua, queda como ``referencia`` y no como mixto.
+    """
+    if fraccion_extrapolada is not None:
+        if fraccion_extrapolada >= 1.0 - 1e-9:          # tolera el redondeo de la suma
+            calidad = "extrapolado"
+        elif fraccion_extrapolada > 1e-9:
+            calidad = "mixto"
+        else:
+            calidad = "referencia" if (y, m) < VIIRS_FROM else "calibrado"
+    elif (y, m) < REFERENCIA_FROM:
+        calidad = "extrapolado"
+    else:
+        calidad = "referencia" if (y, m) < VIIRS_FROM else "calibrado"
+    return calidad, FUENTE[calidad]
 
 
 def category(anom: float | None) -> str | None:
@@ -279,7 +291,8 @@ class PlanStore:
         if aoi.whole_region:
             df = cur.execute(
                 "SELECT anio, mes, sum(eq_hotspots) AS eq_hotspots, count(*) AS celdas_dia, "
-                "sum(n_modis) AS focos_modis, sum(n_viirs) AS focos_viirs "
+                "sum(n_modis) AS focos_modis, sum(n_viirs) AS focos_viirs, "
+                "sum(CASE WHEN calidad = 'extrapolado' THEN eq_hotspots ELSE 0 END) AS eq_ext "
                 "FROM cd GROUP BY 1, 2").df()
         else:
             df = cur.execute(
@@ -287,15 +300,20 @@ class PlanStore:
                 "count(DISTINCT CASE WHEN en_serie = 1 THEN fecha_local || '|' || cell_lat || '|' "
                 "|| cell_lon END) AS celdas_dia, "
                 "count(*) FILTER (WHERE sensor = 'MODIS') AS focos_modis, "
-                "count(*) FILTER (WHERE sensor = 'VIIRS') AS focos_viirs "
+                "count(*) FILTER (WHERE sensor = 'VIIRS') AS focos_viirs, "
+                "sum(CASE WHEN calidad = 'extrapolado' THEN eq_foco ELSE 0 END) AS eq_ext "
                 f"FROM fo WHERE {aoi.sql} GROUP BY 1, 2", list(aoi.params)).df()
         cur.close()
         months = _month_range(COVER_FROM, COVER_TO)
         full = pd.DataFrame(months, columns=["anio", "mes"])
         full = full.merge(df.astype({"anio": int, "mes": int}), on=["anio", "mes"], how="left")
-        for c in ("eq_hotspots", "celdas_dia", "focos_modis", "focos_viirs"):
+        for c in ("eq_hotspots", "celdas_dia", "focos_modis", "focos_viirs", "eq_ext"):
             full[c] = full[c].fillna(0)
-        q = [month_quality(y, m) for y, m in months]
+        con_focos = full["eq_hotspots"] > 0
+        full["fraccion_extrapolada"] = (full["eq_ext"] / full["eq_hotspots"].where(con_focos, 1.0)
+                                        ).clip(0, 1)
+        q = [month_quality(y, m, f if tiene else None) for (y, m), f, tiene
+             in zip(months, full["fraccion_extrapolada"], con_focos, strict=True)]
         full["calidad"] = [c for c, _ in q]
         full["fuente_serie"] = [f for _, f in q]
         full["parcial"] = [(y, m) == COVER_FROM for y, m in months]   # empieza el 2000-11-04
@@ -346,6 +364,7 @@ class PlanStore:
                           "celdas_dia": int(r.celdas_dia), "focos_modis": int(r.focos_modis),
                           "focos_viirs": int(r.focos_viirs), "mediana_hist": _num(r.mediana_hist),
                           "anomalia": anom, "categoria": category(anom), "calidad": r.calidad,
+                          "fraccion_extrapolada": _num(r.fraccion_extrapolada, 3),
                           "fuente_serie": r.fuente_serie, "parcial": bool(r.parcial)})
         notes = []
         if any(c.get("calidad") in ("extrapolado", "mixto") for c in cells):

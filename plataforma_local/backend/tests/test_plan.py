@@ -19,10 +19,15 @@ def _csv_rows(resp) -> list[dict]:
 
 # ------------------------------------------------------------------ unidades
 def test_month_quality_follows_contract():
+    # Sin focos: por fecha.
     assert month_quality(2001, 5) == ("extrapolado", "Terra*kT")
-    assert month_quality(2002, 7) == ("mixto", "Terra*kT + MODIS")
+    assert month_quality(2002, 7) == ("referencia", "MODIS")
     assert month_quality(2012, 12) == ("referencia", "MODIS")
     assert month_quality(2013, 1) == ("calibrado", "VIIRS*k")
+    # Con focos: manda la fracción extrapolada de los datos.
+    assert month_quality(2002, 6, 1.0) == ("extrapolado", "Terra*kT")
+    assert month_quality(2002, 7, 0.0) == ("referencia", "MODIS")
+    assert month_quality(2002, 7, 0.4) == ("mixto", "Terra*kT + MODIS")
 
 
 def test_color_breaks_quantiles_and_category():
@@ -180,3 +185,30 @@ def test_metadatos(api):
 def test_frontend_served(api):
     r = api.get("/")
     assert r.status_code == 200 and "FireCal Cusco" in r.text
+
+
+def test_quality_comes_from_data(api):
+    """Julio de 2002: sus focos (19 al 27) ya son Terra + Aqua -> referencia, no extrapolado."""
+    b = _cal(api, fecha_inicio="2002-05", fecha_fin="2002-08")
+    by = {(c["anio"], c["mes"]): c for c in b["celdas"]}
+    assert by[(2002, 6)]["calidad"] == "extrapolado" and by[(2002, 6)]["fraccion_extrapolada"] == 1
+    assert by[(2002, 7)]["calidad"] == "referencia" and by[(2002, 7)]["fraccion_extrapolada"] == 0
+    assert by[(2002, 8)]["calidad"] == "referencia"
+
+
+def test_departamentos_geojson(api):
+    b = api.get("/api/departamentos.geojson").json()
+    assert b["type"] == "FeatureCollection" and b["features"][0]["properties"]["code"] == "PE-CUS"
+
+
+def test_cors_extra_origins_from_env(plan_home, monkeypatch):
+    from firecal.settings import EnvSettings, Settings
+
+    monkeypatch.setenv("FIRECAL_CORS_ORIGINS", "https://demo.vercel.app, https://x.example")
+    s = Settings(env=EnvSettings(_env_file=None), params=plan_home.settings.params,
+                 paths=plan_home.settings.paths)
+    c = TestClient(create_app(s))
+    r = c.get("/api/metadatos", headers={"Origin": "https://demo.vercel.app"})
+    assert r.headers.get("access-control-allow-origin") == "https://demo.vercel.app"
+    r = c.get("/api/metadatos", headers={"Origin": "https://malo.example"})
+    assert "access-control-allow-origin" not in r.headers

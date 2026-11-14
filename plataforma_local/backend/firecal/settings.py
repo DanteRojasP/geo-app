@@ -300,6 +300,9 @@ class EnvSettings(BaseSettings):
     data_mode: DataMode = Field(default="synthetic", validation_alias="FIRECAL_DATA_MODE")
     firms_map_key: SecretStr | None = Field(default=None, validation_alias="FIRMS_MAP_KEY")
     region: str = Field(default="peru_sur", validation_alias="FIRECAL_REGION")
+    # Orígenes extra permitidos por CORS, separados por comas (p. ej. el frontend publicado en
+    # Vercel). Se suman a api.cors_origins de settings.yaml. Idea de antonio/backend-modelo.
+    cors_origins: str = Field(default="", validation_alias="FIRECAL_CORS_ORIGINS")
     home: Path = Field(default=PROJECT_ROOT, validation_alias="FIRECAL_HOME")
     config_file: Path | None = Field(default=None, validation_alias="FIRECAL_CONFIG")
     log_level: str = Field(default="INFO", validation_alias="FIRECAL_LOG_LEVEL")

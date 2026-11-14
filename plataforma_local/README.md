@@ -79,7 +79,7 @@ $env:PYTHONUTF8 = "1"
 .\.venv\Scripts\firecal plan-events     # ~2 s: valida los CSV y arma el Parquet
 .\.venv\Scripts\firecal serve           # http://localhost:8000  (API: /docs)
 ```
-Pruebas: `.\.venv\Scripts\python -m ruff check .` y `.\.venv\Scripts\python -m pytest -q` (136 pruebas).
+Pruebas: `.\.venv\Scripts\python -m ruff check .` y `.\.venv\Scripts\python -m pytest -q` (139 pruebas).
 
 Verificación de los datos (script de Antonio, ahora funciona en Windows), desde la raíz del repo:
 ```powershell
@@ -95,6 +95,7 @@ AOI: `departamento=PE-CUS` **o** `bbox=oeste,sur,este,norte` **o** `lat=..&lon=.
 | Ruta | Parámetros | Devuelve |
 | --- | --- | --- |
 | `GET /api/departamentos` | — | Cusco (único con datos) y su límite en GeoJSON |
+| `GET /api/departamentos.geojson` | — | Solo el contorno de Cusco (FeatureCollection) |
 | `GET /api/calendario` | AOI, `fecha_inicio`, `fecha_fin` (AAAA-MM, opcionales) | `anios`, `matriz_eq_hotspots` y `matriz_anomalia` (años × 12), `total_eq_hotspots`, `cortes_color`, `celdas[]` |
 | `GET /api/anomalias` | AOI, `mes` | valor del mes, mediana e IQR del mismo mes, anomalía, `historial[]` y `dias[]` |
 | `GET /api/hotspots.csv` | AOI, `fecha_inicio`, `fecha_fin` | CSV de focos (18 columnas del contrato, UTF-8 con BOM); cabeceras `X-Row-Count` y `X-Total-Eq-Foco` |
@@ -102,7 +103,10 @@ AOI: `departamento=PE-CUS` **o** `bbox=oeste,sur,este,norte` **o** `lat=..&lon=.
 | `GET /health`, `GET /health/limits` | — | estado de los datos y del protocolo de solicitudes |
 
 Celda del calendario: `{anio, mes, sin_dato, eq_hotspots, celdas_dia, focos_modis, focos_viirs, mediana_hist,
-anomalia, categoria, calidad, fuente_serie, parcial}`.
+anomalia, categoria, calidad, fraccion_extrapolada, fuente_serie, parcial}`. La `calidad` sale de los datos
+(fracción del valor que es extrapolada).
+
+Frontend en otro dominio: `FIRECAL_CORS_ORIGINS=https://<proyecto>.vercel.app` (varios, separados por comas).
 
 Errores: **404 "Sin datos"** (otra región, área fuera de Cusco o fechas fuera de la serie); **422** con el motivo
 (AOI vacío, rango invertido, fecha mal escrita, área demasiado grande, CSV de más de 200 000 filas); **429/503**
@@ -147,3 +151,25 @@ El backend anterior con datos sintéticos (`/api/v1`, 5 departamentos) quedó **
 - [ ] Vista diaria del calendario completo (hoy el detalle diario está en el panel de cada mes).
 - [ ] `harmonizacion/sequia_fuego/n_efectivo_potencia.py` tiene el mismo problema de Windows con `≈` (no se tocó).
 - [ ] Antes de publicar: ver [`docs/DESPLIEGUE_Y_FALENCIAS.md`](docs/DESPLIEGUE_Y_FALENCIAS.md).
+
+## 8. Integración con las ramas de Antonio y Dante (14-nov, noche)
+
+Eje: `PLAN.md` de `main` + reglas de `MAESTRO.md` + decisiones del equipo (solo Cusco, focos y no eventos, sin FRP).
+
+**Integrado** (de `antonio/backend-modelo`, reescrito sobre esta plataforma, sin unir su rama):
+
+| Pieza | Por qué |
+| --- | --- |
+| Calidad del mes **desde los datos** (`fraccion_extrapolada`), no por fecha | Es un dato, no una opinión: julio de 2002 tiene solo focos Terra + Aqua (días 19-27), así que es `referencia` y no `mixto`. |
+| `FIRECAL_CORS_ORIGINS` (orígenes extra para CORS) | Hace falta para que un frontend publicado en otro dominio (Vercel) llame a la API. |
+| `GET /api/departamentos.geojson` | Ruta que Antonio documentó para Dante; solo devuelve el contorno de Cusco. |
+
+**No integrado, pendiente de análisis:**
+
+| Origen | Pieza | Motivo |
+| --- | --- | --- |
+| Antonio | Margen de los meses extrapolados (`incertidumbre`, `rango`, `anomalia_rango`, categoría `incierta`) | Es método nuevo (error mensual 41-45 % usado como margen ±) que no está en MAESTRO v1.2. Validarlo con Antonio. |
+| Antonio | Nombres `focos_armonizados` / `total_focos_armonizados` en la API | MAESTRO §12 dice que los campos conservan `eq_hotspots`; su guía para Dante usa otros nombres. Hay que acordar uno solo. |
+| Antonio | `frp_modis` / `frp_viirs` y `n_eventos` por compatibilidad | Contradicen las decisiones del equipo (no usar FRP ni "eventos"). |
+| Antonio | `Dockerfile.modelo` con contexto en la raíz del repo | Útil para Cloud Run (`--source` no admite contextos adicionales). Decidir al desplegar. |
+| Dante | App React + Vite + MapLibre (`src/`, `dist/`, `api/fire-overview.js`) | Otro producto: observatorio de focos recientes (FIRMS NRT, 5 días) de 6 departamentos, con FRP, suma de S-NPP + NOAA-20 y datos demo. El PLAN pide Leaflet y el calendario histórico de Cusco. Su modo "API" no es compatible todavía (llama a `/api/anomalias` sin `mes` y espera `calendar.hotspots`). |

@@ -1,6 +1,7 @@
 """Endpoints del plan de trabajo (PLAN.md §4, contrato Julio <-> Dante) sobre los datos de Cusco.
 
 - ``GET /api/departamentos``  región disponible (solo Cusco) con su límite en GeoJSON.
+- ``GET /api/departamentos.geojson`` solo el contorno (FeatureCollection) para el mapa.
 - ``GET /api/calendario``     AOI + rango -> matriz mes x año de focos armonizados y anomalía.
 - ``GET /api/anomalias``      un mes frente a la mediana del mismo mes + detalle diario.
 - ``GET /api/hotspots.csv``   focos del rango con las 18 columnas del contrato (CSV UTF-8 con BOM).
@@ -90,6 +91,15 @@ def departamentos(request: Request) -> dict:
         "geojson": store.region_geojson,
         "notes": ["Prototipo centrado en Cusco: es la única región con factores de armonización "
                   "validados. Otras regiones responden 'sin datos'."]})
+
+
+@router.get("/departamentos.geojson")
+def departamentos_geojson(request: Request) -> dict:
+    """Solo el contorno de Cusco (FeatureCollection), para cargarlo directo en el mapa.
+
+    Misma ruta que documentó antonio/backend-modelo (docs/DESPLIEGUE_MODELO.md) para Dante."""
+    store = _store(request)
+    return {**store.region_geojson, "data_mode": store.meta["data_mode"]}
 
 
 @router.get("/calendario")
