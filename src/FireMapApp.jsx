@@ -12,6 +12,8 @@ import { getFireOverview } from './services/fireApi.js'
 maplibregl.setWorkerUrl(maplibreWorkerUrl)
 
 const MAP_STYLE = 'https://tiles.openfreemap.org/styles/positron'
+const PERU_DEPARTMENTS_URL = 'https://raw.githubusercontent.com/juaneladio/peru-geojson/master/peru_departamental_simple.geojson'
+const EMPTY_FEATURE_COLLECTION = { type: 'FeatureCollection', features: [] }
 const SATELLITE_STYLE = {
   version: 8,
   sources: {
@@ -25,6 +27,7 @@ const SATELLITE_STYLE = {
   layers: [{ id: 'satellite-imagery', type: 'raster', source: 'imagery', paint: { 'raster-saturation': 0.08, 'raster-contrast': 0.08 } }],
 }
 const CUSCO_CENTER = [-71.97, -13.53]
+const PERU_BOUNDS = new maplibregl.LngLatBounds([-81.45, -18.5], [-68.55, 0.25])
 const CUSCO_FEATURE = { ...cuscoBoundaryRaw.features[0], id: 'cusco' }
 const CUSCO_BOUNDARY = { type: 'FeatureCollection', features: [CUSCO_FEATURE] }
 const CUSCO_RING = CUSCO_FEATURE.geometry.coordinates[0]
@@ -81,6 +84,17 @@ function isInsideCusco(point) {
   return pointInRing(point.lon, point.lat, rings[0]) && !rings.slice(1).some((ring) => pointInRing(point.lon, point.lat, ring))
 }
 
+function isInsideGeometry(point, geometry) {
+  if (!geometry) return false
+  const polygons = geometry.type === 'MultiPolygon' ? geometry.coordinates : [geometry.coordinates]
+  return polygons.some((polygon) => pointInRing(point.lon, point.lat, polygon[0])
+    && !polygon.slice(1).some((ring) => pointInRing(point.lon, point.lat, ring)))
+}
+
+function isInsidePeru(point, departments) {
+  return departments.features.some((feature) => isInsideGeometry(point, feature.geometry))
+}
+
 function boundsToGeoJson(bounds) {
   if (!bounds) return { type: 'FeatureCollection', features: [] }
   const { west, east, south, north } = bounds
@@ -109,6 +123,16 @@ function fitToCusco(map, compact = window.innerWidth < 650) {
       : { top: 100, right: 160, bottom: 130, left: 430 },
     duration: 900,
     maxZoom: 8.2,
+  })
+}
+
+function fitToPeru(map, compact = window.innerWidth < 650) {
+  map.fitBounds(PERU_BOUNDS, {
+    padding: compact
+      ? { top: 76, right: 24, bottom: 112, left: 24 }
+      : { top: 100, right: 160, bottom: 130, left: 430 },
+    duration: 900,
+    maxZoom: 5.7,
   })
 }
 
@@ -206,8 +230,11 @@ function FireMapApp() {
   const mapRef = useRef(null)
   const mapReadyRef = useRef(false)
   const hotspotsRef = useRef([])
+  const departmentsRef = useRef(EMPTY_FEATURE_COLLECTION)
   const selectionModeRef = useRef(false)
   const [result, setResult] = useState({ hotspots: [], mode: 'demo', metadata: {} })
+  const [departments, setDepartments] = useState(EMPTY_FEATURE_COLLECTION)
+  const [activeScope, setActiveScope] = useState('peru')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [activeLayer, setActiveLayer] = useState('heat')
@@ -223,7 +250,7 @@ function FireMapApp() {
     setLoading(true)
     setError('')
     try {
-      const data = await getFireOverview({ department: 'cusco', startYear: 2021, endYear: 2026 })
+      const data = await getFireOverview({ department: 'peru', startYear: 2021, endYear: 2026 })
       setResult(data)
     } catch (caught) {
       setError(caught.message || 'No se pudieron consultar las detecciones.')
@@ -234,11 +261,29 @@ function FireMapApp() {
 
   useEffect(() => { loadData() }, [loadData])
 
-  const cuscoHotspots = useMemo(() => result.hotspots.filter(isInsideCusco), [result.hotspots])
-  const dates = useMemo(() => [...new Set(cuscoHotspots.map((point) => point.date).filter(Boolean))].sort().slice(-5), [cuscoHotspots])
-  const visibleHotspots = useMemo(() => selectedDate === 'all' ? cuscoHotspots : cuscoHotspots.filter((point) => point.date === selectedDate), [cuscoHotspots, selectedDate])
+  useEffect(() => {
+    let active = true
+    fetch(PERU_DEPARTMENTS_URL)
+      .then((response) => {
+        if (!response.ok) throw new Error(`Límites: ${response.status}`)
+        return response.json()
+      })
+      .then((data) => { if (active) setDepartments(data) })
+      .catch(() => { if (active) setError('El mapa funciona, pero no se pudieron cargar los límites departamentales.') })
+    return () => { active = false }
+  }, [])
+
+  const peruHotspots = useMemo(() => departments.features.length
+    ? result.hotspots.filter((point) => isInsidePeru(point, departments))
+    : result.hotspots, [departments, result.hotspots])
+  const scopedHotspots = useMemo(() => activeScope === 'cusco'
+    ? peruHotspots.filter(isInsideCusco)
+    : peruHotspots, [activeScope, peruHotspots])
+  const dates = useMemo(() => [...new Set(scopedHotspots.map((point) => point.date).filter(Boolean))].sort().slice(-5), [scopedHotspots])
+  const visibleHotspots = useMemo(() => selectedDate === 'all' ? scopedHotspots : scopedHotspots.filter((point) => point.date === selectedDate), [scopedHotspots, selectedDate])
   const selectedHotspots = useMemo(() => selectionBounds ? visibleHotspots.filter((point) => point.lon >= selectionBounds.west && point.lon <= selectionBounds.east && point.lat >= selectionBounds.south && point.lat <= selectionBounds.north) : [], [selectionBounds, visibleHotspots])
   hotspotsRef.current = visibleHotspots
+  departmentsRef.current = departments
   selectionModeRef.current = selectionMode
 
   useEffect(() => {
@@ -256,9 +301,9 @@ function FireMapApp() {
     const map = new maplibregl.Map({
       container: mapContainerRef.current,
       style: MAP_STYLE,
-      center: CUSCO_CENTER,
-      zoom: 6.4,
-      minZoom: 5,
+      center: [-75.1, -9.2],
+      zoom: 4.2,
+      minZoom: 3.4,
       maxZoom: 14,
       attributionControl: false,
       antialias: true,
@@ -271,6 +316,7 @@ function FireMapApp() {
     let dragStart = null
     let drawBox = null
     let suppressNextClick = false
+    let hoveredDepartmentId = null
 
     const pointerPosition = (event) => {
       const rect = canvas.getBoundingClientRect()
@@ -341,13 +387,20 @@ function FireMapApp() {
     }
 
     map.on('load', () => {
-      map.addSource('cusco-mask', { type: 'geojson', data: CUSCO_MASK })
+      map.addSource('peru-departments', { type: 'geojson', data: departmentsRef.current, generateId: true })
       map.addSource('cusco-area', { type: 'geojson', data: CUSCO_BOUNDARY })
       map.addSource('fire-hotspots', { type: 'geojson', data: hotspotsToGeoJson([]) })
       map.addSource('selection-area', { type: 'geojson', data: boundsToGeoJson(null) })
       map.addSource('selected-hotspots', { type: 'geojson', data: hotspotsToGeoJson([]) })
 
-      map.addLayer({ id: 'outside-mask', type: 'fill', source: 'cusco-mask', paint: { 'fill-color': '#07130f', 'fill-opacity': 0.3 } })
+      map.addLayer({
+        id: 'department-fill', type: 'fill', source: 'peru-departments',
+        paint: { 'fill-color': '#97b6a4', 'fill-opacity': ['case', ['boolean', ['feature-state', 'hover'], false], 0.11, 0.025] },
+      })
+      map.addLayer({
+        id: 'department-lines', type: 'line', source: 'peru-departments',
+        paint: { 'line-color': '#9eb3a8', 'line-width': ['interpolate', ['linear'], ['zoom'], 4, 0.7, 8, 1.5], 'line-opacity': 0.58 },
+      })
       map.addLayer({
         id: 'study-area-fill', type: 'fill', source: 'cusco-area',
         paint: { 'fill-color': '#b8f36b', 'fill-opacity': ['case', ['boolean', ['feature-state', 'selected'], false], 0.22, ['boolean', ['feature-state', 'hover'], false], 0.16, 0.035] },
@@ -387,6 +440,19 @@ function FireMapApp() {
         paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, 7, 10, 11], 'circle-color': '#5ee7d7', 'circle-opacity': 0.95, 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 2 },
       })
 
+      map.on('mousemove', 'department-fill', (event) => {
+        if (selectionModeRef.current) return
+        const feature = event.features?.[0]
+        if (!feature) return
+        if (hoveredDepartmentId !== null) map.setFeatureState({ source: 'peru-departments', id: hoveredDepartmentId }, { hover: false })
+        hoveredDepartmentId = feature.id
+        map.setFeatureState({ source: 'peru-departments', id: hoveredDepartmentId }, { hover: true })
+      })
+      map.on('mouseleave', 'department-fill', () => {
+        if (hoveredDepartmentId !== null) map.setFeatureState({ source: 'peru-departments', id: hoveredDepartmentId }, { hover: false })
+        hoveredDepartmentId = null
+      })
+
       map.on('mouseenter', 'study-area-fill', () => {
         map.getCanvas().style.cursor = 'pointer'
         map.setFeatureState({ source: 'cusco-area', id: 'cusco' }, { hover: true })
@@ -399,6 +465,9 @@ function FireMapApp() {
         if (suppressNextClick) return
         map.setFeatureState({ source: 'cusco-area', id: 'cusco' }, { selected: true })
         setStudySelected(true)
+        setActiveScope('cusco')
+        setSelectedDate('all')
+        setSelectionBounds(null)
         fitToCusco(map)
         showAreaPopup(event.lngLat)
       })
@@ -421,7 +490,7 @@ function FireMapApp() {
 
       mapReadyRef.current = true
       map.getSource('fire-hotspots').setData(hotspotsToGeoJson(hotspotsRef.current))
-      fitToCusco(map)
+      fitToPeru(map)
     })
 
     return () => {
@@ -441,6 +510,12 @@ function FireMapApp() {
     if (!mapReadyRef.current || !map?.getSource('fire-hotspots')) return
     map.getSource('fire-hotspots').setData(hotspotsToGeoJson(visibleHotspots))
   }, [visibleHotspots])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!mapReadyRef.current || !map?.getSource('peru-departments')) return
+    map.getSource('peru-departments').setData(departments)
+  }, [departments])
 
   useEffect(() => {
     const map = mapRef.current
@@ -485,10 +560,15 @@ function FireMapApp() {
   const focusStudyArea = () => {
     const map = mapRef.current
     if (!mapReadyRef.current || !map) return
-    const nextSelected = !studySelected
+    const nextScope = activeScope === 'peru' ? 'cusco' : 'peru'
+    const nextSelected = nextScope === 'cusco'
+    setActiveScope(nextScope)
     setStudySelected(nextSelected)
+    setSelectedDate('all')
+    setSelectionBounds(null)
     map.setFeatureState({ source: 'cusco-area', id: 'cusco' }, { selected: nextSelected })
-    fitToCusco(map)
+    if (nextSelected) fitToCusco(map)
+    else fitToPeru(map)
   }
 
   const toggleSelectionMode = () => {
@@ -520,7 +600,7 @@ function FireMapApp() {
     const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8' })
     const link = document.createElement('a')
     link.href = URL.createObjectURL(blob)
-    link.download = `cusco-posibles-incendios-${suffix}.csv`
+    link.download = `${activeScope}-posibles-incendios-${suffix}.csv`
     link.click()
     URL.revokeObjectURL(link.href)
   }
@@ -530,10 +610,10 @@ function FireMapApp() {
 
   return (
     <div className="fw-app">
-      <div ref={mapContainerRef} className="fw-map" aria-label="Mapa interactivo de posibles incendios en Cusco" />
+      <div ref={mapContainerRef} className="fw-map" aria-label="Mapa nacional interactivo de focos térmicos en Perú" />
       <header className="fw-topbar">
-        <div className="fw-brand"><span><Radar size={21}/></span><div><b>FIREWATCH</b><small>CUSCO · PERÚ</small></div></div>
-        <button className="fw-search" onClick={focusStudyArea}><Search size={18}/><div><b>Cusco, Perú</b><small>{studySelected ? 'Zona de estudio seleccionada' : 'Seleccionar zona de estudio'}</small></div><LocateFixed size={18}/></button>
+        <div className="fw-brand"><span><Radar size={21}/></span><div><b>FIREWATCH</b><small>PERÚ · MONITOREO</small></div></div>
+        <button className="fw-search" onClick={focusStudyArea}><Search size={18}/><div><b>{activeScope === 'peru' ? 'Perú nacional' : 'Cusco, Perú'}</b><small>{activeScope === 'peru' ? 'Abrir zona piloto de Cusco' : 'Volver a la vista nacional'}</small></div><LocateFixed size={18}/></button>
         <div className="fw-top-actions"><span className="fw-live"><i/>{result.mode === 'api' ? 'NASA FIRMS EN VIVO' : 'VISTA DE DEMOSTRACIÓN'}</span><button title="Ayuda"><CircleHelp size={19}/></button><button title="Menú"><Menu size={20}/></button></div>
       </header>
       <nav className="fw-rail" aria-label="Herramientas del mapa">
@@ -544,7 +624,7 @@ function FireMapApp() {
         <button title="Información" onClick={() => setDetailsOpen((value) => !value)}><Info size={20}/><span>Info</span></button>
       </nav>
       {detailsOpen && <aside className="fw-summary">
-        <div className="fw-summary-head"><div><p>MONITOREO ACTIVO</p><h1>Posibles incendios</h1><span>Cusco · {formatDate(selectedDate === 'all' ? null : selectedDate)}</span></div><button onClick={() => setDetailsOpen(false)}><X size={17}/></button></div>
+        <div className="fw-summary-head"><div><p>{activeScope === 'peru' ? 'MONITOREO NACIONAL' : 'ZONA PILOTO'}</p><h1>Posibles incendios</h1><span>{activeScope === 'peru' ? 'Perú' : 'Cusco'} · {formatDate(selectedDate === 'all' ? null : selectedDate)}</span></div><button onClick={() => setDetailsOpen(false)}><X size={17}/></button></div>
         <div className="fw-summary-status"><RiskBadge level={stats.risk}/><span>{loading ? 'Actualizando satélites…' : `${visibleHotspots.length} detecciones visibles`}</span></div>
         {error && <div className="fw-error"><ShieldAlert size={16}/>{error}</div>}
         <div className="fw-metrics">
@@ -555,7 +635,7 @@ function FireMapApp() {
         </div>
         <div className="fw-sensor-row"><span><i className="modis"/>MODIS · 1 km</span><span><i className="viirs"/>VIIRS · 375 m</span></div>
         <div className="fw-summary-actions"><button onClick={loadData} disabled={loading}><RefreshCw className={loading ? 'spin' : ''} size={16}/>Actualizar</button><button onClick={() => downloadCsv(visibleHotspots, selectedDate)}><Download size={16}/>CSV</button></div>
-        <p className="fw-disclaimer">Anomalías térmicas para verificación en campo. Límite oficial: INEI vía IGN.</p>
+        <p className="fw-disclaimer">Anomalías térmicas para verificación en campo. No representan por sí solas incendios confirmados.</p>
       </aside>}
       {layersOpen && !selectionBounds && <aside className="fw-layers">
         <div className="fw-layers-title"><span>CAPAS DEL MAPA</span><SlidersHorizontal size={15}/></div>
@@ -565,10 +645,10 @@ function FireMapApp() {
         <LayerButton active={selectionMode} icon={Scan} label="Área" tone="select" onClick={toggleSelectionMode}/>
         <div className="fw-scale"><span>INTENSIDAD FRP</span><div/><section><small>Baja</small><small>Media</small><small>Alta</small></section></div>
       </aside>}
-      <div className="fw-map-meta"><button onClick={focusStudyArea} className={studySelected ? 'is-active' : ''}><MapPin size={13}/>Zona de estudio · Cusco</button><span><Satellite size={13}/>MODIS + VIIRS</span><span><CloudSun size={13}/>Actualización cada 15 min</span></div>
+      <div className="fw-map-meta"><button onClick={focusStudyArea} className={studySelected ? 'is-active' : ''}><MapPin size={13}/>{activeScope === 'peru' ? 'Abrir piloto · Cusco' : 'Volver a Perú'}</button><span><Satellite size={13}/>MODIS + VIIRS</span><span><CloudSun size={13}/>Últimos 5 días</span></div>
       {selectionMode && <div className="fw-draw-hint"><Scan size={20}/><div><b>Selecciona un área</b><span>Arrastra sobre el mapa para dibujar el cuadro</span></div><button onClick={() => setSelectionMode(false)} title="Cancelar"><X size={16}/></button></div>}
       {selectionBounds && <aside className="fw-selection-card">
-        <div className="fw-selection-head"><div><p>ANÁLISIS DEL CUADRO</p><h2>Área seleccionada</h2><span>Resultados dentro de Cusco</span></div><button onClick={clearSelection} title="Limpiar selección"><Trash2 size={17}/></button></div>
+        <div className="fw-selection-head"><div><p>ANÁLISIS DEL CUADRO</p><h2>Área seleccionada</h2><span>Resultados dentro de {activeScope === 'peru' ? 'Perú' : 'Cusco'}</span></div><button onClick={clearSelection} title="Limpiar selección"><Trash2 size={17}/></button></div>
         <SatelliteSelectionMap bounds={selectionBounds} hotspots={selectedHotspots}/>
         <div className="fw-selection-source"><span>Vista satelital de referencia</span><b>Esri World Imagery · NASA FIRMS</b></div>
         <div className="fw-selection-grid">
@@ -584,7 +664,7 @@ function FireMapApp() {
       <section className="fw-timeline">
         <button className="fw-play" onClick={() => setPlaying((value) => !value)} title={playing ? 'Pausar' : 'Reproducir'}>{playing ? <Pause size={20}/> : <Play size={20}/>}</button>
         <div className="fw-time-info"><CalendarDays size={15}/><div><b>{selectedDate === 'all' ? 'Últimos 5 días' : formatDate(selectedDate)}</b><small>{visibleHotspots.length} detecciones</small></div></div>
-        <div className="fw-days"><button className={selectedDate === 'all' ? 'is-active' : ''} onClick={() => { setSelectedDate('all'); setPlaying(false) }}><span>Todos</span><b>5 días</b></button>{dates.map((date) => <button className={selectedDate === date ? 'is-active' : ''} key={date} onClick={() => { setSelectedDate(date); setPlaying(false) }}><span>{formatDay(date).split(' ')[0]}</span><b>{formatDay(date).split(' ')[1]}</b><i style={{ '--events': Math.min(100, cuscoHotspots.filter((point) => point.date === date).length * 12) }}/></button>)}</div>
+        <div className="fw-days"><button className={selectedDate === 'all' ? 'is-active' : ''} onClick={() => { setSelectedDate('all'); setPlaying(false) }}><span>Todos</span><b>5 días</b></button>{dates.map((date) => <button className={selectedDate === date ? 'is-active' : ''} key={date} onClick={() => { setSelectedDate(date); setPlaying(false) }}><span>{formatDay(date).split(' ')[0]}</span><b>{formatDay(date).split(' ')[1]}</b><i style={{ '--events': Math.min(100, scopedHotspots.filter((point) => point.date === date).length * (activeScope === 'peru' ? 2 : 12)) }}/></button>)}</div>
         <div className="fw-timeline-note"><span>UTC−5</span><b>{result.mode === 'api' ? 'DATOS EN VIVO' : 'MODO DEMO'}</b></div>
       </section>
     </div>

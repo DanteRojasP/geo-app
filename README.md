@@ -36,7 +36,8 @@ Endpoints esperados:
 
 ## Alcance de esta base
 
-- Zona de estudio exclusiva para el departamento de Cusco
+- Vista nacional de Perú con límites departamentales y focos FIRMS recientes
+- Cusco como zona piloto detallada, accesible desde la vista nacional
 - Límite departamental oficial del INEI, distribuido por el IGN
 - Resaltado interactivo por hover y selección por clic o toque
 - Máscara territorial, mapa de calor WebGL y detecciones puntuales
@@ -47,7 +48,7 @@ Endpoints esperados:
 - Descarga CSV
 - Diseño responsive
 - Modo demo y modo API
-- Interfaz cartográfica de pantalla completa enfocada únicamente en Cusco
+- Interfaz cartográfica de pantalla completa con navegación Perú ↔ Cusco
 - Capas de calor, detecciones puntuales y límite del área de interés
 - Cronología interactiva de los últimos cinco días
 

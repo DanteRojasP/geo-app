@@ -1,4 +1,11 @@
 export const departments = {
+  peru: {
+    name: 'Perú',
+    center: [-9.2, -75.1],
+    zoom: 4,
+    base: 124,
+    polygon: [[-0.1,-80.4],[-4.5,-81.3],[-9.4,-79.0],[-18.3,-70.3],[-12.5,-68.8],[-3.2,-70.1]],
+  },
   cusco: {
     name: 'Cusco',
     center: [-13.53, -71.97],
@@ -44,10 +51,11 @@ const seeded = (seed) => {
 export function makeHotspots(key) {
   const department = departments[key]
   const [lat, lon] = department.center
-  return Array.from({ length: 28 }, (_, index) => ({
+  const national = key === 'peru'
+  return Array.from({ length: national ? 110 : 28 }, (_, index) => ({
     id: `${key}-demo-${index}`,
-    lat: lat + (seeded(index * 11 + department.base) - 0.5) * 2.8,
-    lon: lon + (seeded(index * 17 + department.base) - 0.5) * 3.2,
+    lat: national ? -17.6 + seeded(index * 11 + department.base) * 16.9 : lat + (seeded(index * 11 + department.base) - 0.5) * 2.8,
+    lon: national ? -80.7 + seeded(index * 17 + department.base) * 11.4 : lon + (seeded(index * 17 + department.base) - 0.5) * 3.2,
     frp: Math.round(8 + seeded(index * 23 + department.base) * 96),
     confidence: Math.round(62 + seeded(index * 31 + department.base) * 37),
     sensor: index % 3 === 0 ? 'MODIS' : 'VIIRS',
