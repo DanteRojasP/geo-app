@@ -66,7 +66,8 @@ harmonizacion/
   cusco_ref/              limite.json, elev.npy, meta.json
   docs/                   CONTRATO.md (celda-día), CONTRATO_focos.md (focos)
   sequia_fuego/           análisis exploratorio + PROTOCOLO.md + figura
-  ci/verificar-datos.yml.sugerido
+.github/workflows/verificar-datos.yml   CI activo: corre verificar_datos.py en cada cambio de datos o scripts
+.gitignore                              datos crudos, temporales y credenciales
 ```
 
 ## 5. Contratos de datos (resumen; el detalle está en `harmonizacion/docs/`)
@@ -175,8 +176,8 @@ Al terminar: corre verificar_datos.py si tocaste datos o armonización, y añade
 
 ## 10. Convenciones de trabajo
 - Commits pequeños, un propósito cada uno. Prefijos: `datos:`, `app:`, `docs:`, `scripts:`. Sin `push --force`.
-- Ningún dato crudo ni credencial en el repo (§1.11). El archivo `gitignore.sugerido` del paquete lista lo que conviene ignorar: **combínalo con el `.gitignore` existente**, no lo sobrescribas.
-- Si el workflow de verificación (`ci/verificar-datos.yml.sugerido`) se va a activar, pide confirmación al usuario antes de añadirlo a `.github/workflows/`.
+- Ningún dato crudo ni credencial en el repo (§1.11). El `.gitignore` de la raíz ya lista lo que se ignora: amplíalo, no lo sobrescribas.
+- El workflow de verificación está activo en `.github/workflows/verificar-datos.yml` (autorizado por el usuario el 2026-11-14). Pide confirmación antes de cambiarlo o desactivarlo.
 - Las rutas de §4 son una propuesta: si la app ya tiene otra estructura, adáptala y anota el cambio en §4.
 - Contexto del repo según el equipo (no verificado aquí): `HowlO/NASA_CLAUDE_TEAM`; el sitio se publica ahora con Vercel (el workflow de Pages falla); `data/raw/` está excluido de git; ya existen apps de Julio y Dante, con un backend FastAPI de Julio y cinco departamentos en pantalla. Este MAESTRO debe integrarse con ese trabajo, no reemplazarlo (§12).
 
@@ -186,6 +187,7 @@ Al terminar: corre verificar_datos.py si tocaste datos o armonización, y añade
 | 2026-11-14 | v1: CSV de celda-día y de focos de Cusco, contratos, verificación, protocolo sequía-fuego, auditoría de scripts | sesión de ciencia de datos |
 | 2026-11-14 | v1.1: `requirements.txt` con matplotlib en todos los scripts de generación; los scripts aceptan los nombres de archivo de FIRMS y abortan si hay dos del mismo año; reglas 2 y 6 y órdenes P1/P7 adaptadas al trabajo del equipo (Vercel, FastAPI, cinco departamentos); nueva §12 | sesión de ciencia de datos |
 | 2026-11-14 | v1.2: decisiones del equipo cerradas (solo Cusco es real, backend FastAPI, sin estáticos); vocabulario único con "Focos armonizados" como unidad; casos de prueba del backend | sesión de ciencia de datos |
+| 2026-11-14 | Paquete v1.2 integrado al repo en la rama `antonio/modelo`; `.gitignore` creado desde la sugerencia; workflow `verificar-datos` activado con permiso del usuario; `verificar_datos.py` en verde y sumas de control de §6 confirmadas | sesión del repo |
 | | *(añade aquí una línea por cada tarea terminada)* | |
 
 ## 12. Decisiones del equipo y vocabulario (resueltas el 2026-11-14; no reabrir sin el usuario)
