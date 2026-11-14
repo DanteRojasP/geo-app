@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Explorador visual de incendios forestales en Perú con datos armonizados de MODIS y VIIRS.">
+  <title>Fuego Vivo Perú · NASA CLAUDE TEAM</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#inicio" aria-label="Ir al inicio">
+      <span class="brand-mark" aria-hidden="true">◉</span>
+      <span>FUEGO VIVO <b>PERÚ</b></span>
+    </a>
+    <nav aria-label="Navegación principal">
+      <a href="#explorador">Explorador</a>
+      <a href="#metodologia">Metodología</a>
+      <a class="repo-link" href="https://github.com/HowlO/NASA_CLAUDE_TEAM" target="_blank" rel="noreferrer">GitHub ↗</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero" id="inicio">
+      <div class="hero-copy">
+        <p class="eyebrow"><span></span> NASA SPACE APPS · 2026</p>
+        <h1>El fuego deja<br><em>un patrón.</em></h1>
+        <p class="lede">Un calendario de incendios armonizado para entender cuándo y dónde cambia la actividad del fuego en el Perú, sin confundir el cambio de sensor con un cambio real.</p>
+        <a class="primary-cta" href="#explorador">Explorar el calendario <span>↓</span></a>
+      </div>
+      <div class="hero-visual" aria-label="Visualización abstracta del Perú y focos de calor">
+        <div class="orbit orbit-one"></div>
+        <div class="orbit orbit-two"></div>
+        <svg class="peru" viewBox="0 0 330 470" role="img" aria-label="Silueta estilizada del Perú">
+          <path d="M67 16l46 25 51 4 38 26 56 16-8 51 35 27-20 35 22 42-39 29-12 48-47 20-12 50-42 49-38-25-12-60-31-39 18-58-30-44 23-39-18-53 26-30-5-53z"/>
+        </svg>
+        <div class="hotspot h1"><i></i><span>Cajamarca</span></div>
+        <div class="hotspot h2"><i></i><span>Huánuco</span></div>
+        <div class="hotspot h3"><i></i><span>Cusco</span></div>
+        <div class="hotspot h4"><i></i><span>Ucayali</span></div>
+        <div class="sensor-note">MODIS <b>2000—</b><br>VIIRS <b>2012—</b></div>
+      </div>
+    </section>
+
+    <section class="explorer" id="explorador">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow dark"><span></span> PROTOTIPO INTERACTIVO</p>
+          <h2>Calendario de actividad</h2>
+        </div>
+        <p>Selecciona una región y un periodo. Los valores mostrados son datos de demostración para visualizar el concepto del MVP.</p>
+      </div>
+
+      <div class="dashboard">
+        <aside class="filters">
+          <div class="filter-title"><span>01</span> Define tu consulta</div>
+          <label for="department">Departamento</label>
+          <div class="select-wrap">
+            <select id="department">
+              <option value="cusco">Cusco</option>
+              <option value="cajamarca">Cajamarca</option>
+              <option value="huanuco">Huánuco</option>
+              <option value="ucayali">Ucayali</option>
+              <option value="madre-de-dios">Madre de Dios</option>
+            </select>
+          </div>
+          <div class="date-row">
+            <div><label for="fromYear">Desde</label><select id="fromYear"></select></div>
+            <div><label for="toYear">Hasta</label><select id="toYear"></select></div>
+          </div>
+          <button id="updateBtn" class="update-btn">Actualizar vista <span>→</span></button>
+          <div class="legend-copy">
+            <span>FUENTES</span>
+            <p><i class="dot modis"></i> MODIS · 1 km</p>
+            <p><i class="dot viirs"></i> VIIRS · 375 m</p>
+          </div>
+        </aside>
+
+        <div class="results">
+          <div class="result-top">
+            <div><span class="mini-label">ÁREA SELECCIONADA</span><strong id="areaName">CUSCO</strong></div>
+            <div class="metrics">
+              <div><span class="mini-label">EVENTOS</span><strong id="eventCount">1,284</strong></div>
+              <div><span class="mini-label">ANOMALÍA</span><strong id="anomaly" class="positive">+18%</strong></div>
+            </div>
+          </div>
+          <div class="heatmap-wrap">
+            <div class="heatmap" id="heatmap" aria-label="Calendario de calor de actividad mensual"></div>
+            <div class="scale"><span>Menor actividad</span><i></i><i></i><i></i><i></i><i></i><span>Mayor actividad</span></div>
+          </div>
+          <div class="result-bottom">
+            <p><span class="pulse"></span> Vista de demostración · Datos sintéticos</p>
+            <button id="downloadBtn">Descargar CSV <span>↓</span></button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="method" id="metodologia">
+      <div class="method-intro">
+        <p class="eyebrow"><span></span> CÓMO FUNCIONA</p>
+        <h2>Dos sensores.<br>Una sola historia.</h2>
+        <p>MODIS y VIIRS observan el fuego con resoluciones distintas. El proyecto los lleva a una grilla común para construir una serie temporal consistente.</p>
+      </div>
+      <div class="steps">
+        <article><span>01</span><h3>Normalizar</h3><p>Convertimos la confianza de cada sensor a una escala comparable de 0 a 1.</p></article>
+        <article><span>02</span><h3>Armonizar</h3><p>Proyectamos las detecciones sobre una grilla común de un kilómetro.</p></article>
+        <article><span>03</span><h3>Deduplicar</h3><p>Una celda, un día, un evento: conservamos la detección con mayor FRP.</p></article>
+        <article><span>04</span><h3>Comparar</h3><p>Medimos cada mes contra su mediana histórica para detectar anomalías.</p></article>
+      </div>
+    </section>
+
+    <section class="mission">
+      <p class="eyebrow dark"><span></span> LA MISIÓN</p>
+      <blockquote>Convertir décadas de observación satelital en decisiones más claras para quienes protegen el territorio.</blockquote>
+      <div class="audiences"><span>Equipos de emergencia</span><span>Científicos</span><span>Gestores de tierras</span><span>Brigadistas</span></div>
+    </section>
+  </main>
+
+  <footer>
+    <div><b>FUEGO VIVO PERÚ</b><span>NASA CLAUDE TEAM · 2026</span></div>
+    <p>We acknowledge the use of data and/or imagery from NASA's FIRMS.</p>
+    <a href="https://github.com/HowlO/NASA_CLAUDE_TEAM" target="_blank" rel="noreferrer">Ver proyecto ↗</a>
+  </footer>
+  <script src="script.js"></script>
+</body>
+</html>
