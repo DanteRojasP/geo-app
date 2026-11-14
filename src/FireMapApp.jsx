@@ -4,7 +4,7 @@ import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&ur
 import {
   Activity, CalendarDays, CircleHelp, CloudSun, Download, Flame, Gauge, Info,
   Layers3, LocateFixed, MapPin, Menu, Pause, Play, Radar, RefreshCw, Satellite,
-  Search, ShieldAlert, SlidersHorizontal, ThermometerSun, X,
+  Scan, Search, ShieldAlert, SlidersHorizontal, ThermometerSun, Trash2, X,
 } from 'lucide-react'
 import cuscoBoundaryRaw from './data/cusco-boundary.json'
 import { getFireOverview } from './services/fireApi.js'
@@ -54,6 +54,42 @@ function hotspotsToGeoJson(points) {
   }
 }
 
+function pointInRing(lon, lat, ring) {
+  let inside = false
+  for (let index = 0, previous = ring.length - 1; index < ring.length; previous = index++) {
+    const [x1, y1] = ring[index]
+    const [x2, y2] = ring[previous]
+    if ((y1 > lat) !== (y2 > lat) && lon < ((x2 - x1) * (lat - y1)) / (y2 - y1) + x1) inside = !inside
+  }
+  return inside
+}
+
+function isInsideCusco(point) {
+  const rings = CUSCO_FEATURE.geometry.coordinates
+  return pointInRing(point.lon, point.lat, rings[0]) && !rings.slice(1).some((ring) => pointInRing(point.lon, point.lat, ring))
+}
+
+function boundsToGeoJson(bounds) {
+  if (!bounds) return { type: 'FeatureCollection', features: [] }
+  const { west, east, south, north } = bounds
+  return {
+    type: 'FeatureCollection',
+    features: [{
+      type: 'Feature',
+      properties: {},
+      geometry: { type: 'Polygon', coordinates: [[[west, south], [east, south], [east, north], [west, north], [west, south]]] },
+    }],
+  }
+}
+
+function summarizeHotspots(points) {
+  const frp = points.reduce((sum, point) => sum + point.frp, 0)
+  const confidence = points.length ? Math.round(points.reduce((sum, point) => sum + point.confidence, 0) / points.length) : 0
+  const modis = points.filter((point) => point.sensor === 'MODIS').length
+  const risk = points.length >= 25 || frp >= 600 ? 'Alto' : points.length >= 10 || frp >= 180 ? 'Moderado' : 'Bajo'
+  return { frp, confidence, modis, viirs: points.length - modis, risk }
+}
+
 function fitToCusco(map, compact = window.innerWidth < 650) {
   map.fitBounds(CUSCO_BOUNDS, {
     padding: compact
@@ -95,6 +131,7 @@ function FireMapApp() {
   const mapRef = useRef(null)
   const mapReadyRef = useRef(false)
   const hotspotsRef = useRef([])
+  const selectionModeRef = useRef(false)
   const [result, setResult] = useState({ hotspots: [], mode: 'demo', metadata: {} })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -104,6 +141,8 @@ function FireMapApp() {
   const [detailsOpen, setDetailsOpen] = useState(true)
   const [layersOpen, setLayersOpen] = useState(true)
   const [studySelected, setStudySelected] = useState(false)
+  const [selectionMode, setSelectionMode] = useState(false)
+  const [selectionBounds, setSelectionBounds] = useState(null)
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -120,9 +159,12 @@ function FireMapApp() {
 
   useEffect(() => { loadData() }, [loadData])
 
-  const dates = useMemo(() => [...new Set(result.hotspots.map((point) => point.date).filter(Boolean))].sort().slice(-5), [result.hotspots])
-  const visibleHotspots = useMemo(() => selectedDate === 'all' ? result.hotspots : result.hotspots.filter((point) => point.date === selectedDate), [result.hotspots, selectedDate])
+  const cuscoHotspots = useMemo(() => result.hotspots.filter(isInsideCusco), [result.hotspots])
+  const dates = useMemo(() => [...new Set(cuscoHotspots.map((point) => point.date).filter(Boolean))].sort().slice(-5), [cuscoHotspots])
+  const visibleHotspots = useMemo(() => selectedDate === 'all' ? cuscoHotspots : cuscoHotspots.filter((point) => point.date === selectedDate), [cuscoHotspots, selectedDate])
+  const selectedHotspots = useMemo(() => selectionBounds ? visibleHotspots.filter((point) => point.lon >= selectionBounds.west && point.lon <= selectionBounds.east && point.lat >= selectionBounds.south && point.lat <= selectionBounds.north) : [], [selectionBounds, visibleHotspots])
   hotspotsRef.current = visibleHotspots
+  selectionModeRef.current = selectionMode
 
   useEffect(() => {
     if (!playing || !dates.length) return undefined
@@ -149,6 +191,69 @@ function FireMapApp() {
     mapRef.current = map
     map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right')
     map.addControl(new maplibregl.NavigationControl({ showCompass: false, visualizePitch: false }), 'bottom-right')
+    const canvas = map.getCanvas()
+    const canvasContainer = map.getCanvasContainer()
+    let dragStart = null
+    let drawBox = null
+    let suppressNextClick = false
+
+    const pointerPosition = (event) => {
+      const rect = canvas.getBoundingClientRect()
+      return { x: event.clientX - rect.left, y: event.clientY - rect.top }
+    }
+
+    const removeDrawBox = () => {
+      drawBox?.remove()
+      drawBox = null
+      dragStart = null
+    }
+
+    const onPointerDown = (event) => {
+      if (!selectionModeRef.current || event.button !== 0) return
+      event.preventDefault()
+      event.stopPropagation()
+      dragStart = pointerPosition(event)
+      drawBox = document.createElement('div')
+      drawBox.className = 'fw-selection-box'
+      canvasContainer.appendChild(drawBox)
+      canvas.setPointerCapture?.(event.pointerId)
+    }
+
+    const onPointerMove = (event) => {
+      if (!dragStart || !drawBox) return
+      event.preventDefault()
+      event.stopPropagation()
+      const current = pointerPosition(event)
+      drawBox.style.left = `${Math.min(dragStart.x, current.x)}px`
+      drawBox.style.top = `${Math.min(dragStart.y, current.y)}px`
+      drawBox.style.width = `${Math.abs(current.x - dragStart.x)}px`
+      drawBox.style.height = `${Math.abs(current.y - dragStart.y)}px`
+    }
+
+    const onPointerUp = (event) => {
+      if (!dragStart || !drawBox) return
+      event.preventDefault()
+      event.stopPropagation()
+      const end = pointerPosition(event)
+      const width = Math.abs(end.x - dragStart.x)
+      const height = Math.abs(end.y - dragStart.y)
+      if (width >= 8 && height >= 8) {
+        suppressNextClick = true
+        window.setTimeout(() => { suppressNextClick = false }, 0)
+        const first = map.unproject([Math.min(dragStart.x, end.x), Math.max(dragStart.y, end.y)])
+        const second = map.unproject([Math.max(dragStart.x, end.x), Math.min(dragStart.y, end.y)])
+        setSelectionBounds({ west: first.lng, south: first.lat, east: second.lng, north: second.lat })
+        if (window.innerWidth < 650) setDetailsOpen(false)
+        setSelectionMode(false)
+      }
+      removeDrawBox()
+      canvas.releasePointerCapture?.(event.pointerId)
+    }
+
+    canvas.addEventListener('pointerdown', onPointerDown, true)
+    canvas.addEventListener('pointermove', onPointerMove, true)
+    canvas.addEventListener('pointerup', onPointerUp, true)
+    canvas.addEventListener('pointercancel', removeDrawBox, true)
 
     const showAreaPopup = (lngLat) => {
       new maplibregl.Popup({ closeButton: false, offset: 12, className: 'fw-map-popup' })
@@ -164,6 +269,8 @@ function FireMapApp() {
       map.addSource('cusco-mask', { type: 'geojson', data: CUSCO_MASK })
       map.addSource('cusco-area', { type: 'geojson', data: CUSCO_BOUNDARY })
       map.addSource('fire-hotspots', { type: 'geojson', data: hotspotsToGeoJson([]) })
+      map.addSource('selection-area', { type: 'geojson', data: boundsToGeoJson(null) })
+      map.addSource('selected-hotspots', { type: 'geojson', data: hotspotsToGeoJson([]) })
 
       map.addLayer({ id: 'outside-mask', type: 'fill', source: 'cusco-mask', paint: { 'fill-color': '#07130f', 'fill-opacity': 0.3 } })
       map.addLayer({
@@ -198,6 +305,12 @@ function FireMapApp() {
           'circle-stroke-width': 1.2,
         },
       })
+      map.addLayer({ id: 'selection-area-fill', type: 'fill', source: 'selection-area', paint: { 'fill-color': '#5ee7d7', 'fill-opacity': 0.12 } })
+      map.addLayer({ id: 'selection-area-line', type: 'line', source: 'selection-area', paint: { 'line-color': '#5ee7d7', 'line-width': 2.5, 'line-dasharray': [2, 1.4] } })
+      map.addLayer({
+        id: 'selected-fire-points', type: 'circle', source: 'selected-hotspots',
+        paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, 7, 10, 11], 'circle-color': '#5ee7d7', 'circle-opacity': 0.95, 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 2 },
+      })
 
       map.on('mouseenter', 'study-area-fill', () => {
         map.getCanvas().style.cursor = 'pointer'
@@ -208,6 +321,7 @@ function FireMapApp() {
         map.setFeatureState({ source: 'cusco-area', id: 'cusco' }, { hover: false })
       })
       map.on('click', 'study-area-fill', (event) => {
+        if (suppressNextClick) return
         map.setFeatureState({ source: 'cusco-area', id: 'cusco' }, { selected: true })
         setStudySelected(true)
         fitToCusco(map)
@@ -216,6 +330,7 @@ function FireMapApp() {
       map.on('mouseenter', 'fire-points', () => { map.getCanvas().style.cursor = 'pointer' })
       map.on('mouseleave', 'fire-points', () => { map.getCanvas().style.cursor = '' })
       map.on('click', 'fire-points', (event) => {
+        if (suppressNextClick) return
         const feature = event.features?.[0]
         if (!feature) return
         const properties = feature.properties
@@ -236,6 +351,11 @@ function FireMapApp() {
 
     return () => {
       mapReadyRef.current = false
+      canvas.removeEventListener('pointerdown', onPointerDown, true)
+      canvas.removeEventListener('pointermove', onPointerMove, true)
+      canvas.removeEventListener('pointerup', onPointerUp, true)
+      canvas.removeEventListener('pointercancel', removeDrawBox, true)
+      removeDrawBox()
       map.remove()
       mapRef.current = null
     }
@@ -246,6 +366,36 @@ function FireMapApp() {
     if (!mapReadyRef.current || !map?.getSource('fire-hotspots')) return
     map.getSource('fire-hotspots').setData(hotspotsToGeoJson(visibleHotspots))
   }, [visibleHotspots])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!mapReadyRef.current || !map) return
+    map.getContainer().classList.toggle('is-selecting', selectionMode)
+    if (selectionMode) {
+      map.dragPan.disable()
+      map.touchZoomRotate.disable()
+      map.doubleClickZoom.disable()
+    } else {
+      map.dragPan.enable()
+      map.touchZoomRotate.enable()
+      map.doubleClickZoom.enable()
+    }
+  }, [selectionMode])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!mapReadyRef.current || !map?.getSource('selection-area')) return
+    map.getSource('selection-area').setData(boundsToGeoJson(selectionBounds))
+    map.getSource('selected-hotspots').setData(hotspotsToGeoJson(selectedHotspots))
+  }, [selectedHotspots, selectionBounds])
+
+  useEffect(() => {
+    const cancelSelection = (event) => {
+      if (event.key === 'Escape') setSelectionMode(false)
+    }
+    window.addEventListener('keydown', cancelSelection)
+    return () => window.removeEventListener('keydown', cancelSelection)
+  }, [])
 
   useEffect(() => {
     const map = mapRef.current
@@ -266,22 +416,33 @@ function FireMapApp() {
     fitToCusco(map)
   }
 
-  const stats = useMemo(() => {
-    const frp = visibleHotspots.reduce((sum, point) => sum + point.frp, 0)
-    const confidence = visibleHotspots.length ? Math.round(visibleHotspots.reduce((sum, point) => sum + point.confidence, 0) / visibleHotspots.length) : 0
-    const modis = visibleHotspots.filter((point) => point.sensor === 'MODIS').length
-    const viirs = visibleHotspots.length - modis
-    const risk = visibleHotspots.length >= 25 || frp >= 600 ? 'Alto' : visibleHotspots.length >= 10 || frp >= 180 ? 'Moderado' : 'Bajo'
-    return { frp, confidence, modis, viirs, risk }
-  }, [visibleHotspots])
+  const toggleSelectionMode = () => {
+    setPlaying(false)
+    setSelectionMode((active) => !active)
+  }
 
-  const downloadCsv = () => {
+  const clearSelection = () => {
+    setSelectionMode(false)
+    setSelectionBounds(null)
+  }
+
+  const stats = useMemo(() => summarizeHotspots(visibleHotspots), [visibleHotspots])
+  const selectionStats = useMemo(() => summarizeHotspots(selectedHotspots), [selectedHotspots])
+  const selectionArea = useMemo(() => {
+    if (!selectionBounds) return 0
+    const middleLatitude = (selectionBounds.north + selectionBounds.south) / 2 * Math.PI / 180
+    const width = Math.abs(selectionBounds.east - selectionBounds.west) * 111.32 * Math.cos(middleLatitude)
+    const height = Math.abs(selectionBounds.north - selectionBounds.south) * 110.57
+    return width * height
+  }, [selectionBounds])
+
+  const downloadCsv = (points, suffix) => {
     const rows = ['fecha,sensor,fuente,latitud,longitud,frp_mw,confianza']
-    visibleHotspots.forEach((point) => rows.push([point.date, point.sensor, point.source || point.sensor, point.lat, point.lon, point.frp, point.confidence].join(',')))
+    points.forEach((point) => rows.push([point.date, point.sensor, point.source || point.sensor, point.lat, point.lon, point.frp, point.confidence].join(',')))
     const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8' })
     const link = document.createElement('a')
     link.href = URL.createObjectURL(blob)
-    link.download = `cusco-posibles-incendios-${selectedDate}.csv`
+    link.download = `cusco-posibles-incendios-${suffix}.csv`
     link.click()
     URL.revokeObjectURL(link.href)
   }
@@ -299,6 +460,7 @@ function FireMapApp() {
       </header>
       <nav className="fw-rail" aria-label="Herramientas del mapa">
         <button className="is-active" title="Monitoreo"><Flame size={20}/><span>Fuego</span></button>
+        <button className={selectionMode ? 'is-active select' : ''} title="Seleccionar área" onClick={toggleSelectionMode}><Scan size={20}/><span>Área</span></button>
         <button title="Capas" onClick={() => setLayersOpen((value) => !value)}><Layers3 size={20}/><span>Capas</span></button>
         <button title="Alertas"><ShieldAlert size={20}/><span>Alertas</span></button>
         <button title="Información" onClick={() => setDetailsOpen((value) => !value)}><Info size={20}/><span>Info</span></button>
@@ -314,21 +476,35 @@ function FireMapApp() {
           <Metric icon={Satellite} label="MODIS / VIIRS" value={`${stats.modis} / ${stats.viirs}`} tone="blue"/>
         </div>
         <div className="fw-sensor-row"><span><i className="modis"/>MODIS · 1 km</span><span><i className="viirs"/>VIIRS · 375 m</span></div>
-        <div className="fw-summary-actions"><button onClick={loadData} disabled={loading}><RefreshCw className={loading ? 'spin' : ''} size={16}/>Actualizar</button><button onClick={downloadCsv}><Download size={16}/>CSV</button></div>
+        <div className="fw-summary-actions"><button onClick={loadData} disabled={loading}><RefreshCw className={loading ? 'spin' : ''} size={16}/>Actualizar</button><button onClick={() => downloadCsv(visibleHotspots, selectedDate)}><Download size={16}/>CSV</button></div>
         <p className="fw-disclaimer">Anomalías térmicas para verificación en campo. Límite oficial: INEI vía IGN.</p>
       </aside>}
-      {layersOpen && <aside className="fw-layers">
+      {layersOpen && !selectionBounds && <aside className="fw-layers">
         <div className="fw-layers-title"><span>CAPAS DEL MAPA</span><SlidersHorizontal size={15}/></div>
         <LayerButton active={activeLayer === 'heat'} icon={ThermometerSun} label="Calor" tone="heat" onClick={() => setActiveLayer('heat')}/>
         <LayerButton active={activeLayer === 'points'} icon={MapPin} label="Puntos" tone="points" onClick={() => setActiveLayer('points')}/>
         <LayerButton active={activeLayer === 'aoi'} icon={Layers3} label="Límite" tone="boundary" onClick={() => setActiveLayer('aoi')}/>
+        <LayerButton active={selectionMode} icon={Scan} label="Área" tone="select" onClick={toggleSelectionMode}/>
         <div className="fw-scale"><span>INTENSIDAD FRP</span><div/><section><small>Baja</small><small>Media</small><small>Alta</small></section></div>
       </aside>}
       <div className="fw-map-meta"><button onClick={focusStudyArea} className={studySelected ? 'is-active' : ''}><MapPin size={13}/>Zona de estudio · Cusco</button><span><Satellite size={13}/>MODIS + VIIRS</span><span><CloudSun size={13}/>Actualización cada 15 min</span></div>
+      {selectionMode && <div className="fw-draw-hint"><Scan size={20}/><div><b>Selecciona un área</b><span>Arrastra sobre el mapa para dibujar el cuadro</span></div><button onClick={() => setSelectionMode(false)} title="Cancelar"><X size={16}/></button></div>}
+      {selectionBounds && <aside className="fw-selection-card">
+        <div className="fw-selection-head"><div><p>ANÁLISIS DEL CUADRO</p><h2>Área seleccionada</h2><span>Resultados dentro de Cusco</span></div><button onClick={clearSelection} title="Limpiar selección"><Trash2 size={17}/></button></div>
+        <div className="fw-selection-grid">
+          <article><span>Detecciones</span><b>{selectedHotspots.length}</b></article>
+          <article><span>FRP acumulado</span><b>{selectionStats.frp.toFixed(1)} MW</b></article>
+          <article><span>Confianza</span><b>{selectionStats.confidence}%</b></article>
+          <article><span>MODIS / VIIRS</span><b>{selectionStats.modis} / {selectionStats.viirs}</b></article>
+          <article><span>Superficie del cuadro</span><b>{selectionArea >= 1000 ? `${(selectionArea / 1000).toFixed(1)} mil km²` : `${selectionArea.toFixed(0)} km²`}</b></article>
+          <article><span>Nivel estimado</span><b className={`risk-${selectionStats.risk.toLowerCase()}`}>{selectionStats.risk}</b></article>
+        </div>
+        <div className="fw-selection-actions"><button onClick={toggleSelectionMode}><Scan size={15}/>Redibujar</button><button onClick={() => downloadCsv(selectedHotspots, 'area-seleccionada')} disabled={!selectedHotspots.length}><Download size={15}/>CSV</button></div>
+      </aside>}
       <section className="fw-timeline">
         <button className="fw-play" onClick={() => setPlaying((value) => !value)} title={playing ? 'Pausar' : 'Reproducir'}>{playing ? <Pause size={20}/> : <Play size={20}/>}</button>
         <div className="fw-time-info"><CalendarDays size={15}/><div><b>{selectedDate === 'all' ? 'Últimos 5 días' : formatDate(selectedDate)}</b><small>{visibleHotspots.length} detecciones</small></div></div>
-        <div className="fw-days"><button className={selectedDate === 'all' ? 'is-active' : ''} onClick={() => { setSelectedDate('all'); setPlaying(false) }}><span>Todos</span><b>5 días</b></button>{dates.map((date) => <button className={selectedDate === date ? 'is-active' : ''} key={date} onClick={() => { setSelectedDate(date); setPlaying(false) }}><span>{formatDay(date).split(' ')[0]}</span><b>{formatDay(date).split(' ')[1]}</b><i style={{ '--events': Math.min(100, result.hotspots.filter((point) => point.date === date).length * 12) }}/></button>)}</div>
+        <div className="fw-days"><button className={selectedDate === 'all' ? 'is-active' : ''} onClick={() => { setSelectedDate('all'); setPlaying(false) }}><span>Todos</span><b>5 días</b></button>{dates.map((date) => <button className={selectedDate === date ? 'is-active' : ''} key={date} onClick={() => { setSelectedDate(date); setPlaying(false) }}><span>{formatDay(date).split(' ')[0]}</span><b>{formatDay(date).split(' ')[1]}</b><i style={{ '--events': Math.min(100, cuscoHotspots.filter((point) => point.date === date).length * 12) }}/></button>)}</div>
         <div className="fw-timeline-note"><span>UTC−5</span><b>{result.mode === 'api' ? 'DATOS EN VIVO' : 'MODO DEMO'}</b></div>
       </section>
     </div>

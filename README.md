@@ -40,6 +40,8 @@ Endpoints esperados:
 - Límite departamental oficial del INEI, distribuido por el IGN
 - Resaltado interactivo por hover y selección por clic o toque
 - Máscara territorial, mapa de calor WebGL y detecciones puntuales
+- Selección rectangular con análisis agregado, resaltado de focos y descarga CSV
+- Filtrado geográfico punto-en-polígono para excluir detecciones fuera de Cusco
 - Métricas de eventos, FRP y confianza
 - Descarga CSV
 - Diseño responsive
