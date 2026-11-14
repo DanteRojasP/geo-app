@@ -150,3 +150,14 @@
 
 @media(max-width:950px){.fw-layers{top:78px;right:12px;bottom:auto;width:52px;padding:5px;display:block;border-radius:18px}.fw-layers-title{height:25px;display:grid}.fw-basemap-switch{width:auto;margin:0 0 4px;padding:0 0 5px;border:0;border-bottom:1px solid rgba(255,255,255,.14)}.fw-basemap-switch>div{height:auto;display:flex;flex-direction:column}.fw-basemap-switch button{width:40px;height:36px}.fw-layer-button{width:40px;height:40px}.fw-layer-button>span{width:31px;height:31px}.fw-scale{display:block}.fw-basemap-switch button b,.fw-layer-button b{display:none}}
 @media(max-width:650px){.fw-layers{top:68px;right:8px;width:46px;padding:4px}.fw-layers-title{height:22px}.fw-basemap-switch button{width:36px;height:32px}.fw-layer-button{width:36px;height:36px}.fw-layer-button>span{width:28px;height:28px}.fw-scale{margin-left:3px;margin-right:3px}.fw-scale>div{width:30px}}
+
+/* Floating circles without a rail container */
+.fw-layers{width:44px;padding:0;border:0;border-radius:0;background:transparent;box-shadow:none;backdrop-filter:none}
+.fw-layers-title,.fw-scale{display:none}
+.fw-basemap-switch{margin:0;padding:0;border:0}.fw-basemap-switch>div{gap:7px}
+.fw-basemap-switch button{width:40px;height:40px;margin:0 2px;border-radius:50%;background:rgba(20,31,40,.92);box-shadow:0 4px 13px rgba(0,0,0,.26)}
+.fw-basemap-switch button.is-active{box-shadow:0 0 0 2px #fff,0 4px 13px rgba(0,0,0,.28)}
+.fw-layer-button{width:44px;height:44px;margin:4px 0;background:transparent}.fw-layer-button:hover,.fw-layer-button.is-active{background:transparent}.fw-layer-button>span{box-shadow:inset 0 0 0 1px rgba(255,255,255,.22),0 4px 13px rgba(0,0,0,.26)}
+
+@media(max-width:950px){.fw-layers{width:40px;padding:0}.fw-layers-title,.fw-scale{display:none}.fw-basemap-switch{margin:0;padding:0;border:0}.fw-basemap-switch button{width:36px;height:36px;margin:0 2px}.fw-layer-button{width:40px;height:40px;margin:3px 0}}
+@media(max-width:650px){.fw-layers{width:36px;padding:0}.fw-basemap-switch button{width:34px;height:34px;margin:0 1px}.fw-layer-button{width:36px;height:36px;margin:3px 0}.fw-layer-button>span{width:28px;height:28px}}
