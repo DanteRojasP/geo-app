@@ -5,7 +5,8 @@ Base frontend para el calendario armonizado de incendios forestales del equipo N
 ## Stack
 
 - React + Vite
-- Leaflet + React Leaflet
+- MapLibre GL JS (WebGL)
+- Mapa vectorial OpenFreeMap / OpenStreetMap
 - JavaScript
 - CSS responsive sin framework visual
 - Adaptador preparado para FastAPI
@@ -35,10 +36,11 @@ Endpoints esperados:
 
 ## Alcance de esta base
 
-- Selección de departamento y periodo
-- Mapa Leaflet con AOI y hotspots de muestra
-- Métricas de eventos, anomalía, FRP y confianza
-- Calendario histórico mes × año
+- Zona de estudio exclusiva para el departamento de Cusco
+- Límite departamental oficial del INEI, distribuido por el IGN
+- Resaltado interactivo por hover y selección por clic o toque
+- Máscara territorial, mapa de calor WebGL y detecciones puntuales
+- Métricas de eventos, FRP y confianza
 - Descarga CSV
 - Diseño responsive
 - Modo demo y modo API

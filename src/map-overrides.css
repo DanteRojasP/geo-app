@@ -1,4 +1,0 @@
-.map .leaflet-tile {
-  filter: grayscale(.72) saturate(.7) brightness(.82) contrast(1.08);
-  opacity: 1;
-}
