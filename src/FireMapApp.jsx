@@ -2,8 +2,8 @@ import { createElement, useCallback, useEffect, useMemo, useRef, useState } from
 import * as maplibregl from 'maplibre-gl'
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import {
-  Activity, CircleHelp, CloudSun, Download, Flame, Gauge, Info,
-  Layers3, Map as MapIcon, MapPin, Menu, Mountain, Pause, Play, Radar, RefreshCw, Satellite,
+  Activity, CloudSun, Download, Flame, Gauge, Info,
+  Layers3, Map as MapIcon, MapPin, Mountain, Pause, Play, RefreshCw, Satellite,
   Scan, ShieldAlert, SlidersHorizontal, ThermometerSun, Trash2, X,
 } from 'lucide-react'
 import cuscoBoundaryRaw from './data/cusco-boundary.json'
@@ -695,11 +695,7 @@ function FireMapApp() {
   return (
     <div className="fw-app">
       <div ref={mapContainerRef} className="fw-map" aria-label="Mapa nacional interactivo de focos térmicos en Perú" />
-      <header className="fw-topbar">
-        <div className="fw-brand"><span><Radar size={19}/></span><div><b>Firewatch Perú</b><small>Observatorio de actividad térmica</small></div></div>
-        <button className="fw-search" onClick={focusStudyArea}><MapPin size={17}/><div><small>Ámbito de monitoreo</small><b>{activeScope === 'peru' ? 'Perú nacional' : 'Cusco, Perú'}</b></div><span className="fw-scope-action">{activeScope === 'peru' ? 'Ver piloto Cusco' : 'Ver todo el país'}</span></button>
-        <div className="fw-top-actions"><span className="fw-live"><i/>{result.mode === 'api' ? 'FIRMS conectado' : 'Modo demostración'}</span><button title="Ayuda"><CircleHelp size={18}/></button><button title="Menú"><Menu size={19}/></button></div>
-      </header>
+      <div className="fw-nubel-brand" aria-label="Nubel Team"><img src="/nubel-team-n-friendly.png" alt="Nubel Team"/></div>
       <nav className="fw-rail" aria-label="Herramientas del mapa">
         <button className="is-active" title="Monitoreo"><Flame size={20}/><span>Fuego</span></button>
         <button className={selectionMode ? 'is-active select' : ''} title="Seleccionar área" onClick={toggleSelectionMode}><Scan size={20}/><span>Área</span></button>
