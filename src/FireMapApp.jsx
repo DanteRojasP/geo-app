@@ -259,7 +259,7 @@ function FireMapApp() {
   const [activeScope, setActiveScope] = useState('peru')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [activeLayer, setActiveLayer] = useState('activity')
+  const [activeLayer, setActiveLayer] = useState('surface')
   const [selectedDate, setSelectedDate] = useState('all')
   const [playing, setPlaying] = useState(false)
   const [detailsOpen, setDetailsOpen] = useState(true)
@@ -421,7 +421,7 @@ function FireMapApp() {
         paint: {
           'fill-color': ['interpolate', ['linear'], ['coalesce', ['get', 'fireCount'], 0],
             0, '#17362c', 1, '#d9ef8b', 5, '#fee08b', 15, '#fdae61', 35, '#f46d43', 70, '#a50026'],
-          'fill-opacity': ['case', ['boolean', ['feature-state', 'hover'], false], 0.9, 0.72],
+          'fill-opacity': ['case', ['boolean', ['feature-state', 'hover'], false], 0.18, 0.045],
         },
       })
       map.addLayer({
@@ -442,13 +442,16 @@ function FireMapApp() {
       })
       map.addLayer({
         id: 'fire-heat', type: 'heatmap', source: 'fire-hotspots', maxzoom: 12,
-        layout: { visibility: 'none' },
+        layout: { visibility: 'visible' },
         paint: {
-          'heatmap-weight': ['interpolate', ['linear'], ['get', 'frp'], 0, 0.18, 40, 0.55, 100, 1],
-          'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 5, 0.75, 10, 1.75],
-          'heatmap-color': ['interpolate', ['linear'], ['heatmap-density'], 0, 'rgba(255,229,122,0)', 0.2, '#ffe57a', 0.42, '#ffb13b', 0.65, '#ff6534', 0.82, '#eb2d2d', 1, '#9f001f'],
-          'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 5, 20, 8, 38, 11, 58],
-          'heatmap-opacity': ['interpolate', ['linear'], ['zoom'], 5, 0.72, 11, 0.35],
+          'heatmap-weight': ['interpolate', ['linear'], ['get', 'frp'], 0, 0.12, 15, 0.32, 45, 0.65, 110, 1],
+          'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 3.5, 0.8, 6, 1.15, 10, 1.7],
+          'heatmap-color': ['interpolate', ['linear'], ['heatmap-density'],
+            0, 'rgba(43,131,186,0)', 0.08, 'rgba(43,131,186,.34)', 0.2, '#66c2a5',
+            0.36, '#d9ef8b', 0.52, '#fee08b', 0.68, '#fdae61', 0.82, '#f46d43',
+            0.93, '#d73027', 1, '#7f003b'],
+          'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 3.5, 34, 5, 48, 7, 68, 10, 104],
+          'heatmap-opacity': ['interpolate', ['linear'], ['zoom'], 3.5, 0.82, 8, 0.76, 11, 0.52],
         },
       })
       map.addLayer({
@@ -595,7 +598,7 @@ function FireMapApp() {
   useEffect(() => {
     const map = mapRef.current
     if (!mapReadyRef.current) return
-    map.setLayoutProperty('fire-heat', 'visibility', activeLayer === 'heat' ? 'visible' : 'none')
+    map.setLayoutProperty('fire-heat', 'visibility', activeLayer === 'surface' ? 'visible' : 'none')
     map.setLayoutProperty('fire-points', 'visibility', activeLayer === 'points' ? 'visible' : 'none')
     map.setPaintProperty('department-fill', 'fill-opacity', activeLayer === 'activity'
       ? ['case', ['boolean', ['feature-state', 'hover'], false], 0.9, 0.72]
@@ -683,16 +686,16 @@ function FireMapApp() {
         </div>
         <div className="fw-sensor-row"><span><i className="modis"/>MODIS · 1 km</span><span><i className="viirs"/>VIIRS · 375 m</span></div>
         <div className="fw-summary-actions"><button onClick={loadData} disabled={loading}><RefreshCw className={loading ? 'spin' : ''} size={16}/>Actualizar</button><button onClick={() => downloadCsv(visibleHotspots, selectedDate)}><Download size={16}/>CSV</button></div>
-        <p className="fw-disclaimer">Anomalías térmicas para verificación en campo. No representan por sí solas incendios confirmados.</p>
+        <p className="fw-disclaimer">Superficie interpolada desde detecciones FIRMS para exploración. No representa por sí sola incendios confirmados ni un pronóstico.</p>
       </aside>}
       {layersOpen && !selectionBounds && <aside className="fw-layers">
         <div className="fw-layers-title"><span>CAPAS DEL MAPA</span><SlidersHorizontal size={15}/></div>
-        <LayerButton active={activeLayer === 'activity'} icon={Gauge} label="Actividad" tone="activity" onClick={() => setActiveLayer('activity')}/>
-        <LayerButton active={activeLayer === 'heat'} icon={ThermometerSun} label="Calor" tone="heat" onClick={() => setActiveLayer('heat')}/>
+        <LayerButton active={activeLayer === 'surface'} icon={ThermometerSun} label="Superficie" tone="heat" onClick={() => setActiveLayer('surface')}/>
+        <LayerButton active={activeLayer === 'activity'} icon={Gauge} label="Regiones" tone="activity" onClick={() => setActiveLayer('activity')}/>
         <LayerButton active={activeLayer === 'points'} icon={MapPin} label="Puntos" tone="points" onClick={() => setActiveLayer('points')}/>
         <LayerButton active={activeLayer === 'aoi'} icon={Layers3} label="Límite" tone="boundary" onClick={() => setActiveLayer('aoi')}/>
         <LayerButton active={selectionMode} icon={Scan} label="Área" tone="select" onClick={toggleSelectionMode}/>
-        <div className="fw-scale"><span>{activeLayer === 'activity' ? 'ACTIVIDAD TÉRMICA' : 'INTENSIDAD FRP'}</span><div/><section><small>Baja</small><small>Media</small><small>Alta</small></section></div>
+        <div className="fw-scale"><span>{activeLayer === 'surface' ? 'INTENSIDAD CONTINUA' : activeLayer === 'activity' ? 'ACTIVIDAD POR REGIÓN' : 'INTENSIDAD FRP'}</span><div/><section><small>Baja</small><small>Media</small><small>Alta</small></section></div>
       </aside>}
       <div className="fw-map-meta"><button onClick={focusStudyArea} className={studySelected ? 'is-active' : ''}><MapPin size={13}/>{activeScope === 'peru' ? 'Abrir piloto · Cusco' : 'Volver a Perú'}</button><span><Satellite size={13}/>MODIS + VIIRS</span><span><CloudSun size={13}/>Últimos 5 días</span></div>
       {selectionMode && <div className="fw-draw-hint"><Scan size={20}/><div><b>Selecciona un área</b><span>Arrastra sobre el mapa para dibujar el cuadro</span></div><button onClick={() => setSelectionMode(false)} title="Cancelar"><X size={16}/></button></div>}
