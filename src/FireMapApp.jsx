@@ -12,6 +12,18 @@ import { getFireOverview } from './services/fireApi.js'
 maplibregl.setWorkerUrl(maplibreWorkerUrl)
 
 const MAP_STYLE = 'https://tiles.openfreemap.org/styles/positron'
+const SATELLITE_STYLE = {
+  version: 8,
+  sources: {
+    imagery: {
+      type: 'raster',
+      tiles: ['https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
+      tileSize: 256,
+      attribution: 'Source: Esri, Vantor, Earthstar Geographics, and the GIS User Community',
+    },
+  },
+  layers: [{ id: 'satellite-imagery', type: 'raster', source: 'imagery', paint: { 'raster-saturation': 0.08, 'raster-contrast': 0.08 } }],
+}
 const CUSCO_CENTER = [-71.97, -13.53]
 const CUSCO_FEATURE = { ...cuscoBoundaryRaw.features[0], id: 'cusco' }
 const CUSCO_BOUNDARY = { type: 'FeatureCollection', features: [CUSCO_FEATURE] }
@@ -124,6 +136,69 @@ function LayerButton({ active, icon, label, onClick, tone }) {
 
 function Metric({ icon, label, value, tone }) {
   return <div className="fw-metric"><span className={tone}>{createElement(icon, { size: 16 })}</span><div><b>{value}</b><small>{label}</small></div></div>
+}
+
+function SatelliteSelectionMap({ bounds, hotspots }) {
+  const containerRef = useRef(null)
+  const previewMapRef = useRef(null)
+  const previewReadyRef = useRef(false)
+  const hotspotsRef = useRef(hotspots)
+  const boundsRef = useRef(bounds)
+  hotspotsRef.current = hotspots
+  boundsRef.current = bounds
+
+  const fitPreview = useCallback((map, nextBounds) => {
+    map.fitBounds([[nextBounds.west, nextBounds.south], [nextBounds.east, nextBounds.north]], { padding: 22, duration: 0, maxZoom: 12 })
+  }, [])
+
+  useEffect(() => {
+    const map = new maplibregl.Map({
+      container: containerRef.current,
+      style: SATELLITE_STYLE,
+      center: [(boundsRef.current.west + boundsRef.current.east) / 2, (boundsRef.current.south + boundsRef.current.north) / 2],
+      zoom: 8,
+      minZoom: 5,
+      maxZoom: 16,
+      attributionControl: false,
+      antialias: true,
+    })
+    previewMapRef.current = map
+    map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-left')
+    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right')
+    map.on('load', () => {
+      map.addSource('preview-hotspots', { type: 'geojson', data: hotspotsToGeoJson(hotspotsRef.current) })
+      map.addLayer({
+        id: 'preview-heat', type: 'heatmap', source: 'preview-hotspots', maxzoom: 14,
+        paint: {
+          'heatmap-weight': ['interpolate', ['linear'], ['get', 'frp'], 0, 0.2, 40, 0.6, 100, 1],
+          'heatmap-intensity': 1.35,
+          'heatmap-color': ['interpolate', ['linear'], ['heatmap-density'], 0, 'rgba(255,230,110,0)', 0.25, '#ffe66d', 0.5, '#ff9f32', 0.72, '#ff4c2f', 1, '#9f001f'],
+          'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 6, 18, 12, 42],
+          'heatmap-opacity': 0.78,
+        },
+      })
+      map.addLayer({
+        id: 'preview-points', type: 'circle', source: 'preview-hotspots',
+        paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 6, 4, 12, 8], 'circle-color': '#ff5a3d', 'circle-opacity': 0.95, 'circle-stroke-color': '#fff5dc', 'circle-stroke-width': 1.4 },
+      })
+      previewReadyRef.current = true
+      fitPreview(map, boundsRef.current)
+    })
+    return () => {
+      previewReadyRef.current = false
+      map.remove()
+      previewMapRef.current = null
+    }
+  }, [fitPreview])
+
+  useEffect(() => {
+    const map = previewMapRef.current
+    if (!previewReadyRef.current || !map) return
+    map.getSource('preview-hotspots').setData(hotspotsToGeoJson(hotspots))
+    fitPreview(map, bounds)
+  }, [bounds, fitPreview, hotspots])
+
+  return <div className="fw-satellite-preview"><div ref={containerRef} className="fw-satellite-map"/><span className="fw-satellite-badge"><i/>IMAGEN SATELITAL</span><div className="fw-satellite-legend"><span><i className="heat"/>Calor FIRMS</span><span><i className="point"/>Detección</span></div></div>
 }
 
 function FireMapApp() {
@@ -418,7 +493,10 @@ function FireMapApp() {
 
   const toggleSelectionMode = () => {
     setPlaying(false)
-    setSelectionMode((active) => !active)
+    setSelectionMode((active) => {
+      if (!active) setSelectionBounds(null)
+      return !active
+    })
   }
 
   const clearSelection = () => {
@@ -491,6 +569,8 @@ function FireMapApp() {
       {selectionMode && <div className="fw-draw-hint"><Scan size={20}/><div><b>Selecciona un área</b><span>Arrastra sobre el mapa para dibujar el cuadro</span></div><button onClick={() => setSelectionMode(false)} title="Cancelar"><X size={16}/></button></div>}
       {selectionBounds && <aside className="fw-selection-card">
         <div className="fw-selection-head"><div><p>ANÁLISIS DEL CUADRO</p><h2>Área seleccionada</h2><span>Resultados dentro de Cusco</span></div><button onClick={clearSelection} title="Limpiar selección"><Trash2 size={17}/></button></div>
+        <SatelliteSelectionMap bounds={selectionBounds} hotspots={selectedHotspots}/>
+        <div className="fw-selection-source"><span>Vista satelital de referencia</span><b>Esri World Imagery · NASA FIRMS</b></div>
         <div className="fw-selection-grid">
           <article><span>Detecciones</span><b>{selectedHotspots.length}</b></article>
           <article><span>FRP acumulado</span><b>{selectionStats.frp.toFixed(1)} MW</b></article>

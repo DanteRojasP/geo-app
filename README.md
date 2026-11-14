@@ -41,6 +41,7 @@ Endpoints esperados:
 - Resaltado interactivo por hover y selección por clic o toque
 - Máscara territorial, mapa de calor WebGL y detecciones puntuales
 - Selección rectangular con análisis agregado, resaltado de focos y descarga CSV
+- Vista satelital interactiva del cuadro con calor y focos FIRMS superpuestos
 - Filtrado geográfico punto-en-polígono para excluir detecciones fuera de Cusco
 - Métricas de eventos, FRP y confianza
 - Descarga CSV
