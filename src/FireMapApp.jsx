@@ -173,7 +173,8 @@ function createPopupContent(title, lines) {
 }
 
 function RiskBadge({ level }) {
-  return <span className={`fw-risk fw-risk--${level.toLowerCase()}`}><i />Actividad {level}</span>
+  const activityLevel = { Alto: 'alta', Moderado: 'moderada', Bajo: 'baja' }[level] || level
+  return <span className={`fw-risk fw-risk--${level.toLowerCase()}`}><i />Actividad {activityLevel}</span>
 }
 
 function LayerButton({ active, icon, label, onClick, tone }) {
