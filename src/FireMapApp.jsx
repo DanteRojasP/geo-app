@@ -95,6 +95,28 @@ function isInsidePeru(point, departments) {
   return departments.features.some((feature) => isInsideGeometry(point, feature.geometry))
 }
 
+function addActivityToDepartments(departments, points) {
+  return {
+    ...departments,
+    features: departments.features.map((feature) => {
+      const matches = points.filter((point) => isInsideGeometry(point, feature.geometry))
+      const frp = matches.reduce((sum, point) => sum + point.frp, 0)
+      const confidence = matches.length
+        ? Math.round(matches.reduce((sum, point) => sum + point.confidence, 0) / matches.length)
+        : 0
+      return {
+        ...feature,
+        properties: {
+          ...feature.properties,
+          fireCount: matches.length,
+          frp: Number(frp.toFixed(1)),
+          confidence,
+        },
+      }
+    }),
+  }
+}
+
 function boundsToGeoJson(bounds) {
   if (!bounds) return { type: 'FeatureCollection', features: [] }
   const { west, east, south, north } = bounds
@@ -237,7 +259,7 @@ function FireMapApp() {
   const [activeScope, setActiveScope] = useState('peru')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [activeLayer, setActiveLayer] = useState('heat')
+  const [activeLayer, setActiveLayer] = useState('activity')
   const [selectedDate, setSelectedDate] = useState('all')
   const [playing, setPlaying] = useState(false)
   const [detailsOpen, setDetailsOpen] = useState(true)
@@ -281,9 +303,10 @@ function FireMapApp() {
     : peruHotspots, [activeScope, peruHotspots])
   const dates = useMemo(() => [...new Set(scopedHotspots.map((point) => point.date).filter(Boolean))].sort().slice(-5), [scopedHotspots])
   const visibleHotspots = useMemo(() => selectedDate === 'all' ? scopedHotspots : scopedHotspots.filter((point) => point.date === selectedDate), [scopedHotspots, selectedDate])
+  const mappedDepartments = useMemo(() => addActivityToDepartments(departments, visibleHotspots), [departments, visibleHotspots])
   const selectedHotspots = useMemo(() => selectionBounds ? visibleHotspots.filter((point) => point.lon >= selectionBounds.west && point.lon <= selectionBounds.east && point.lat >= selectionBounds.south && point.lat <= selectionBounds.north) : [], [selectionBounds, visibleHotspots])
   hotspotsRef.current = visibleHotspots
-  departmentsRef.current = departments
+  departmentsRef.current = mappedDepartments
   selectionModeRef.current = selectionMode
 
   useEffect(() => {
@@ -395,7 +418,11 @@ function FireMapApp() {
 
       map.addLayer({
         id: 'department-fill', type: 'fill', source: 'peru-departments',
-        paint: { 'fill-color': '#97b6a4', 'fill-opacity': ['case', ['boolean', ['feature-state', 'hover'], false], 0.11, 0.025] },
+        paint: {
+          'fill-color': ['interpolate', ['linear'], ['coalesce', ['get', 'fireCount'], 0],
+            0, '#17362c', 1, '#d9ef8b', 5, '#fee08b', 15, '#fdae61', 35, '#f46d43', 70, '#a50026'],
+          'fill-opacity': ['case', ['boolean', ['feature-state', 'hover'], false], 0.9, 0.72],
+        },
       })
       map.addLayer({
         id: 'department-lines', type: 'line', source: 'peru-departments',
@@ -447,10 +474,26 @@ function FireMapApp() {
         if (hoveredDepartmentId !== null) map.setFeatureState({ source: 'peru-departments', id: hoveredDepartmentId }, { hover: false })
         hoveredDepartmentId = feature.id
         map.setFeatureState({ source: 'peru-departments', id: hoveredDepartmentId }, { hover: true })
+        map.getCanvas().style.cursor = 'pointer'
       })
       map.on('mouseleave', 'department-fill', () => {
         if (hoveredDepartmentId !== null) map.setFeatureState({ source: 'peru-departments', id: hoveredDepartmentId }, { hover: false })
         hoveredDepartmentId = null
+        map.getCanvas().style.cursor = ''
+      })
+      map.on('click', 'department-fill', (event) => {
+        if (selectionModeRef.current || suppressNextClick) return
+        const feature = event.features?.[0]
+        if (!feature || feature.properties?.NOMBDEP === 'CUSCO') return
+        const properties = feature.properties
+        new maplibregl.Popup({ offset: 10, className: 'fw-map-popup' })
+          .setLngLat(event.lngLat)
+          .setDOMContent(createPopupContent(properties.NOMBDEP || 'Departamento', [
+            { value: `${properties.fireCount || 0} detecciones recientes` },
+            { value: `${Number(properties.frp || 0).toFixed(1)} MW FRP`, strong: true },
+            { value: properties.fireCount ? `Confianza media ${properties.confidence}%` : 'Sin actividad térmica visible' },
+          ]))
+          .addTo(map)
       })
 
       map.on('mouseenter', 'study-area-fill', () => {
@@ -514,8 +557,8 @@ function FireMapApp() {
   useEffect(() => {
     const map = mapRef.current
     if (!mapReadyRef.current || !map?.getSource('peru-departments')) return
-    map.getSource('peru-departments').setData(departments)
-  }, [departments])
+    map.getSource('peru-departments').setData(mappedDepartments)
+  }, [mappedDepartments])
 
   useEffect(() => {
     const map = mapRef.current
@@ -551,7 +594,10 @@ function FireMapApp() {
     const map = mapRef.current
     if (!mapReadyRef.current) return
     map.setLayoutProperty('fire-heat', 'visibility', activeLayer === 'heat' ? 'visible' : 'none')
-    map.setLayoutProperty('fire-points', 'visibility', activeLayer === 'aoi' ? 'none' : 'visible')
+    map.setLayoutProperty('fire-points', 'visibility', activeLayer === 'points' ? 'visible' : 'none')
+    map.setPaintProperty('department-fill', 'fill-opacity', activeLayer === 'activity'
+      ? ['case', ['boolean', ['feature-state', 'hover'], false], 0.9, 0.72]
+      : ['case', ['boolean', ['feature-state', 'hover'], false], 0.18, 0.045])
     map.setPaintProperty('study-area-fill', 'fill-opacity', activeLayer === 'aoi'
       ? ['case', ['boolean', ['feature-state', 'selected'], false], 0.3, ['boolean', ['feature-state', 'hover'], false], 0.22, 0.12]
       : ['case', ['boolean', ['feature-state', 'selected'], false], 0.22, ['boolean', ['feature-state', 'hover'], false], 0.16, 0.035])
@@ -639,11 +685,12 @@ function FireMapApp() {
       </aside>}
       {layersOpen && !selectionBounds && <aside className="fw-layers">
         <div className="fw-layers-title"><span>CAPAS DEL MAPA</span><SlidersHorizontal size={15}/></div>
+        <LayerButton active={activeLayer === 'activity'} icon={Gauge} label="Actividad" tone="activity" onClick={() => setActiveLayer('activity')}/>
         <LayerButton active={activeLayer === 'heat'} icon={ThermometerSun} label="Calor" tone="heat" onClick={() => setActiveLayer('heat')}/>
         <LayerButton active={activeLayer === 'points'} icon={MapPin} label="Puntos" tone="points" onClick={() => setActiveLayer('points')}/>
         <LayerButton active={activeLayer === 'aoi'} icon={Layers3} label="Límite" tone="boundary" onClick={() => setActiveLayer('aoi')}/>
         <LayerButton active={selectionMode} icon={Scan} label="Área" tone="select" onClick={toggleSelectionMode}/>
-        <div className="fw-scale"><span>INTENSIDAD FRP</span><div/><section><small>Baja</small><small>Media</small><small>Alta</small></section></div>
+        <div className="fw-scale"><span>{activeLayer === 'activity' ? 'ACTIVIDAD TÉRMICA' : 'INTENSIDAD FRP'}</span><div/><section><small>Baja</small><small>Media</small><small>Alta</small></section></div>
       </aside>}
       <div className="fw-map-meta"><button onClick={focusStudyArea} className={studySelected ? 'is-active' : ''}><MapPin size={13}/>{activeScope === 'peru' ? 'Abrir piloto · Cusco' : 'Volver a Perú'}</button><span><Satellite size={13}/>MODIS + VIIRS</span><span><CloudSun size={13}/>Últimos 5 días</span></div>
       {selectionMode && <div className="fw-draw-hint"><Scan size={20}/><div><b>Selecciona un área</b><span>Arrastra sobre el mapa para dibujar el cuadro</span></div><button onClick={() => setSelectionMode(false)} title="Cancelar"><X size={16}/></button></div>}
