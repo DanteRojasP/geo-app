@@ -689,6 +689,8 @@ function FireMapApp() {
 
   const formatDay = (date) => new Intl.DateTimeFormat('es-PE', { weekday: 'short', day: '2-digit' }).format(new Date(`${date}T12:00:00`)).replace('.', '')
   const formatDate = (date) => date ? new Intl.DateTimeFormat('es-PE', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(`${date}T12:00:00`)) : 'Últimos 5 días'
+  const timelineIndex = selectedDate === 'all' ? Math.max(0, dates.length - 1) : Math.max(0, dates.indexOf(selectedDate))
+  const timelineProgress = dates.length > 1 ? (timelineIndex / (dates.length - 1)) * 100 : 0
 
   return (
     <div className="fw-app">
@@ -752,10 +754,22 @@ function FireMapApp() {
         <div className="fw-selection-actions"><button onClick={toggleSelectionMode}><Scan size={15}/>Redibujar</button><button onClick={() => downloadCsv(selectedHotspots, 'area-seleccionada')} disabled={!selectedHotspots.length}><Download size={15}/>CSV</button></div>
       </aside>}
       <section className="fw-timeline">
-        <button className="fw-play" onClick={() => setPlaying((value) => !value)} title={playing ? 'Pausar' : 'Reproducir'}>{playing ? <Pause size={20}/> : <Play size={20}/>}</button>
-        <div className="fw-time-info"><CalendarDays size={15}/><div><b>{selectedDate === 'all' ? 'Últimos 5 días' : formatDate(selectedDate)}</b><small>{visibleHotspots.length} detecciones</small></div></div>
-        <div className="fw-days"><button className={selectedDate === 'all' ? 'is-active' : ''} onClick={() => { setSelectedDate('all'); setPlaying(false) }}><span>Todos</span><b>5 días</b></button>{dates.map((date) => <button className={selectedDate === date ? 'is-active' : ''} key={date} onClick={() => { setSelectedDate(date); setPlaying(false) }}><span>{formatDay(date).split(' ')[0]}</span><b>{formatDay(date).split(' ')[1]}</b><i style={{ '--events': Math.min(100, scopedHotspots.filter((point) => point.date === date).length * (activeScope === 'peru' ? 2 : 12)) }}/></button>)}</div>
-        <div className="fw-timeline-note"><span>UTC−5</span><b>{result.mode === 'api' ? 'DATOS EN VIVO' : 'MODO DEMO'}</b></div>
+        <div className="fw-timeline-control">
+          <button className="fw-play" onClick={() => setPlaying((value) => !value)} title={playing ? 'Pausar' : 'Reproducir'}>{playing ? <Pause size={18}/> : <Play size={18}/>}</button>
+          <div className="fw-time-info"><span>PERIODO ACTIVO</span><b>{selectedDate === 'all' ? 'Últimos 5 días' : formatDate(selectedDate)}</b><small>{visibleHotspots.length} detecciones</small></div>
+        </div>
+        <div className="fw-time-axis">
+          <div className="fw-scrubber" style={{ '--progress': `${timelineProgress}%` }} aria-hidden="true"><i/><span/></div>
+          <div className="fw-days">{dates.map((date) => {
+            const count = scopedHotspots.filter((point) => point.date === date).length
+            const [weekday, day] = formatDay(date).split(' ')
+            return <button className={selectedDate === date ? 'is-active' : ''} key={date} onClick={() => { setSelectedDate(date); setPlaying(false) }}><span>{weekday}</span><b>{day}</b><small>{count} focos</small><i style={{ '--events': Math.min(100, count * (activeScope === 'peru' ? 2 : 12)) }}/></button>
+          })}</div>
+        </div>
+        <div className="fw-timeline-note">
+          <button className={selectedDate === 'all' ? 'is-active' : ''} onClick={() => { setSelectedDate('all'); setPlaying(false) }}><CalendarDays size={13}/><span>Ventana completa</span><b>5 días</b></button>
+          <div><span>UTC−5 · NASA FIRMS</span><b>{result.mode === 'api' ? 'ACTUALIZACIÓN EN VIVO' : 'MODO DEMO'}</b></div>
+        </div>
       </section>
     </div>
   )
