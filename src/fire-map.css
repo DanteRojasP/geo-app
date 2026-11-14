@@ -161,3 +161,16 @@
 
 @media(max-width:950px){.fw-layers{width:40px;padding:0}.fw-layers-title,.fw-scale{display:none}.fw-basemap-switch{margin:0;padding:0;border:0}.fw-basemap-switch button{width:36px;height:36px;margin:0 2px}.fw-layer-button{width:40px;height:40px;margin:3px 0}}
 @media(max-width:650px){.fw-layers{width:36px;padding:0}.fw-basemap-switch button{width:34px;height:34px;margin:0 1px}.fw-layer-button{width:36px;height:36px;margin:3px 0}.fw-layer-button>span{width:28px;height:28px}}
+
+/* Headerless map with Nubel Team mark */
+.fw-nubel-brand{position:absolute;z-index:720;top:14px;left:14px;width:50px;height:50px;display:grid;place-items:center;pointer-events:none;filter:drop-shadow(0 5px 10px rgba(0,0,0,.28))}
+.fw-nubel-brand img{width:100%;height:100%;object-fit:contain}
+.fw-rail{top:76px;bottom:auto;border-bottom:1px solid #2b3944;border-radius:0 5px 5px 0}
+.fw-summary{top:16px}
+.fw-layers{top:18px}
+.fw-map-meta{top:18px}
+.fw-selection-card{top:16px}
+.fw-draw-hint{top:18px}
+
+@media(max-width:950px){.fw-layers{top:76px}.fw-summary{top:16px}.fw-selection-card{top:16px}}
+@media(max-width:650px){.fw-nubel-brand{top:10px;left:10px;width:44px;height:44px}.fw-summary{top:66px}.fw-layers{top:66px}.fw-selection-card{top:66px}.fw-draw-hint{top:66px}}
