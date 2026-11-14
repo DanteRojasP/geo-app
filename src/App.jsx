@@ -11,7 +11,10 @@ const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', '
 
 function MapFocus({ center, zoom }) {
   const map = useMap()
-  useEffect(() => { map.flyTo(center, zoom, { duration: 1.15 }) }, [center, zoom, map])
+  useEffect(() => {
+    map.invalidateSize({ pan: false })
+    map.setView(center, zoom, { animate: false })
+  }, [center, zoom, map])
   return null
 }
 
@@ -117,7 +120,7 @@ function App() {
 
           <div className="map-panel">
             <div className="map-heading"><div><p>ÁREA SELECCIONADA</p><h2>{department.name}</h2></div><div className="map-switch"><button className={mapLayer === 'hotspots' ? 'active' : ''} onClick={() => setMapLayer('hotspots')}><Flame size={14}/>Hotspots</button><button className={mapLayer === 'aoi' ? 'active' : ''} onClick={() => setMapLayer('aoi')}><Layers3 size={14}/>AOI</button></div></div>
-            <MapContainer center={department.center} zoom={department.zoom} zoomControl={false} className="map">
+            <MapContainer center={department.center} zoom={department.zoom} minZoom={5} zoomControl={false} className="map">
               <TileLayer
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                 url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
