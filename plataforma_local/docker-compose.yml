@@ -1,0 +1,12 @@
+# Levanta la plataforma completa en http://localhost:8000
+#   docker compose up --build
+services:
+  firecal:
+    build: .
+    image: firecal-peru:local
+    ports:
+      - "8000:8000"
+    environment:
+      FIRECAL_DATA_MODE: synthetic
+      # FIRMS_MAP_KEY: ${FIRMS_MAP_KEY}   # solo modo real (Fase R); nunca en el repositorio
+    restart: unless-stopped
