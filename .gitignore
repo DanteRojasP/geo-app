@@ -10,3 +10,7 @@ __pycache__/
 .env
 *credentials*
 *.key
+
+# Credenciales en espanol (las de Meteomatics, FIRMS...) y datos descargados de Meteomatics
+*credenciales*
+exploratorio/meteomatics/datos/
