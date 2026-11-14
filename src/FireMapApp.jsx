@@ -695,7 +695,7 @@ function FireMapApp() {
   return (
     <div className="fw-app">
       <div ref={mapContainerRef} className="fw-map" aria-label="Mapa nacional interactivo de focos térmicos en Perú" />
-      <div className="fw-nubel-brand" aria-label="Nubel Team"><img src="/nubel-team-n-friendly.png" alt="Nubel Team"/></div>
+      <div className="fw-nubel-brand" aria-label="Nubel Team"><img src="/nubel-team-logo.png" alt="Nubel Team"/></div>
       <nav className="fw-rail" aria-label="Herramientas del mapa">
         <button className="is-active" title="Monitoreo"><Flame size={20}/><span>Fuego</span></button>
         <button className={selectionMode ? 'is-active select' : ''} title="Seleccionar área" onClick={toggleSelectionMode}><Scan size={20}/><span>Área</span></button>
