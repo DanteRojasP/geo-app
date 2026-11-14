@@ -103,6 +103,7 @@ Comando de verificación (desde la raíz del repo):
 - Los archivos terminan el 2025-12-31 UTC: el último día local puede estar incompleto.
 - `kT` es impreciso (error mensual 41–45 %; anual de −32 % a +45 % en el estrato bajo).
 - Solo S-NPP; sin NOAA-20/21 (no estaban en los archivos públicos por país).
+- `verificar_datos.py` se caía en Windows con `UnicodeEncodeError` (la consola cp1252 no imprime `Δ`, y `python -I` ignora `PYTHONUTF8`): **corregido** forzando UTF-8 en stdout/stderr. `sequia_fuego/n_efectivo_potencia.py` tiene el mismo problema con `≈` (abierto).
 - Los scripts se probaron solo en Windows con Python 3.11.9 (numpy 2.4.4, pandas 2.3.3, scipy 1.17.1, matplotlib 3.10.8, earthengine-api 1.7.22). No probados en Linux ni en CI, salvo `verificar_datos.py`, que solo necesita numpy y pandas.
 - `sequia_fuego/` es exploratorio: decenas de pruebas sobre los mismos datos, SPI con base 1981-2010 mal calibrado para 2003-25 (quiebre de CHIRPS en 1999-2000). **No citar ningún p-valor de ahí como resultado.**
 
@@ -188,6 +189,9 @@ Al terminar: corre verificar_datos.py si tocaste datos o armonización, y añade
 | 2026-11-14 | v1.1: `requirements.txt` con matplotlib en todos los scripts de generación; los scripts aceptan los nombres de archivo de FIRMS y abortan si hay dos del mismo año; reglas 2 y 6 y órdenes P1/P7 adaptadas al trabajo del equipo (Vercel, FastAPI, cinco departamentos); nueva §12 | sesión de ciencia de datos |
 | 2026-11-14 | v1.2: decisiones del equipo cerradas (solo Cusco es real, backend FastAPI, sin estáticos); vocabulario único con "Focos armonizados" como unidad; casos de prueba del backend | sesión de ciencia de datos |
 | 2026-11-14 | Paquete v1.2 integrado al repo en la rama `antonio/modelo`; `.gitignore` creado desde la sugerencia; workflow `verificar-datos` activado con permiso del usuario; `verificar_datos.py` en verde y sumas de control de §6 confirmadas | sesión del repo |
+| 2026-11-14 | `verificar_datos.py` corre en Windows (stdout/stderr en UTF-8); datos sin cambios, sumas de control de §6 confirmadas (`TODO OK`) | Julio (rama `julio/actividades`) |
+| 2026-11-14 | Analíticas "en simple" sobre la plataforma de Julio (rama `antonio/analitica`): estacionalidad, ranking de años, curva acumulada, altitud y recurrencia por celda (solo VIIRS, desde 2013), cada una con una frase en lenguaje sencillo; `GET /api/resumen` y `GET /api/analitica/*`; panel con cuatro gráficos descargables (PNG y CSV) en la interfaz. Año típico = mediana de los años completos sin focos extrapolados (2003–2025) | sesión del repo |
+| 2026-11-14 | Revisión de `antonio/analitica` (unido a `julio/actividades`): fecha de cruce de la curva acumulada corregida en años bisiestos (2020: 24 de agosto) y nota de 2025 en curva, ranking y resumen. Datos sin cambios | Julio |
 | | *(añade aquí una línea por cada tarea terminada)* | |
 
 ## 12. Decisiones del equipo y vocabulario (resueltas el 2026-11-14; no reabrir sin el usuario)
