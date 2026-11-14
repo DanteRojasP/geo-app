@@ -2,7 +2,7 @@ import { createElement, useCallback, useEffect, useMemo, useRef, useState } from
 import * as maplibregl from 'maplibre-gl'
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import {
-  Activity, CalendarDays, CircleHelp, CloudSun, Download, Flame, Gauge, Info,
+  Activity, CircleHelp, CloudSun, Download, Flame, Gauge, Info,
   Layers3, MapPin, Menu, Mountain, Pause, Play, Radar, RefreshCw, Satellite,
   Scan, ShieldAlert, SlidersHorizontal, ThermometerSun, Trash2, X,
 } from 'lucide-react'
@@ -754,21 +754,19 @@ function FireMapApp() {
         <div className="fw-selection-actions"><button onClick={toggleSelectionMode}><Scan size={15}/>Redibujar</button><button onClick={() => downloadCsv(selectedHotspots, 'area-seleccionada')} disabled={!selectedHotspots.length}><Download size={15}/>CSV</button></div>
       </aside>}
       <section className="fw-timeline">
-        <div className="fw-timeline-control">
-          <button className="fw-play" onClick={() => setPlaying((value) => !value)} title={playing ? 'Pausar' : 'Reproducir'}>{playing ? <Pause size={18}/> : <Play size={18}/>}</button>
-          <div className="fw-time-info"><span>PERIODO ACTIVO</span><b>{selectedDate === 'all' ? 'Últimos 5 días' : formatDate(selectedDate)}</b><small>{visibleHotspots.length} detecciones</small></div>
-        </div>
-        <div className="fw-time-axis">
-          <div className="fw-scrubber" style={{ '--progress': `${timelineProgress}%` }} aria-hidden="true"><i/><span/></div>
+        <button className="fw-play" onClick={() => setPlaying((value) => !value)} title={playing ? 'Pausar' : 'Reproducir'}>{playing ? <Pause size={19}/> : <Play size={19}/>}</button>
+        <div className="fw-timeline-panel" style={{ '--progress': `${timelineProgress}%` }}>
+          <div className={`fw-time-callout ${timelineIndex === 0 ? 'is-start' : timelineIndex === dates.length - 1 ? 'is-end' : ''}`}><b>{selectedDate === 'all' ? 'Últimos 5 días' : formatDate(selectedDate)}</b><span>{visibleHotspots.length} focos</span></div>
           <div className="fw-days">{dates.map((date) => {
             const count = scopedHotspots.filter((point) => point.date === date).length
             const [weekday, day] = formatDay(date).split(' ')
-            return <button className={selectedDate === date ? 'is-active' : ''} key={date} onClick={() => { setSelectedDate(date); setPlaying(false) }}><span>{weekday}</span><b>{day}</b><small>{count} focos</small><i style={{ '--events': Math.min(100, count * (activeScope === 'peru' ? 2 : 12)) }}/></button>
+            return <button className={selectedDate === date ? 'is-active' : ''} key={date} onClick={() => { setSelectedDate(date); setPlaying(false) }}><span>{weekday} {day}</span><small>{count} focos</small></button>
           })}</div>
-        </div>
-        <div className="fw-timeline-note">
-          <button className={selectedDate === 'all' ? 'is-active' : ''} onClick={() => { setSelectedDate('all'); setPlaying(false) }}><CalendarDays size={13}/><span>Ventana completa</span><b>5 días</b></button>
-          <div><span>UTC−5 · NASA FIRMS</span><b>{result.mode === 'api' ? 'ACTUALIZACIÓN EN VIVO' : 'MODO DEMO'}</b></div>
+          <div className="fw-timeline-options">
+            <button className={selectedDate === 'all' ? 'is-active' : ''} onClick={() => { setSelectedDate('all'); setPlaying(false) }}><Layers3 size={13}/><span>Superficie térmica</span></button>
+            <div className="fw-sensor-tabs"><b>Todos</b><span>MODIS</span><span>VIIRS</span></div>
+            <div className="fw-timeline-source"><span>UTC−5 · NASA FIRMS</span><b>{result.mode === 'api' ? 'EN VIVO' : 'DEMO'}</b></div>
+          </div>
         </div>
       </section>
     </div>

@@ -110,3 +110,26 @@
 @media(max-width:1100px){.fw-timeline{height:70px;grid-template-columns:154px minmax(330px,1fr) 158px;gap:10px}}
 @media(max-width:950px){.fw-timeline{height:66px;grid-template-columns:128px 1fr}.fw-time-axis{height:51px}.fw-days,.fw-days button{height:36px}.fw-layers{bottom:92px}.fw-selection-card{bottom:90px}}
 @media(max-width:650px){.fw-timeline{height:60px;grid-template-columns:40px 1fr;gap:6px}.fw-play{width:32px;height:32px}.fw-time-axis{height:48px}.fw-days,.fw-days button{height:34px}.fw-layers{bottom:78px}.fw-selection-card{bottom:80px}}
+
+/* Windy-inspired floating time control */
+.fw-timeline{left:50%;right:auto;bottom:12px;width:min(820px,calc(100vw - 130px));height:68px;padding:0;display:flex;align-items:center;gap:12px;border:0;border-radius:0;background:transparent;box-shadow:none;transform:translateX(-50%);overflow:visible}
+.fw-play{flex:0 0 auto;width:46px;height:46px;margin:0;border:1px solid rgba(15,23,42,.18);border-radius:50%;background:#f8fafc;color:#ad1f18;box-shadow:0 5px 18px rgba(0,0,0,.25)}
+.fw-play:hover{background:#fff;color:#c32920;box-shadow:0 6px 22px rgba(0,0,0,.32)}
+.fw-timeline-panel{position:relative;flex:1;height:68px;display:grid;grid-template-rows:33px 35px;border:1px solid rgba(255,255,255,.12);border-radius:3px;background:rgba(58,61,64,.96);box-shadow:0 8px 26px rgba(0,0,0,.26);color:#f8fafc}
+.fw-time-callout{position:absolute;z-index:4;left:var(--progress);top:-40px;min-width:126px;height:32px;padding:0 12px;border-radius:9px;background:#dfa000;color:#fff;display:flex;align-items:center;justify-content:center;gap:7px;box-shadow:0 3px 10px rgba(0,0,0,.28);transform:translateX(-50%);white-space:nowrap}
+.fw-time-callout:after{content:'';position:absolute;left:50%;bottom:-6px;border:6px solid transparent;border-top-color:#dfa000;border-bottom:0;transform:translateX(-50%)}
+.fw-time-callout.is-start{transform:none}.fw-time-callout.is-start:after{left:16px}.fw-time-callout.is-end{transform:translateX(-100%)}.fw-time-callout.is-end:after{left:auto;right:12px}
+.fw-time-callout b{font-size:10px;font-weight:600}.fw-time-callout span{padding-left:7px;border-left:1px solid rgba(255,255,255,.42);font-size:8px}
+.fw-timeline-panel .fw-days{position:relative;inset:auto;width:100%;height:33px;display:grid;grid-template-columns:repeat(5,1fr);padding:0;gap:0;overflow:visible}
+.fw-timeline-panel .fw-days:before{content:'';position:absolute;z-index:2;top:0;left:0;width:var(--progress);height:3px;background:#c72b20;pointer-events:none}
+.fw-timeline-panel .fw-days button{height:33px;padding:0;border:0;border-right:1px solid rgba(255,255,255,.16);border-radius:0;background:transparent;color:#d8dde1;display:flex;flex-direction:row;gap:5px;align-items:center;justify-content:center;box-shadow:none}
+.fw-timeline-panel .fw-days button:last-child{border-right:0}.fw-timeline-panel .fw-days button:hover{background:rgba(255,255,255,.07);color:#fff}.fw-timeline-panel .fw-days button.is-active{background:rgba(124,22,15,.32);box-shadow:inset 0 3px #d62f24;color:#fff}
+.fw-timeline-panel .fw-days button span{font:500 9px 'IBM Plex Sans',sans-serif;text-transform:capitalize;letter-spacing:0}.fw-timeline-panel .fw-days button small{margin:0;color:#9fa8ae;font-size:7px}.fw-timeline-panel .fw-days button.is-active small{color:#d4d9dd}
+.fw-timeline-options{height:35px;padding:0 12px;display:flex;align-items:center;border-top:1px solid rgba(255,255,255,.13);color:#eef1f3}
+.fw-timeline-options>button{height:26px;padding:0 9px;border:0;border-radius:3px;background:transparent;color:#f3f4f6;display:flex;align-items:center;gap:7px;font-size:9px;cursor:pointer}.fw-timeline-options>button:hover,.fw-timeline-options>button.is-active{background:rgba(255,255,255,.1)}
+.fw-sensor-tabs{margin-left:16px;display:flex;align-items:center;gap:14px;color:#e3e7ea;font-size:9px}.fw-sensor-tabs b{padding:5px 9px;border-radius:14px;background:#a75c4b;color:#fff;font-weight:500}.fw-sensor-tabs span{color:#e5e7eb}
+.fw-timeline-source{margin-left:auto;display:flex;align-items:center;gap:9px}.fw-timeline-source span{color:#b9c1c6;font:500 7px 'IBM Plex Mono',monospace}.fw-timeline-source b{color:#f2bf3f;font:600 8px 'IBM Plex Mono',monospace}
+.fw-selection-card{bottom:92px}
+
+@media(max-width:950px){.fw-timeline{width:calc(100vw - 36px);bottom:10px}.fw-sensor-tabs{gap:9px;margin-left:8px}.fw-timeline-source span{display:none}.fw-layers{bottom:132px}}
+@media(max-width:650px){.fw-timeline{width:calc(100vw - 16px);height:58px;gap:7px}.fw-play{width:38px;height:38px}.fw-timeline-panel{height:58px;grid-template-rows:29px 29px}.fw-time-callout{top:-35px;min-width:108px;height:28px;padding:0 9px}.fw-time-callout span{display:none}.fw-timeline-panel .fw-days,.fw-timeline-panel .fw-days button{height:29px}.fw-timeline-panel .fw-days button{gap:0}.fw-timeline-panel .fw-days button span{font-size:8px}.fw-timeline-panel .fw-days button small,.fw-sensor-tabs{display:none}.fw-timeline-options{height:29px;padding:0 7px}.fw-timeline-options>button{height:23px;font-size:8px}.fw-timeline-source{gap:5px}.fw-timeline-source b{font-size:7px}.fw-layers{bottom:120px}.fw-selection-card{bottom:78px}}
