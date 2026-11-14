@@ -1,9 +1,8 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import 'leaflet/dist/leaflet.css'
-import './styles.css'
-import './map-overrides.css'
-import App from './App.jsx'
+import './fire-map.css'
+import App from './FireMapApp.jsx'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

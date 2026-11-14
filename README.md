@@ -42,6 +42,9 @@ Endpoints esperados:
 - Descarga CSV
 - Diseño responsive
 - Modo demo y modo API
+- Interfaz cartográfica de pantalla completa enfocada únicamente en Cusco
+- Capas de calor, detecciones puntuales y límite del área de interés
+- Cronología interactiva de los últimos cinco días
 
 ## Datos FIRMS en Vercel
 

@@ -41,17 +41,17 @@ const seeded = (seed) => {
   return value - Math.floor(value)
 }
 
-export function makeHotspots(key, year = 2026) {
+export function makeHotspots(key) {
   const department = departments[key]
   const [lat, lon] = department.center
   return Array.from({ length: 28 }, (_, index) => ({
-    id: `${key}-${year}-${index}`,
+    id: `${key}-demo-${index}`,
     lat: lat + (seeded(index * 11 + department.base) - 0.5) * 2.8,
     lon: lon + (seeded(index * 17 + department.base) - 0.5) * 3.2,
     frp: Math.round(8 + seeded(index * 23 + department.base) * 96),
     confidence: Math.round(62 + seeded(index * 31 + department.base) * 37),
     sensor: index % 3 === 0 ? 'MODIS' : 'VIIRS',
-    date: `${year}-${String(7 + (index % 4)).padStart(2, '0')}-${String(1 + (index % 27)).padStart(2, '0')}`,
+    date: new Date(Date.now() - (index % 5) * 86400000).toISOString().slice(0, 10),
   })).filter((point) => point.confidence >= 70)
 }
 
