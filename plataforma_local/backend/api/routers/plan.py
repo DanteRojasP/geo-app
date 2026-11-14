@@ -7,6 +7,8 @@
 - ``GET /api/hotspots.csv``   focos del rango con las 18 columnas del contrato (CSV UTF-8 con BOM).
 - ``GET /api/focos.geojson``   focos del rango como puntos para el mapa (peso = eq_foco, sin FRP).
 - ``GET /api/metadatos``      método, factores, calidad, cobertura, sumas de control y créditos.
+- ``GET /api/resumen`` y ``GET /api/analitica/*``  analíticas sencillas, cada una con una frase
+  en lenguaje simple (firecal/plan/analitica.py).
 
 AOI: ``departamento=PE-CUS`` o ``bbox=oeste,sur,este,norte`` o ``lat`` + ``lon`` + ``radio_km``.
 Unidad: **focos armonizados**; en la API el campo se llama ``focos_armonizados`` (decisión del
@@ -188,6 +190,70 @@ def hotspots_csv(request: Request, fecha_inicio: Annotated[str, Query(descriptio
         "Content-Disposition": f'attachment; filename="{name}"',
         "X-Data-Mode": store.meta["data_mode"], "X-Row-Count": str(n_rows),
         "X-Total-Eq-Foco": f"{total:.2f}"})
+
+
+def _analitica(request: Request, nombre: str, departamento, bbox, lat, lon, radio_km,
+               **extra) -> dict:
+    """Analíticas sencillas (firecal/plan/analitica.py): una pregunta, una frase y sus datos."""
+    from firecal.plan import analitica
+
+    store = _store(request)
+    aoi = _call(store.resolve_aoi, departamento, bbox, lat, lon, radio_km)
+    fn = getattr(analitica, nombre)
+    if _custom_aoi(bbox, lat):
+        with request.app.state.gate.turn():
+            return _envelope(store, _call(lambda: fn(store, aoi, **extra)))
+    return _envelope(store, _call(lambda: fn(store, aoi, **extra)))
+
+
+@router.get("/resumen")
+def resumen(request: Request, departamento: Dep = None, bbox: BBox = None, lat: Lat = None,
+            lon: Lon = None, radio_km: Radio = None) -> dict:
+    """Cinco frases en lenguaje sencillo sobre el fuego del AOI."""
+    return _analitica(request, "resumen", departamento, bbox, lat, lon, radio_km)
+
+
+@router.get("/analitica/estacionalidad")
+def analitica_estacionalidad(request: Request, departamento: Dep = None, bbox: BBox = None,
+                             lat: Lat = None, lon: Lon = None, radio_km: Radio = None) -> dict:
+    """En qué meses se concentra el fuego (mediana y rango por mes, temporada y mes pico)."""
+    return _analitica(request, "estacionalidad", departamento, bbox, lat, lon, radio_km)
+
+
+@router.get("/analitica/ranking")
+def analitica_ranking(request: Request, departamento: Dep = None, bbox: BBox = None,
+                      lat: Lat = None, lon: Lon = None, radio_km: Radio = None) -> dict:
+    """Años ordenados del más al menos activo, frente a un año típico."""
+    return _analitica(request, "ranking", departamento, bbox, lat, lon, radio_km)
+
+
+@router.get("/analitica/acumulado")
+def analitica_acumulado(request: Request,
+                        anio: Annotated[int | None, Query(description="Año (por defecto, el "
+                                                          "último completo)")] = None,
+                        departamento: Dep = None, bbox: BBox = None, lat: Lat = None,
+                        lon: Lon = None, radio_km: Radio = None) -> dict:
+    """Curva acumulada de un año frente a la banda histórica."""
+    return _analitica(request, "acumulado", departamento, bbox, lat, lon, radio_km, anio=anio)
+
+
+@router.get("/analitica/altitud")
+def analitica_altitud(request: Request, departamento: Dep = None, bbox: BBox = None,
+                      lat: Lat = None, lon: Lon = None, radio_km: Radio = None) -> dict:
+    """Reparto del fuego por franja de altitud."""
+    return _analitica(request, "altitud", departamento, bbox, lat, lon, radio_km)
+
+
+@router.get("/analitica/recurrencia")
+def analitica_recurrencia(request: Request,
+                          limite: Annotated[int, Query(ge=0, le=20000, description="Celdas a "
+                                                       "devolver, de la más repetida a la "
+                                                       "menos")] = 5000,
+                          departamento: Dep = None, bbox: BBox = None, lat: Lat = None,
+                          lon: Lon = None, radio_km: Radio = None) -> dict:
+    """En cuántos años distintos ardió cada celda de ~1 km (desde 2013)."""
+    return _analitica(request, "recurrencia", departamento, bbox, lat, lon, radio_km,
+                      limite=limite)
 
 
 @router.get("/metadatos")

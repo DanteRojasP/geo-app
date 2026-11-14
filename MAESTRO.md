@@ -190,6 +190,7 @@ Al terminar: corre verificar_datos.py si tocaste datos o armonización, y añade
 | 2026-11-14 | v1.2: decisiones del equipo cerradas (solo Cusco es real, backend FastAPI, sin estáticos); vocabulario único con "Focos armonizados" como unidad; casos de prueba del backend | sesión de ciencia de datos |
 | 2026-11-14 | Paquete v1.2 integrado al repo en la rama `antonio/modelo`; `.gitignore` creado desde la sugerencia; workflow `verificar-datos` activado con permiso del usuario; `verificar_datos.py` en verde y sumas de control de §6 confirmadas | sesión del repo |
 | 2026-11-14 | `verificar_datos.py` corre en Windows (stdout/stderr en UTF-8); datos sin cambios, sumas de control de §6 confirmadas (`TODO OK`) | Julio (rama `julio/actividades`) |
+| 2026-11-14 | Analíticas "en simple" sobre la plataforma de Julio (rama `antonio/analitica`): estacionalidad, ranking de años, curva acumulada, altitud y recurrencia por celda (solo VIIRS, desde 2013), cada una con una frase en lenguaje sencillo; `GET /api/resumen` y `GET /api/analitica/*`; panel con cuatro gráficos descargables (PNG y CSV) en la interfaz. Año típico = mediana de los años completos sin focos extrapolados (2003–2025) | sesión del repo |
 | | *(añade aquí una línea por cada tarea terminada)* | |
 
 ## 12. Decisiones del equipo y vocabulario (resueltas el 2026-11-14; no reabrir sin el usuario)

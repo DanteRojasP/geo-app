@@ -177,6 +177,8 @@ Todas las llamadas son **GET** y no llevan credenciales: los datos son públicos
 | Al elegir un mes | `GET /api/anomalias?departamento=PE-CUS&mes=AAAA-MM` | Detalle del mes (mediana, anomalía, margen, días) |
 | Al dibujar un rectángulo | `GET /api/calendario?bbox=O,S,E,N&...` y `GET /api/focos.geojson?bbox=O,S,E,N&...` | Total y puntos del área |
 | Botón CSV | `GET /api/hotspots.csv?<AOI>&fecha_inicio=AAAA-MM&fecha_fin=AAAA-MM` | Descarga de focos |
+| Botón «En simple» | `GET /api/resumen?<AOI>` y `GET /api/analitica/{estacionalidad,ranking,acumulado,altitud}?<AOI>` | Cinco frases en lenguaje sencillo y cuatro gráficos descargables |
+| Cambiar el año de la curva | `GET /api/analitica/acumulado?<AOI>&anio=AAAA` | Curva acumulada de ese año |
 
 Ninguna llamada sale a FIRMS ni a Google: los datos son los CSV de Antonio, cargados en el servidor. Las únicas
 conexiones externas del navegador son el mapa base (OpenFreeMap), la vista satelital (Esri) y las fuentes tipográficas.
@@ -198,6 +200,8 @@ conexiones externas del navegador son el mapa base (OpenFreeMap), la vista satel
 | `/api/focos.geojson` | `FeatureCollection` de puntos con `fecha_local`, `hora_utc`, `sensor`, `satelite`, `eq_foco`, `en_serie`, `calidad` (sin FRP); `n_focos`, `total_focos_armonizados`. Máx. 50 000 focos por llamada |
 | `/api/hotspots.csv` | CSV UTF-8 con BOM, **18 columnas del contrato** de Antonio; cabeceras `X-Row-Count` y `X-Total-Eq-Foco` |
 | `/api/metadatos` | `unidad`, `armonizacion` (k, kT, margen, filtros), `cobertura`, `controles_maestro`, `creditos`, `notes` |
+| `/api/resumen` | `titulo`, `frases[{pregunta, respuesta}]` (cinco), `notes` |
+| `/api/analitica/*` | `titulo` (la pregunta), `en_simple` (respuesta en una frase), `como_leerlo`, y los datos del gráfico: `meses[]` (estacionalidad), `anios[]` y `anio_tipico` (ranking), `curva[]` y `rango_normal` (acumulado), `bandas[]` (altitud), `celdas[]` (recurrencia, con `limite`) |
 
 Reglas de pantalla:
 - El número que se muestra es `focos_armonizados`, con la etiqueta "Focos armonizados". En pantalla se puede
@@ -206,6 +210,8 @@ Reglas de pantalla:
 - Si la `calidad` es `extrapolado`, el mes va atenuado y con su `rango`.
 - Si la `categoria` es `incierta`, la anomalía no se muestra como si fuera firme.
 - Los focos MODIS y VIIRS se muestran por separado y no se suman.
+- Las analíticas describen lo que ya ocurrió: no se rotulan como "riesgo", "alerta" ni "pronóstico". El "año típico"
+  es la mediana de los años completos sin focos extrapolados (2003-2025). La recurrencia usa solo VIIRS (desde 2013).
 
 ### 4. Errores y límites (protocolo de solicitudes)
 
