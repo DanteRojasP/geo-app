@@ -442,6 +442,7 @@ function FireMapApp() {
       })
       map.addLayer({
         id: 'fire-heat', type: 'heatmap', source: 'fire-hotspots', maxzoom: 12,
+        layout: { visibility: 'none' },
         paint: {
           'heatmap-weight': ['interpolate', ['linear'], ['get', 'frp'], 0, 0.18, 40, 0.55, 100, 1],
           'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 5, 0.75, 10, 1.75],
@@ -452,6 +453,7 @@ function FireMapApp() {
       })
       map.addLayer({
         id: 'fire-points', type: 'circle', source: 'fire-hotspots',
+        layout: { visibility: 'none' },
         paint: {
           'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, 4, 10, 8],
           'circle-color': ['match', ['get', 'sensor'], 'MODIS', '#ff9b3f', '#f33932'],
