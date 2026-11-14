@@ -9,16 +9,16 @@ Construir una aplicación web que combine los *hotspots* de FIRMS de MODIS (desd
 - El usuario elige un área de interés (AOI) y un rango de fechas.
 - Obtiene un calendario de actividad (meses × años), conteos de hotspots, comparación con la mediana histórica (anomalías) y un CSV descargable.
 - Público: equipos de emergencia, científicos, gestores de tierras y brigadistas.
+- **Alcance geográfico (AOI):** los departamentos de Perú con más incendios históricos, a nivel departamental.
 
 ## 2. Decisiones de armonización
 
 - **Responsable:** Antonio.
-- **Alternativa elegida:** **A (grilla común de 1 km)** como base.
-- **Algoritmo combinado:** B (calibración por solapamiento 2012+) + C (anomalías normalizadas), aplicado sobre A.
-  - ⚠️ La propuesta recomienda **A + C en el MVP** y dejar **B solo si el hito H1 (sáb 20:00) se cumple a tiempo**. Combinar B desde el inicio agrega trabajo de calibración antes de H1; conviene tener un fallback a A + C.
+- **Alternativas del MVP:** **A (grilla común de 1 km) + C (anomalías normalizadas)**.
+- **Alternativa B (calibración por solapamiento 2012+):** opcional. Solo se incorpora si el hito H1 (sáb 20:00) se cumple a tiempo.
 - **Regla de deduplicación:** si MODIS y VIIRS detectan en la misma celda de 1 km el mismo día, cuenta como un solo evento y se conserva el de mayor FRP (MW).
 - **Umbral de confianza:** por definir (ver sección 9).
-- **Pendiente de definir:** el formato de salida para cumplir el máximo en ms de la consigna (ver sección 9).
+- **Latencia (requisito):** máximo en milisegundos para la selección de imágenes de muestra. Las pruebas con APIs grandes tienen un objetivo distinto y se miden aparte (ver sección 9).
 
 ## 3. Formatos
 
@@ -36,7 +36,7 @@ Construir una aplicación web que combine los *hotspots* de FIRMS de MODIS (desd
 - GeoServer es opcional, solo para publicar la capa de puntos como WMS/WFS.
 
 **Endpoints mínimos (contrato entre Julio y Dante):**
-- `GET /api/calendario`: AOI (bbox o centro + radio), fecha inicio y fin → matriz mes × año.
+- `GET /api/calendario`: AOI (departamento de Perú; alternativamente bbox o centro + radio), fecha inicio y fin → matriz mes × año.
 - `GET /api/anomalias`: mes consultado frente a la mediana histórica.
 - `GET /api/hotspots.csv`: descarga de eventos del rango seleccionado.
 - `GET /api/metadatos`: versión del armonizador, umbral de confianza y advertencias.
@@ -46,7 +46,7 @@ Construir una aplicación web que combine los *hotspots* de FIRMS de MODIS (desd
 | Integrante | Rol | Entregables | Depende de |
 |---|---|---|---|
 | **Julio** | Backend | API FastAPI con los 4 endpoints; carga de Parquet; exportación CSV; documentación OpenAPI | Antonio (esquema congelado a las 11:00 del sáb) |
-| **Dante** | Frontend y geoservidor | Mapa Leaflet, dibujo del AOI, selector de fechas, calendario en color; integración con GeoServer u opción GeoJSON | Julio (contrato de la API); empieza con datos de muestra |
+| **Dante** | Frontend y geoservidor | Mapa Leaflet, selector de AOI por departamento (dibujo opcional), selector de fechas, calendario en color; integración con GeoServer u opción GeoJSON | Julio (contrato de la API); empieza con datos de muestra |
 | **Antonio** | Armonización | Ingesta de FIRMS, normalización de confianza, grilla de 1 km, deduplicación, anomalías y diccionario de datos | Ninguno. Cuello de botella: prioridad máxima |
 | **Erik** | Q/A de usuario, propuesta y control de errores | Casos de uso reales; mensajes de error claros (AOI vacío, rango invertido, sin datos, área demasiado grande); revisión de UX y de la propuesta | Frontend y API integrados (H2) |
 | **Gabriel** | Q/A de lógica | Pruebas de conteos, deduplicación, mediana y anomalías contra un cálculo manual en un caso de control; validación del CSV | Datos armonizados v1 (H1) |
@@ -66,7 +66,7 @@ Construir una aplicación web que combine los *hotspots* de FIRMS de MODIS (desd
 ## 7. Alcance
 
 **MVP (obligatorio):**
-- Selección del AOI (dibujo en el mapa o latitud/longitud + radio).
+- Selección del AOI por departamento de Perú (dibujo en el mapa como opción adicional).
 - Rango de fechas.
 - Calendario mes × año con escala de color accesible.
 - Conteo mensual y comparación con la mediana histórica.
@@ -92,9 +92,10 @@ Construir una aplicación web que combine los *hotspots* de FIRMS de MODIS (desd
 
 ## 9. Decisiones pendientes (confirmar hoy)
 
-- [ ] Región del AOI de prueba (sáb 9:00).
+- [ ] Departamentos de Perú que entran al AOI (los de mayor historial de incendios) y el departamento de prueba (sáb 9:00).
 - [ ] Umbral de confianza para MODIS y para las categorías de VIIRS.
 - [ ] Si GeoServer entra en la versión final o queda como extra.
 - [ ] Si la elección del sensor se hace por fecha (VIIRS desde 2012) o por deduplicación en todo el periodo.
-- [ ] **Formato de salida para cumplir el máximo en ms** (la consigna no está clara en el texto de Antonio: confirmar si se refiere a latencia de la API, al tiempo de procesamiento o a otra cosa, y el límite exacto).
+- [ ] **Límite de latencia en ms** para la selección de imágenes de muestra (valor exacto por definir).
+- [ ] **Objetivo de latencia para pruebas con APIs grandes** (distinto del de muestra; definir valor y cómo se mide).
 - [ ] Verificar contra la guía de atributos de FIRMS los umbrales, la fecha de inicio de VIIRS y los nombres de campos antes de fijar el esquema.
