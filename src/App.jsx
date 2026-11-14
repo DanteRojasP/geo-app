@@ -118,7 +118,11 @@ function App() {
           <div className="map-panel">
             <div className="map-heading"><div><p>ÁREA SELECCIONADA</p><h2>{department.name}</h2></div><div className="map-switch"><button className={mapLayer === 'hotspots' ? 'active' : ''} onClick={() => setMapLayer('hotspots')}><Flame size={14}/>Hotspots</button><button className={mapLayer === 'aoi' ? 'active' : ''} onClick={() => setMapLayer('aoi')}><Layers3 size={14}/>AOI</button></div></div>
             <MapContainer center={department.center} zoom={department.zoom} zoomControl={false} className="map">
-              <TileLayer attribution='&copy; OpenStreetMap contributors &copy; CARTO' url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
+              <TileLayer
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+                className="base-map-tiles"
+              />
               <MapFocus center={department.center} zoom={department.zoom} />
               <Polygon positions={department.polygon} pathOptions={{ color: '#b7f36b', fillColor: '#89d65b', fillOpacity: mapLayer === 'aoi' ? 0.2 : 0.06, weight: 1.5, dashArray: '5 5' }} />
               {mapLayer === 'hotspots' && result.hotspots.map((point) => <CircleMarker key={point.id} center={[point.lat, point.lon]} radius={Math.max(4, Math.min(11, point.frp/9))} pathOptions={{ color: point.sensor === 'MODIS' ? '#ff8c42' : '#ff4d3d', fillColor: point.sensor === 'MODIS' ? '#ffb15c' : '#ff513f', fillOpacity: 0.78, weight: 1 }}><Popup><b>{point.sensor}</b><br/>{point.date}<br/>FRP: {point.frp} MW<br/>Confianza: {point.confidence}%</Popup></CircleMarker>)}
