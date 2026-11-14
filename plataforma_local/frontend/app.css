@@ -11,8 +11,11 @@ header { display: flex; justify-content: space-between; align-items: center; gap
 h1 { margin: 0; font-size: 1.35rem; }
 h2 { font-size: .95rem; margin: 0 0 .5rem; }
 .sub { margin: .15rem 0 0; color: #c9cfdb; font-size: .85rem; }
-.banner { background: #fef0c7; color: #7a2e0e; padding: .4rem .75rem; border-radius: 6px;
+.badge { background: #e8f3ec; color: #05603a; padding: .4rem .75rem; border-radius: 6px;
   font-size: .85rem; font-weight: 600; }
+.total { background: #fff7ed; border: 1px solid #fed7aa; border-radius: 6px; padding: .5rem .6rem;
+  margin-bottom: .5rem; font-size: .85rem; }
+.total b { font-size: 1.05rem; }
 main { display: flex; flex: 1; min-height: 0; }
 aside { width: 320px; flex-shrink: 0; padding: 1rem; background: var(--card);
   border-right: 1px solid var(--line); overflow-y: auto; }
@@ -46,7 +49,16 @@ button:disabled { opacity: .55; cursor: wait; }
   font-variant-numeric: tabular-nums; }
 .cal td.empty { background: #eef0f3; cursor: default; }
 .cal td.partial { outline: 1px dashed #5d6677; outline-offset: -2px; }
-.cal td.era-start { box-shadow: inset 0 3px 0 #1d2330; }
+.cal td.viirs-start { box-shadow: inset 3px 0 0 #1d2330; }
+/* Calidad 'extrapolado' (solo Terra): misma rampa, atenuada y rayada (no otro color). */
+.cal td.extrap { opacity: .55; background-image: repeating-linear-gradient(45deg,
+  rgba(255,255,255,.55) 0 3px, transparent 3px 7px); }
+/* Sin dato (fuera de la cobertura): gris distinto del cero y rayado. */
+.cal td.nodata { background-color: #c9ced6; background-image: repeating-linear-gradient(-45deg,
+  rgba(255,255,255,.7) 0 2px, transparent 2px 6px); cursor: default; }
+.sw { display: inline-block; width: 18px; height: 12px; border-radius: 2px; vertical-align: middle;
+  margin-right: 3px; border: 1px solid rgba(0,0,0,.08); }
+.legend .cls { display: inline-flex; align-items: center; margin-right: .5rem; }
 .cal td:hover:not(.empty) { outline: 2px solid #1d2330; outline-offset: -1px; }
 .legend { display: flex; align-items: center; gap: .5rem; margin-top: .75rem; font-size: .75rem;
   color: var(--muted); flex-wrap: wrap; }

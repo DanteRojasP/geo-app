@@ -1,178 +1,185 @@
-"""Eventos armonizados del plan (alternativa A) -> Parquet particionado por año y mes.
+"""Carga de los datos armonizados reales de Cusco (Antonio, MAESTRO.md v1.2) -> Parquet.
 
-Regla de deduplicación (PLAN.md sección 2): si MODIS y VIIRS (o dos satélites) detectan en la misma
-celda de 1 km el mismo día (fecha local, America/Lima), cuenta como un solo evento y se conserva la
-detección de mayor FRP (MW).
+Fuente de verdad: los dos CSV de ``data/harmonized/`` (ver ``firecal.plan.sources``). Este paso:
 
-Constelación constante (hallazgo al implementar el plan): sumar todos los satélites VIIRS hace que
-las detecciones suban en 2018 (entra NOAA-20) y 2024 (NOAA-21) sin que haya más fuego. Por eso se
-usa UN solo VIIRS a la vez: S-NPP mientras opera y NOAA-20 después (``VIIRS_CHAIN``). MODIS usa
-Terra + Aqua, y la serie empieza en ``harmonization.series_start`` (2003-01, Aqua completo).
+1. Verifica el contrato: columnas y orden, filas, suma de pesos y SHA-256 (MAESTRO §6). Si algo
+   no coincide, se detiene (los datos cambiaron: hay que investigar antes de servirlos).
+2. Escribe Parquet particionado por año y mes (PLAN.md §3), que la API consulta con DuckDB:
+   ``celda_dia/anio=/mes=`` (calendario) y ``focos/anio=/mes=`` (descarga y AOI dibujados).
+3. Escribe el límite de Cusco (FAO GAUL, ``cusco_ref/limite.json``) en GeoJSON para el mapa.
 
-Esquema del evento armonizado (PLAN.md sección 3):
-``fecha_utc, hora, lat, lon, celda_1km, sensor, confianza_norm (0-1), frp_mw, dia_noche``
-más columnas de apoyo: ``fecha_local``, ``satelite``, ``n_detecciones`` (detecciones fusionadas),
-``sensores`` (p. ej. "MODIS+VIIRS"), ``departamento`` (código ISO o NULL) y las particiones
-``anio``, ``mes`` (mes LOCAL).
+No se recalcula ningún peso: ``eq_hotspots`` y ``eq_foco`` se usan tal cual (MAESTRO §1).
+``hora_utc`` y ``confianza`` se leen como texto (MAESTRO §1.7).
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import shutil
-from datetime import UTC, date, datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
+import duckdb
 import numpy as np
 import pandas as pd
-import shapely
+from shapely.geometry import MultiPolygon, Polygon, mapping
 
-from firecal.etl.load import connect
-from firecal.regions import load_regions
+from firecal.plan.sources import (
+    CELDA_DIA_CSV,
+    COLS_CELDA_DIA,
+    COLS_FOCOS,
+    CONTROL,
+    FOCOS_CSV,
+    REGION_CODE,
+    REGION_NAME,
+    cusco_ref_dir,
+    harmonized_dir,
+)
 from firecal.settings import Settings
 
 log = logging.getLogger(__name__)
 
-EVENTS_DIRNAME = "eventos"
-META_FILENAME = "eventos_meta.json"
-PLAN_VERSION = "plan-AC-v0.1"
+PLAN_DIRNAME = "plan"
+META_FILENAME = "plan_meta.json"
+REGION_FILENAME = "cusco_limite.geojson"
+PLAN_VERSION = "cusco-v1.2"            # = versión del MAESTRO de los datos
 
-# Confianza normalizada 0-1. MODIS ya es 0-100 -> /100. VIIRS es categórica: valores
-# representativos de cada clase (supuesto documentado en /api/metadatos; ajustable).
-VIIRS_CONF_NORM = {"low": 0.3, "nominal": 0.6, "high": 0.9}
-
-# Primer mes completo con VIIRS (S-NPP desde 2012-01-20): define las eras de sensores.
-VIIRS_ERA_START = (2012, 2)
+ALTO_M = 2500                          # estrato de altitud de los factores k y kT
 
 
-def viirs_chain(settings: Settings) -> list[tuple[str, date, date | None]]:
-    """[(satélite, desde, hasta)]: S-NPP hasta su fin; luego NOAA-20."""
-    snpp_start, snpp_end = settings.params.harmonization.satellite_periods["SNPP"]
-    return [("SNPP", snpp_start, snpp_end), ("N20", snpp_end or date.max, None)]
+class DataContractError(ValueError):
+    """Los CSV no cumplen el contrato o las sumas de control de MAESTRO §6."""
 
 
-def constellation_mask(df: pd.DataFrame, settings: Settings) -> np.ndarray:
-    """True para detecciones de la constelación constante (MODIS + un VIIRS a la vez)."""
-    keep = (df["sensor"] == "MODIS").to_numpy().copy()
-    d = pd.to_datetime(df["local_date"])
-    for sat, start, end in viirs_chain(settings):
-        m = (df["satellite"] == sat) & (d >= pd.Timestamp(start))
-        if end is not None:
-            m &= d < pd.Timestamp(end)
-        keep |= m.to_numpy()
-    y0, m0 = (int(v) for v in settings.params.harmonization.series_start.split("-"))
-    keep &= (d >= pd.Timestamp(y0, m0, 1)).to_numpy()
-    return keep
-
-
-def events_dir(settings: Settings) -> Path:
-    return settings.paths.processed_dir / EVENTS_DIRNAME
+def plan_dir(settings: Settings) -> Path:
+    return settings.paths.processed_dir / PLAN_DIRNAME
 
 
 def meta_path(settings: Settings) -> Path:
-    return settings.paths.processed_dir / META_FILENAME
+    return plan_dir(settings) / META_FILENAME
 
 
-def confidence_norm(df: pd.DataFrame) -> np.ndarray:
-    """Confianza en 0-1: MODIS numérica / 100; VIIRS por categoría (``VIIRS_CONF_NORM``)."""
-    out = np.full(len(df), np.nan)
-    modis = (df["sensor"] == "MODIS").to_numpy()
-    raw = pd.to_numeric(df["confidence_raw"], errors="coerce").to_numpy()
-    out[modis] = np.clip(raw[modis] / 100.0, 0, 1)
-    viirs = ~modis
-    out[viirs] = df.loc[viirs, "confidence_cat"].map(VIIRS_CONF_NORM).to_numpy(dtype=float)
-    return np.round(out, 2)
+def region_path(settings: Settings) -> Path:
+    return plan_dir(settings) / REGION_FILENAME
 
 
-def assign_departments(lat: np.ndarray, lon: np.ndarray, settings: Settings) -> np.ndarray:
-    """Código de departamento (``level == "departamento"``) que contiene cada punto, o None."""
-    out = np.full(lat.size, None, dtype=object)
-    for region in load_regions(settings.paths.regions_dir).values():
-        if region.level != "departamento":
-            continue
-        shapely.prepare(region.geometry)
-        inside = shapely.contains_xy(region.geometry, lon, lat) & pd.isna(out)
-        out[inside] = region.code
-    return out
+def _sha256(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as f:
+        for block in iter(lambda: f.read(1 << 20), b""):
+            h.update(block)
+    return h.hexdigest()
 
 
-def deduplicate(df: pd.DataFrame) -> pd.DataFrame:
-    """Un evento por (celda_1km, fecha local): la detección de mayor FRP (FRP nulo = 0)."""
-    df = df.assign(_frp=df["frp"].fillna(0.0))
-    grp = df.groupby(["px1km_id", "local_date"], sort=False)
-    n_det = grp["id"].transform("size")
-    mixed = grp["sensor"].transform("nunique") > 1
-    sensors = df["sensor"].where(~mixed, "MODIS+VIIRS")
-    df = df.assign(n_detecciones=n_det, sensores=sensors)
-    df = df.sort_values(["px1km_id", "local_date", "_frp", "id"],
-                        ascending=[True, True, False, True])
-    return df.drop_duplicates(["px1km_id", "local_date"], keep="first").drop(columns="_frp")
+def _check(name: str, path: Path, df: pd.DataFrame, cols: list[str], weight: str,
+           strict: bool) -> dict:
+    expected = CONTROL[name]
+    got = {"filas": len(df), "suma": round(float(df[weight].sum()), 2), "sha256": _sha256(path)}
+    problems = []
+    if list(df.columns) != cols:
+        problems.append(f"columnas distintas al contrato: {list(df.columns)}")
+    if got["filas"] != expected["filas"]:
+        problems.append(f"filas {got['filas']} (esperadas {expected['filas']})")
+    if abs(got["suma"] - expected["suma"]) > 0.01:
+        problems.append(f"suma de {weight} {got['suma']} (esperada {expected['suma']})")
+    if got["sha256"] != expected["sha256"]:
+        problems.append("SHA-256 distinto al de MAESTRO seccion 6")
+    if problems and strict:
+        raise DataContractError(
+            f"{path.name}: " + "; ".join(problems) + ". Los datos cambiaron: corre "
+            "harmonizacion/verificar_datos.py, revisa MAESTRO seccion 6 y actualiza "
+            "firecal/plan/sources.py::CONTROL solo si el cambio es intencional.")
+    return {**got, "coincide_maestro": not problems, "problemas": problems}
 
 
-def build_events(settings: Settings) -> dict:
-    """``hotspots_clean`` (DuckDB) -> eventos armonizados en Parquet particionado (anio, mes)."""
-    with connect(settings.paths.duckdb_path) as con:
-        df = con.execute(
-            "SELECT id, sensor, satellite, acq_utc, local_date, lat, lon, confidence_cat, "
-            "confidence_raw, frp, daynight, px1km_id FROM hotspots_clean").df()
-        info = dict(con.execute("SELECT key, value FROM pipeline_info").fetchall())
-    n_all = len(df)
-    df = df[constellation_mask(df, settings)]
-    n_in = len(df)
-    df = deduplicate(df)
-    acq = pd.to_datetime(df["acq_utc"])
-    local = pd.to_datetime(df["local_date"])
-    ev = pd.DataFrame({
-        "fecha_utc": acq.dt.date,
-        "hora": acq.dt.strftime("%H:%M"),
-        "lat": df["lat"].round(5),
-        "lon": df["lon"].round(5),
-        "celda_1km": df["px1km_id"].astype("int64"),
-        "sensor": df["sensor"],
-        "satelite": df["satellite"],
-        "confianza_norm": confidence_norm(df),
-        "frp_mw": df["frp"].round(2),
-        "dia_noche": df["daynight"],
-        "fecha_local": local.dt.date,
-        "n_detecciones": df["n_detecciones"].astype("int32"),
-        "sensores": df["sensores"],
-    })
-    ev["departamento"] = assign_departments(ev["lat"].to_numpy(), ev["lon"].to_numpy(), settings)
-    ev["anio"] = local.dt.year.astype("int32")
-    ev["mes"] = local.dt.month.astype("int32")
+def read_sources(strict: bool = True) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
+    """Lee y valida los dos CSV. Devuelve (celda_dia, focos, resultado de los controles)."""
+    src = harmonized_dir()
+    cd_path, fo_path = src / CELDA_DIA_CSV, src / FOCOS_CSV
+    cd = pd.read_csv(cd_path, dtype={"fecha_local": str, "fuente_serie": str, "calidad": str})
+    fo = pd.read_csv(fo_path, dtype={"fecha_local": str, "fecha_utc": str, "hora_utc": str,
+                                     "confianza": str, "sensor": str, "satelite": str,
+                                     "fuente_serie": str, "calidad": str})
+    fo["calidad"] = fo["calidad"].fillna("")      # vacío = fuera de serie (contrato de focos)
+    controls = {"celda_dia": _check("celda_dia", cd_path, cd, COLS_CELDA_DIA, "eq_hotspots",
+                                    strict),
+                "focos": _check("focos", fo_path, fo, COLS_FOCOS, "eq_foco", strict)}
+    return cd, fo, controls
 
-    out = events_dir(settings)
+
+def cusco_geometry() -> MultiPolygon:
+    """Límite de Cusco (FAO GAUL 2015 simplificado). Igual que los scripts de Antonio: solo los
+    ``Polygon`` del GeometryCollection y su anillo exterior."""
+    lim = json.loads((cusco_ref_dir() / "limite.json").read_text(encoding="utf-8"))
+    geoms = lim["geometries"] if lim["type"] == "GeometryCollection" else [lim]
+    polys = [Polygon(g["coordinates"][0]) for g in geoms if g["type"] == "Polygon"]
+    if not polys:
+        raise DataContractError("cusco_ref/limite.json no tiene poligonos.")
+    polys = [p if p.is_valid else p.buffer(0) for p in polys]
+    parts = [q for p in polys for q in (p.geoms if isinstance(p, MultiPolygon) else [p])]
+    return MultiPolygon(parts)
+
+
+def _add_partitions(df: pd.DataFrame) -> pd.DataFrame:
+    return df.assign(anio=df["fecha_local"].str[:4].astype("int32"),
+                     mes=df["fecha_local"].str[5:7].astype("int32"))
+
+
+def _write_parquet(df: pd.DataFrame, out: Path) -> None:
+    con = duckdb.connect()
+    try:
+        con.register("_t", df)
+        con.execute("COPY (SELECT * FROM _t ORDER BY anio, mes, fecha_local) "
+                    f"TO '{out.as_posix()}' "
+                    "(FORMAT parquet, PARTITION_BY (anio, mes), COMPRESSION zstd)")
+    finally:
+        con.close()
+
+
+def _factors(cd: pd.DataFrame) -> dict:
+    """Factores tal como vienen en los datos (no se recalculan): un valor por fuente y estrato."""
+    est = np.where(cd["alt_m"] >= ALTO_M, "alto", "bajo")
+    g = cd.assign(estrato=est).groupby(["fuente_serie", "estrato"])["eq_hotspots"].first()
+    return {f"{f}|{e}": round(float(v), 3) for (f, e), v in g.items()}
+
+
+def build_events(settings: Settings, strict: bool = True) -> dict:
+    """CSV armonizados de Cusco -> Parquet (celda_dia, focos) + límite + metadatos."""
+    cd, fo, controls = read_sources(strict=strict)
+    out = plan_dir(settings)
     if out.exists():
         shutil.rmtree(out)
     out.mkdir(parents=True)
-    with connect(settings.paths.duckdb_path) as con:
-        con.register("_ev", ev)
-        con.execute("COPY (SELECT * FROM _ev ORDER BY anio, mes, departamento) "
-                    f"TO '{out.as_posix()}' "
-                    "(FORMAT parquet, PARTITION_BY (anio, mes), COMPRESSION zstd)")
-        con.unregister("_ev")
+    _write_parquet(_add_partitions(cd), out / "celda_dia")
+    _write_parquet(_add_partitions(fo), out / "focos")
 
-    y0 = int(ev["anio"].min())
+    geom = cusco_geometry()
+    simple = geom.simplify(0.002, preserve_topology=True)
+    region_path(settings).write_text(json.dumps({
+        "type": "FeatureCollection",
+        "features": [{"type": "Feature", "geometry": mapping(simple),
+                      "properties": {"code": REGION_CODE, "name": REGION_NAME,
+                                     "fuente": "FAO GAUL 2015 nivel 1 (simplificado)"}}]},
+        ensure_ascii=False), encoding="utf-8")
+
+    fechas = cd["fecha_local"]
     meta = {
         "plan_version": PLAN_VERSION,
-        "data_mode": info.get("data_mode", settings.data_mode),
+        "data_mode": "real",
         "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
-        "n_detecciones_limpias": int(n_all),
-        "n_detecciones_constelacion": int(n_in),
-        "viirs_cadena": [[s, str(a), None if b is None else str(b)]
-                         for s, a, b in viirs_chain(settings)],
-        "n_eventos": int(len(ev)),
-        "fusionadas": int(n_in - len(ev)),
-        "eventos_multisensor": int((ev["sensores"] == "MODIS+VIIRS").sum()),
-        "primer_mes": f"{y0}-{int(ev.loc[ev['anio'] == y0, 'mes'].min()):02d}",
-        "ultimo_fecha_local": str(ev["fecha_local"].max()),
-        "umbral_confianza": settings.params.filters.min_confidence,
-        "grilla_deg": settings.params.grid.px1km_deg,
-        "viirs_conf_norm": VIIRS_CONF_NORM,
-        "departamentos": sorted(c for c in ev["departamento"].dropna().unique()),
+        "fuente": "NASA FIRMS (MODIS Terra/Aqua y VIIRS S-NPP), armonizado (MAESTRO.md v1.2)",
+        "region": {"code": REGION_CODE, "name": REGION_NAME,
+                   "bbox": [round(v, 4) for v in geom.bounds]},
+        "primer_dia": str(fechas.min()), "ultimo_dia": str(fechas.max()),
+        "cobertura_desde": "2000-11-04", "cobertura_hasta": "2025-12-31",
+        "controles": controls,
+        "factores": _factors(cd),
+        "filas_por_fuente": cd["fuente_serie"].value_counts().to_dict(),
+        "focos_por_sensor": fo["sensor"].value_counts().to_dict(),
     }
     meta_path(settings).write_text(json.dumps(meta, indent=2, ensure_ascii=False) + "\n",
                                    encoding="utf-8")
-    log.info("Eventos del plan: %d detecciones -> %d eventos (%s)", n_in, len(ev), out)
+    log.info("Datos de Cusco: %d celdas-dia, %d focos (%s)", len(cd), len(fo), out)
     return meta

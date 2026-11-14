@@ -175,32 +175,15 @@ $env:PYTHONUTF8 = "1"
 
 ## Endpoints del plan (GET /api/*)
 
-Capa agregada en `local_plat` según `PLAN.md` (alternativas A + C). Datos: `data/processed/eventos/` (Parquet
-particionado `anio=/mes=`), generados con `firecal plan-events` (incluido en `firecal all`).
+Desde el 14-nov sirven los **datos reales de Cusco** (MAESTRO.md) y la documentación vigente está en
+[`../../README.md`](../../README.md), sección 4. Resumen:
 
-**AOI** (uno solo): `departamento` (código ISO: `PE-CUS`, `PE-APU`, `PE-AYA`, `PE-PUN`, `PE-MDD`) ·
-`bbox=oeste,sur,este,norte` (≤ `api.max_aoi_km2`) · `lat`, `lon`, `radio_km` (≤ `api.max_point_radius_km`).
-**Fechas:** `AAAA-MM`. **Envoltura:** `data_mode`, `version`, `generado`, `notes`. Cabecera `X-Process-Time-ms`.
+| Ruta | Respuesta principal |
+| --- | --- |
+| `GET /api/departamentos` | `departamentos: [{code: "PE-CUS", ...}]`, `geojson` (límite FAO GAUL) |
+| `GET /api/calendario` | `matriz_eq_hotspots`, `matriz_anomalia`, `total_eq_hotspots`, `cortes_color`, `celdas[]` |
+| `GET /api/anomalias` | `eq_hotspots`, `mediana_hist`, `anomalia`, `calidad`, `historial[]`, `dias[]` |
+| `GET /api/hotspots.csv` | CSV con las 18 columnas del contrato de focos (`harmonizacion/docs/CONTRATO_focos.md`) |
+| `GET /api/metadatos` | unidad, factores k y kT, calidad, cobertura, sumas de control, créditos |
 
-| Ruta | Parámetros | Respuesta principal |
-| --- | --- | --- |
-| `GET /api/departamentos` | — | `departamentos: [{code, name, area_km2}]` |
-| `GET /api/calendario` | AOI, `fecha_inicio?`, `fecha_fin?` | `aoi`, `anios`, `meses`, `matriz_n_eventos[año][mes]`, `matriz_anomalia[año][mes]`, `celdas[]` |
-| `GET /api/anomalias` | AOI, `mes` | `n_eventos`, `mediana_hist`, `p25`, `p75`, `anomalia`, `categoria`, `era`, `parcial`, `historial[]` |
-| `GET /api/hotspots.csv` | AOI, `fecha_inicio`, `fecha_fin` (≤ `api.max_csv_years`) | CSV UTF-8 con BOM |
-| `GET /api/metadatos` | — | `armonizador`, `umbral_confianza`, `cobertura`, `conteos`, `creditos` |
-
-Celda del calendario: `{anio, mes, n_eventos, frp_total, mediana_hist, anomalia, categoria, era, parcial}`.
-`anomalia = (n_eventos − mediana) / max(IQR, 1)` con mediana e IQR del mismo mes dentro de la misma era
-(`MODIS` hasta ene-2012, `MODIS+VIIRS` desde feb-2012); `null` si la era tiene < 5 años o si el mes está en curso.
-Categorías: `< -1` muy por debajo · `< -0,5` por debajo · `< 0,5` normal · `< 1` por encima · resto muy por encima.
-
-Errores: 422 `{"detail": "<motivo en español>"}` (AOI vacío, más de un tipo de AOI, departamento desconocido,
-fecha mal escrita, rango invertido, área demasiado grande, CSV de más de 5 años); 404 sin datos; 503 sin eventos.
-
-Ejemplo:
-```
-GET /api/calendario?departamento=PE-CUS&fecha_inicio=2020-01&fecha_fin=2020-12
-GET /api/anomalias?departamento=PE-PUN&mes=2024-09
-GET /api/hotspots.csv?bbox=-72.6,-13.8,-71.8,-13.2&fecha_inicio=2024-08&fecha_fin=2024-09
-```
+Los endpoints `/api/v1/*` de este documento son del backend anterior (sintético) y están apagados por defecto.

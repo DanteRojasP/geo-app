@@ -7,3 +7,6 @@ backend/.env
 **/*.duckdb
 **/*.png
 !frontend/vendor/leaflet/images/*.png
+data
+harmonizacion
+.env

@@ -233,5 +233,5 @@ def test_not_ready_returns_503(tmp_path):
                         paths=Paths(home=tmp_path))
     client = TestClient(create_app(settings))
     assert client.get("/health").json()["data_ready"] is False
-    resp = client.get("/api/v1/meta")
-    assert resp.status_code == 503 and "pipeline" in resp.json()["detail"]
+    resp = client.get("/api/calendario", params={"departamento": "PE-CUS"})
+    assert resp.status_code == 503 and "plan-events" in resp.json()["detail"]

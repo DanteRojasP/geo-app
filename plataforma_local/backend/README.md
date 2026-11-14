@@ -5,10 +5,10 @@ Calcula un **calendario de actividad de quema** (año × mes) armonizado entre M
 frente a la mediana histórica, la descarga de focos por área de interés (AOI) y, más adelante, una perspectiva del
 mes siguiente. El frontend consume la API en `http://localhost:8000`.
 
-> **Plataforma local (`local_plat`):** además de la API `/api/v1`, este backend implementa el plan de trabajo
-> del equipo (`PLAN.md`): departamentos del Perú, armonización A + C (`firecal/plan/`), endpoints
-> `GET /api/calendario | anomalias | hotspots.csv | metadatos` y sirve el frontend Leaflet en `http://localhost:8000/`.
-> Guía general: [`../README.md`](../README.md).
+> **Plataforma del prototipo (desde 14-nov):** este backend sirve los **datos reales de Cusco** armonizados por
+> Antonio (`MAESTRO.md`, `data/harmonized/`) con `GET /api/calendario | anomalias | hotspots.csv | metadatos` y el
+> frontend Leaflet en `http://localhost:8000/`. Guía vigente: [`../README.md`](../README.md). Lo que sigue en este
+> archivo describe el **backend anterior** (pipeline sintético, `/api/v1`), hoy desactivado (`api.legacy_v1: false`).
 
 > **Estado actual:** pipeline y API completos en **modo sintético** (Fases 0–6). Pendiente: modelo de perspectiva
 > (Fase 7; hoy `/forecast` responde `available: false`), empaquetado Docker (Fase 8) y datos reales de FIRMS

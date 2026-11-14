@@ -3,17 +3,17 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>FireCal Perú · Calendario de incendios MODIS + VIIRS</title>
+  <title>FireCal Cusco · Calendario de focos armonizados MODIS + VIIRS</title>
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
   <link rel="stylesheet" href="app.css">
 </head>
 <body>
   <header>
     <div>
-      <h1>FireCal Perú</h1>
+      <h1>FireCal Cusco</h1>
       <p class="sub">Calendario armonizado de focos de calor MODIS + VIIRS · NASA Space Apps 2026</p>
     </div>
-    <div id="banner" class="banner" hidden></div>
+    <div id="badge" class="badge">Datos NASA FIRMS · Cusco · 2000-11 a 2025-12</div>
   </header>
 
   <main>
@@ -21,16 +21,15 @@
       <section>
         <h2>1. Área de interés</h2>
         <div class="tabs" role="tablist">
-          <button type="button" class="tab active" data-mode="departamento">Departamento</button>
+          <button type="button" class="tab active" data-mode="departamento">Todo Cusco</button>
           <button type="button" class="tab" data-mode="bbox">Dibujar rectángulo</button>
         </div>
         <div id="mode-departamento">
-          <label for="dep">Departamento</label>
-          <select id="dep"></select>
-          <p class="hint">También puedes hacer clic en un departamento del mapa.</p>
+          <p class="hint">El prototipo cubre <b>solo Cusco</b>, la única región con armonización
+            validada.</p>
         </div>
         <div id="mode-bbox" hidden>
-          <p class="hint">Arrastra sobre el mapa para dibujar el rectángulo (máx. 50 000 km²).</p>
+          <p class="hint">Arrastra sobre el mapa, dentro de Cusco (máx. 50 000 km²).</p>
           <p id="bbox-text" class="mono">Sin rectángulo</p>
         </div>
       </section>
@@ -38,22 +37,24 @@
       <section>
         <h2>2. Rango de fechas</h2>
         <div class="row">
-          <div><label for="ini">Desde</label><input type="month" id="ini" min="2003-01"></div>
-          <div><label for="fin">Hasta</label><input type="month" id="fin" min="2003-01"></div>
+          <div><label for="ini">Desde</label><input type="month" id="ini" min="2000-11" max="2025-12"></div>
+          <div><label for="fin">Hasta</label><input type="month" id="fin" min="2000-11" max="2025-12"></div>
         </div>
+        <p class="hint">Serie histórica: 2000-11-04 a 2025-12-31.</p>
       </section>
 
       <section>
         <h2>3. Color del calendario</h2>
         <div class="tabs">
-          <button type="button" class="tab active" data-color="anomalia">Anomalía</button>
-          <button type="button" class="tab" data-color="n">N.º de eventos</button>
+          <button type="button" class="tab active" data-color="valor">Focos armonizados</button>
+          <button type="button" class="tab" data-color="anomalia">Anomalía</button>
         </div>
-        <p class="hint">La anomalía compara cada mes con la mediana del mismo mes en su era de
-          sensores; es la vista recomendada para comparar años antes y después de 2012.</p>
+        <p class="hint" id="unit-def">Focos armonizados: celdas de ~1 km con fuego por día, en
+          escala equivalente a MODIS.</p>
       </section>
 
       <button id="go" class="primary" type="button">Consultar</button>
+      <div id="total" class="total" hidden></div>
       <button id="csv" class="secondary" type="button">Descargar CSV de focos</button>
       <div id="msg" class="msg" role="status" aria-live="polite"></div>
     </aside>
@@ -65,7 +66,7 @@
           <h2 id="cal-title">Calendario</h2>
           <span id="latency" class="mono"></span>
         </div>
-        <div id="cal" class="cal"><p class="hint">Elige un área y pulsa «Consultar».</p></div>
+        <div id="cal" class="cal"><p class="hint">Cargando…</p></div>
         <div id="legend" class="legend"></div>
         <div id="notes" class="notes"></div>
         <div id="detail" class="detail" hidden></div>
@@ -80,7 +81,7 @@
     </details>
     <p>We acknowledge the use of data and/or imagery from NASA's FIRMS
       (<a href="https://earthdata.nasa.gov/firms" target="_blank" rel="noopener">earthdata.nasa.gov/firms</a>).
-      Límites departamentales: geoBoundaries (CC BY 4.0). Mapa base © OpenStreetMap.</p>
+      Límite de Cusco: FAO GAUL 2015. Altitud: SRTM. Mapa base © OpenStreetMap.</p>
   </footer>
 
   <script src="vendor/leaflet/leaflet.js"></script>

@@ -54,6 +54,7 @@ def pipeline_home(tmp_path_factory):
     raw = load_params(home / "config" / "settings.yaml").model_dump()
     raw["harmonization"]["bootstrap_reps"] = 200  # suficiente para probar la lógica
     raw["api"]["rate_limit"]["enabled"] = False  # se prueba aparte en test_limits.py
+    raw["api"]["legacy_v1"] = True                # estos tests ejercitan /api/v1 (sintético)
     env = EnvSettings(_env_file=None, FIRECAL_DATA_MODE="synthetic")
     settings = Settings(env=env, params=ScientificParams.model_validate(raw),
                         paths=Paths(home=home))
@@ -63,8 +64,27 @@ def pipeline_home(tmp_path_factory):
     run_aggregate(settings)
     summary = run_harmonize(settings)
     metrics = run_validate(settings)
-    from firecal.plan.events import build_events
+    return SimpleNamespace(settings=settings, summary=summary, metrics=metrics)
 
-    plan_meta = build_events(settings)
-    return SimpleNamespace(settings=settings, summary=summary, metrics=metrics,
-                           plan_meta=plan_meta)
+
+@pytest.fixture(scope="session")
+def plan_home(tmp_path_factory):
+    """Datos reales de Cusco (CSV de Antonio, data/harmonized/) cargados en una carpeta aislada.
+
+    No necesita el pipeline sintético: es lo que usa la plataforma del prototipo.
+    """
+    import shutil
+    from types import SimpleNamespace
+
+    from firecal.plan.events import build_events
+    from firecal.settings import PROJECT_ROOT, Paths, ScientificParams, load_params
+
+    home = tmp_path_factory.mktemp("plan_home")
+    shutil.copytree(PROJECT_ROOT / "config", home / "config")
+    raw = load_params(home / "config" / "settings.yaml").model_dump()
+    raw["api"]["rate_limit"]["enabled"] = False
+    env = EnvSettings(_env_file=None, FIRECAL_DATA_MODE="real")
+    settings = Settings(env=env, params=ScientificParams.model_validate(raw),
+                        paths=Paths(home=home))
+    meta = build_events(settings)
+    return SimpleNamespace(settings=settings, meta=meta)

@@ -1,5 +1,7 @@
 # CLAUDE.md — FireCal Perú (backend)
 
+**Antes de tocar datos o armonización, lee `MAESTRO.md` (raíz del repositorio).**
+
 Backend local para el reto NASA Space Apps 2026 *Harmonization of MODIS and VIIRS Hot Spots*.
 La especificación completa está en `C:\linasa\local_testing\PROMPT_BACKEND.md` (fuera del repo). Este archivo es su resumen.
 
@@ -131,14 +133,17 @@ models/artifacts/  reports/  docs/  tests/
 - `.gitattributes` fija LF para Makefile, Dockerfile, *.sh, *.py, *.yaml, *.md, *.toml.
 - El usuario sigue en **Windows nativo + PowerShell** (no WSL2) durante el hackathon: todo debe funcionar ahí.
 
-## Capa del plan (local_plat, A + C)
-- `firecal plan-events` -> `data/processed/eventos/anio=/mes=/*.parquet` + `eventos_meta.json`. Constelación constante:
-  MODIS (Terra + Aqua) + UN VIIRS (S-NPP y luego N20; sumar VIIRS infla los conteos). Serie desde `series_start`.
-  Deduplicación: (px1km_id, local_date) -> mayor FRP.
-- `firecal.plan.query.PlanStore` (DuckDB en memoria sobre el Parquet, caché de series por AOI) y
-  `api/routers/plan.py` (`GET /api/...`). Errores `PlanError` (422), `PlanNoData` (404), `PlanNotReady` (503).
-- Frontend estático en `../frontend` (montado en `/`; `FIRECAL_FRONTEND_DIR` lo cambia, vacío lo desactiva).
-- Tests: `tests/test_plan.py`.
+## Capa del plan: datos reales de Cusco (desde 14-nov)
+- Fuente: CSV de Antonio en `<repo>/data/harmonized/` y `<repo>/harmonizacion/cusco_ref/` (`firecal/plan/sources.py`;
+  `FIRECAL_SOURCE_ROOT` cambia la raíz). Contrato y sumas de control de MAESTRO §6 en `sources.CONTROL`.
+- `firecal plan-events` -> valida (columnas, filas, sumas, SHA-256) y escribe `data/processed/plan/{celda_dia,focos}/anio=/mes=`
+  + `cusco_limite.geojson` + `plan_meta.json`. Falla si los datos no coinciden (DataContractError).
+- Reglas del equipo (MAESTRO §1 y §12): solo Cusco; unidad "focos armonizados" = Σ eq_hotspots / Σ eq_foco; no contar
+  filas; no usar FRP; no usar la palabra "evento"; fuera de cobertura = "sin datos" (404), nunca 0.
+- `firecal.plan.query.PlanStore`: departamento -> tabla celda-día; bbox/punto -> focos por latitude/longitude (el total
+  coincide con la descarga). Anomalía C sobre meses referencia/calibrado.
+- `/api/v1` (sintético) apagado: `api.legacy_v1: false`. Los tests del backend anterior lo activan en `pipeline_home`.
+- Tests: `tests/test_plan.py` (fixture `plan_home`, casos de MAESTRO §12) y `tests/test_limits.py`.
 
 ## Estado de fases
 - [x] Fase 0 — andamiaje

@@ -164,6 +164,7 @@ class ApiParams(_Strict):
     csv_chunk_rows: int = Field(gt=0)
     region_simplify_deg: float = Field(ge=0)
     max_csv_rows: int = Field(default=200000, gt=0)         # filas máximas por descarga CSV
+    legacy_v1: bool = False                                 # /api/v1 (pipeline sintético)
     rate_limit: RateLimitParams = RateLimitParams()
 
 

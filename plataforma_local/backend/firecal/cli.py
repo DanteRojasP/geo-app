@@ -149,12 +149,19 @@ def train() -> None:
 
 @app.command(name="plan-events")
 def plan_events() -> None:
-    """Eventos armonizados del plan (A: grilla 1 km + deduplicacion) -> Parquet por anio/mes."""
-    from firecal.plan.events import build_events
+    """Carga los CSV armonizados de Cusco (MAESTRO.md) -> Parquet por anio/mes, con controles."""
+    from firecal.plan.events import DataContractError, build_events
 
-    meta = build_events(get_settings())
-    typer.echo(f"OK plan-events: {meta['n_detecciones_limpias']:,} detecciones -> "
-               f"{meta['n_eventos']:,} eventos (data/processed/eventos/)")
+    try:
+        meta = build_events(get_settings())
+    except (DataContractError, FileNotFoundError) as exc:
+        typer.echo(f"ERROR plan-events: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+    c = meta["controles"]
+    typer.echo(f"OK plan-events: Cusco {meta['primer_dia']}..{meta['ultimo_dia']} | "
+               f"celda-dia {c['celda_dia']['filas']:,} filas, suma {c['celda_dia']['suma']:,.2f} | "
+               f"focos {c['focos']['filas']:,} filas, suma {c['focos']['suma']:,.2f} | "
+               "sumas de control de MAESTRO 6: OK (data/processed/plan/)")
 
 
 @app.command()

@@ -1,13 +1,14 @@
-"""Endpoints del plan de trabajo (PLAN.md sección 4, contrato Julio <-> Dante).
+"""Endpoints del plan de trabajo (PLAN.md §4, contrato Julio <-> Dante) sobre los datos de Cusco.
 
-- ``GET /api/calendario``   AOI + rango -> matriz mes x año (conteos y anomalía normalizada).
-- ``GET /api/anomalias``    mes consultado frente a la mediana histórica de su era de sensores.
-- ``GET /api/hotspots.csv`` descarga de eventos armonizados del rango (CSV UTF-8 con BOM).
-- ``GET /api/metadatos``    versión, umbral de confianza, reglas y advertencias.
-- ``GET /api/departamentos`` departamentos disponibles (código ISO, nombre, área).
+- ``GET /api/departamentos``  región disponible (solo Cusco) con su límite en GeoJSON.
+- ``GET /api/calendario``     AOI + rango -> matriz mes x año de focos armonizados y anomalía.
+- ``GET /api/anomalias``      un mes frente a la mediana del mismo mes + detalle diario.
+- ``GET /api/hotspots.csv``   focos del rango con las 18 columnas del contrato (CSV UTF-8 con BOM).
+- ``GET /api/metadatos``      método, factores, calidad, cobertura, sumas de control y créditos.
 
-AOI: ``departamento`` (p. ej. PE-CUS), ``bbox=oeste,sur,este,norte`` o
-``lat`` + ``lon`` + ``radio_km``.
+AOI: ``departamento=PE-CUS`` o ``bbox=oeste,sur,este,norte`` o ``lat`` + ``lon`` + ``radio_km``.
+Unidad: **focos armonizados** (MAESTRO §12); los campos conservan los nombres del contrato
+(``eq_hotspots``, ``eq_foco``).
 """
 
 from __future__ import annotations
@@ -21,30 +22,32 @@ from typing import Annotated
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 
-from firecal.plan.events import PLAN_VERSION, VIIRS_CONF_NORM
+from firecal.plan.events import PLAN_VERSION
 from firecal.plan.query import (
     CATEGORY_EDGES,
-    CSV_COLUMNS,
     MIN_YEARS,
+    NOTE_2025,
+    NOTE_EXTRAPOLADO,
+    UNIDAD,
     PlanError,
     PlanNoData,
     PlanNotReady,
     PlanStore,
 )
+from firecal.plan.sources import COLS_FOCOS
 
 router = APIRouter(prefix="/api", tags=["plan (MVP)"])
 
 FIRMS_CREDIT = ("We acknowledge the use of data and/or imagery from NASA's FIRMS "
                 "(https://earthdata.nasa.gov/firms).")
-NOTE_SYNTHETIC = "Datos sintéticos (simulados con el formato de FIRMS): no usar para decisiones."
 
-Dep = Annotated[str | None, Query(description="Código ISO del departamento, p. ej. PE-CUS")]
+Dep = Annotated[str | None, Query(description="Código del departamento: PE-CUS (único con datos)")]
 BBox = Annotated[str | None, Query(description="oeste,sur,este,norte en grados WGS84")]
 Lat = Annotated[float | None, Query(description="Latitud del centro (con lon y radio_km)")]
 Lon = Annotated[float | None, Query(description="Longitud del centro")]
 Radio = Annotated[float | None, Query(description="Radio en km")]
-Inicio = Annotated[str | None, Query(description="AAAA-MM (por defecto, inicio de la serie)")]
-Fin = Annotated[str | None, Query(description="AAAA-MM (por defecto, último mes)")]
+Inicio = Annotated[str | None, Query(description="AAAA-MM (por defecto 2000-11)")]
+Fin = Annotated[str | None, Query(description="AAAA-MM (por defecto 2025-12)")]
 
 
 def _store(request: Request) -> PlanStore:
@@ -58,9 +61,9 @@ def _store(request: Request) -> PlanStore:
 
 def _envelope(store: PlanStore, body: dict) -> dict:
     meta = store.meta
-    notes = ([NOTE_SYNTHETIC] if meta["data_mode"] == "synthetic" else []) + body.pop("notes", [])
     return {"data_mode": meta["data_mode"], "version": meta["plan_version"],
-            "generado": datetime.now(UTC).isoformat(timespec="seconds"), **body, "notes": notes}
+            "generado": datetime.now(UTC).isoformat(timespec="seconds"), **body,
+            "notes": body.pop("notes", [])}
 
 
 def _custom_aoi(bbox, lat) -> bool:
@@ -79,18 +82,21 @@ def _call(fn, *args):
 
 @router.get("/departamentos")
 def departamentos(request: Request) -> dict:
-    """Departamentos con eventos procesados (para el selector del frontend)."""
+    """Región con datos armonizados y validados (solo Cusco) y su límite (FAO GAUL) en GeoJSON."""
     store = _store(request)
-    deps = [{"code": d["code"], "name": d["name"], "area_km2": round(d["area_km2"], 1)}
-            for d in sorted(store.departments.values(), key=lambda d: d["name"])]
-    return _envelope(store, {"departamentos": deps})
+    reg = store.meta["region"]
+    return _envelope(store, {
+        "departamentos": [{"code": reg["code"], "name": reg["name"], "datos": "armonizados"}],
+        "geojson": store.region_geojson,
+        "notes": ["Prototipo centrado en Cusco: es la única región con factores de armonización "
+                  "validados. Otras regiones responden 'sin datos'."]})
 
 
 @router.get("/calendario")
 def calendario(request: Request, departamento: Dep = None, bbox: BBox = None, lat: Lat = None,
                lon: Lon = None, radio_km: Radio = None, fecha_inicio: Inicio = None,
                fecha_fin: Fin = None) -> dict:
-    """Matriz mes x año de eventos armonizados y su anomalía normalizada (A + C)."""
+    """Matriz mes x año de focos armonizados (Σ eq_hotspots), anomalía y cortes de color."""
     store = _store(request)
     aoi = _call(store.resolve_aoi, departamento, bbox, lat, lon, radio_km)
     if _custom_aoi(bbox, lat):
@@ -103,7 +109,7 @@ def calendario(request: Request, departamento: Dep = None, bbox: BBox = None, la
 def anomalias(request: Request, mes: Annotated[str, Query(description="AAAA-MM")],
               departamento: Dep = None, bbox: BBox = None, lat: Lat = None, lon: Lon = None,
               radio_km: Radio = None) -> dict:
-    """Un mes frente a la mediana histórica del mismo mes en su era de sensores."""
+    """Un mes frente a la mediana histórica del mismo mes, con su detalle diario."""
     store = _store(request)
     aoi = _call(store.resolve_aoi, departamento, bbox, lat, lon, radio_km)
     if _custom_aoi(bbox, lat):
@@ -117,14 +123,16 @@ def hotspots_csv(request: Request, fecha_inicio: Annotated[str, Query(descriptio
                  fecha_fin: Annotated[str, Query(description="AAAA-MM")],
                  departamento: Dep = None, bbox: BBox = None, lat: Lat = None, lon: Lon = None,
                  radio_km: Radio = None) -> StreamingResponse:
-    """Eventos armonizados del rango en CSV (UTF-8 con BOM: abre bien en Excel)."""
+    """Focos del rango con las 18 columnas del contrato (UTF-8 con BOM: abre bien en Excel).
+
+    La cabecera ``X-Total-Eq-Foco`` trae Σ eq_foco de las filas: es el total que muestra la web."""
     store = _store(request)
     aoi = _call(store.resolve_aoi, departamento, bbox, lat, lon, radio_km)
     # El turno se toma aquí y se libera cuando termina de enviarse el CSV (o si el cliente corta).
     gate = request.app.state.gate
     gate.acquire()
     try:
-        sql, params = _call(store.hotspots_query, aoi, fecha_inicio, fecha_fin)
+        sql, params, n_rows, total = _call(store.hotspots_query, aoi, fecha_inicio, fecha_fin)
         chunk = store.settings.params.api.csv_chunk_rows
         cur = store.cursor()
         cur.execute(sql, params)
@@ -135,61 +143,71 @@ def hotspots_csv(request: Request, fecha_inicio: Annotated[str, Query(descriptio
     def rows() -> Iterator[bytes]:
         buf = io.StringIO()
         w = csv.writer(buf, lineterminator="\n")
-        w.writerow(CSV_COLUMNS)
+        w.writerow(COLS_FOCOS)
         yield ("﻿" + buf.getvalue()).encode("utf-8")
         try:
             while batch := cur.fetchmany(chunk):
                 buf.seek(0)
                 buf.truncate()
-                w.writerows(batch)
+                w.writerows(["" if v is None else v for v in row] for row in batch)
                 yield buf.getvalue().encode("utf-8")
         finally:
             cur.close()
             gate.release()
 
-    tag = (departamento or aoi.kind).lower()
+    tag = "cusco" if aoi.whole_region else aoi.kind
     name = f"focos_{tag}_{fecha_inicio}_{fecha_fin}.csv"
     return StreamingResponse(rows(), media_type="text/csv; charset=utf-8", headers={
         "Content-Disposition": f'attachment; filename="{name}"',
-        "X-Data-Mode": store.meta["data_mode"]})
+        "X-Data-Mode": store.meta["data_mode"], "X-Row-Count": str(n_rows),
+        "X-Total-Eq-Foco": f"{total:.2f}"})
 
 
 @router.get("/metadatos")
 def metadatos(request: Request) -> dict:
-    """Versión del armonizador, umbral de confianza, reglas y advertencias."""
+    """Método, factores, calidad, cobertura, sumas de control y créditos (MAESTRO.md v1.2)."""
     store = _store(request)
     m = store.meta
+    f = m["factores"]
     return _envelope(store, {
-        "armonizador": {
-            "version": PLAN_VERSION,
-            "alternativas": ["A: grilla común de ~1 km (0.01°)",
-                             "C: anomalías normalizadas por era"],
-            "deduplicacion": "Misma celda de 1 km y mismo día local (America/Lima): un evento; se "
-                             "conserva la detección de mayor FRP (MW).",
-            "eras": {"MODIS": "ene-2003 a ene-2012 (Terra + Aqua)",
-                     "MODIS+VIIRS": "desde feb-2012 (Terra + Aqua + un solo VIIRS)"},
-            "constelacion": "Un VIIRS a la vez para no inflar conteos al sumar satélites: "
-                            + ", ".join(f"{s} desde {a}" for s, a, _ in m["viirs_cadena"]),
-            "anomalia": "(n_eventos - mediana del mismo mes en la misma era) / max(IQR, 1)",
+        "unidad": {"nombre": "Focos armonizados", "nombre_en": "Harmonized hotspots",
+                   "definicion": UNIDAD,
+                   "campos": "eq_hotspots (celda-día) y eq_foco (foco); nunca contar filas ni "
+                             "sumar n_modis + n_viirs"},
+        "armonizacion": {
+            "version_datos": PLAN_VERSION,
+            "grilla": "celda de 0.01° (~1.1 km) × día local (UTC−5); presencia de fuego",
+            "serie": [
+                {"periodo": "2000-11-04 a 2002-07-03", "fuente_serie": "Terra*kT",
+                 "calidad": "extrapolado", "kT": {"alto": f.get("Terra*kT|alto"),
+                                                  "bajo": f.get("Terra*kT|bajo")}},
+                {"periodo": "2002-07-04 a 2012-12-31", "fuente_serie": "MODIS",
+                 "calidad": "referencia", "peso": 1.0},
+                {"periodo": "desde 2013-01-01", "fuente_serie": "VIIRS*k", "calidad": "calibrado",
+                 "k": {"alto": f.get("VIIRS*k|alto"), "bajo": f.get("VIIRS*k|bajo")}},
+            ],
+            "estratos": "alto ≥ 2500 m, bajo < 2500 m (altitud SRTM)",
+            "validacion": "k calibrado en 2013-2019; en 2020-2024 VIIRS×k / MODIS real = "
+                          "0.90-1.09 por año",
+            "filtros": "type = 0 (vegetación); MODIS confidence ≥ 30; VIIRS n o h; solo S-NPP",
+            "anomalia": "(valor − mediana del mismo mes) / max(IQR, 1), con los meses completos "
+                        "de calidad referencia o calibrado",
             "min_anios_para_anomalia": MIN_YEARS,
             "categorias": [{"hasta": e if e != float("inf") else None, "nombre": n}
                            for e, n in CATEGORY_EDGES],
-            "alternativa_B": "Calibración por solapamiento disponible en /api/v1/calendar "
-                             "(backend anterior, focos equivalentes a MODIS-Aqua diurno).",
         },
-        "umbral_confianza": {"minimo": m["umbral_confianza"],
-                             "viirs_conf_norm": VIIRS_CONF_NORM,
-                             "modis_conf_norm": "confidence / 100"},
-        "cobertura": {"primer_mes": m["primer_mes"], "ultima_fecha": m["ultimo_fecha_local"],
-                      "departamentos": m["departamentos"]},
-        "conteos": {"detecciones_limpias": m["n_detecciones_limpias"],
-                    "detecciones_constelacion": m["n_detecciones_constelacion"],
-                    "eventos": m["n_eventos"], "fusionadas": m["fusionadas"],
-                    "eventos_multisensor": m["eventos_multisensor"]},
-        "creditos": FIRMS_CREDIT,
-        "notes": ["Se miden focos de calor detectables por satélite, no número de incendios.",
-                  "VIIRS (375 m) detecta fuegos más pequeños que MODIS (1 km): por eso la "
-                  "anomalía se calcula dentro de cada era.",
-                  "Limitación: la deriva orbital de Terra y Aqua (desde ~2020-2022) cambia su hora "
-                  "de paso; A + C no la corrige. La alternativa B (/api/v1) sí la modela."],
+        "cobertura": {"region": m["region"], "desde": m["cobertura_desde"],
+                      "hasta": m["cobertura_hasta"], "ultimo_dia_con_focos": m["ultimo_dia"],
+                      "nota": "Serie histórica: no incluye 2026."},
+        "controles_maestro": {k: {"filas": v["filas"], "suma": v["suma"],
+                                  "coincide": v["coincide_maestro"]}
+                              for k, v in m["controles"].items()},
+        "creditos": [FIRMS_CREDIT, "Límite de Cusco: FAO GAUL 2015 (nivel 1, simplificado).",
+                     "Altitud: SRTM.", "Mapa base: © OpenStreetMap."],
+        "notes": ["Un foco es un píxel con anomalía térmica, no un incendio ni un área quemada.",
+                  "No se calcula área quemada y el FRP no se usa (no está armonizado entre "
+                  "sensores).",
+                  NOTE_EXTRAPOLADO, NOTE_2025,
+                  "Cobertura validada: solo Cusco. Los factores k y kT no se reutilizan en otras "
+                  "regiones."],
     })

@@ -1,17 +1,20 @@
-# FireCal Perú: API (FastAPI) + frontend estático (Leaflet) en una sola imagen.
-# Construir desde local_plat/:  docker build -t firecal .
-# Correr:                        docker run --rm -p 8000:8000 firecal
+# FireCal Cusco: API (FastAPI) + frontend estático (Leaflet) + datos armonizados de Cusco.
 #
-# Datos: por defecto se generan en la construcción (modo sintético, ~3-4 min) para que la imagen
-# arranque al instante en la nube. Con --build-arg BUILD_DATA=0 la imagen sale sin datos y el
-# contenedor los genera al arrancar (o se monta un volumen en /app/backend/data).
+# Los datos NO están en esta carpeta: son los CSV de Antonio en la raíz del repositorio
+# (data/harmonized/ y harmonizacion/cusco_ref/). Se pasan como contextos adicionales:
+#   docker compose up --build                       (ya los define docker-compose.yml)
+#   docker build -t firecal-cusco \
+#     --build-context harmonized=../data/harmonized \
+#     --build-context cusco_ref=../harmonizacion/cusco_ref .
+# En la construcción se validan contra las sumas de control de MAESTRO §6 (si no coinciden,
+# la construcción falla).
 
-FROM python:3.12-slim AS base
+FROM python:3.12-slim
 ENV PYTHONUTF8=1 PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1 FIRECAL_DATA_MODE=synthetic
+    PIP_DISABLE_PIP_VERSION_CHECK=1
 WORKDIR /app/backend
 
-# libgomp1: lo necesita lightgbm (modelo de la Fase 7) en Debian slim.
+# libgomp1: lo necesita lightgbm (dependencia del backend anterior) en Debian slim.
 RUN apt-get update && apt-get install -y --no-install-recommends libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
@@ -22,15 +25,17 @@ COPY backend/ ./
 COPY frontend/ /app/frontend/
 RUN pip install -e . --no-deps
 
-ARG BUILD_DATA=1
-RUN if [ "$BUILD_DATA" = "1" ]; then firecal all --mode synthetic && rm -rf data/synthetic data/interim; fi
+# Datos de Cusco (MAESTRO.md): mismos caminos relativos que en el repositorio.
+COPY --from=harmonized . /app/data/harmonized/
+COPY --from=cusco_ref . /app/harmonizacion/cusco_ref/
+RUN firecal plan-events
 
-# Usuario sin privilegios; data/ escribible para regenerar en el arranque si hace falta.
-RUN useradd --create-home --uid 10001 firecal && mkdir -p data && chown -R firecal /app/backend/data
+# Usuario sin privilegios.
+RUN useradd --create-home --uid 10001 firecal && chown -R firecal /app/backend/data
 USER firecal
 
 EXPOSE 8000
 # PORT lo fijan Azure Container Apps / Cloud Run / App Service; 8000 por defecto.
 # En la nube, FIRECAL_TRUST_PROXY=1 para limitar por la IP real del cliente (api/limits.py).
 # No se usa --forwarded-allow-ips='*': haría que uvicorn creyera IPs inventadas por el cliente.
-CMD ["sh", "-c", "[ -f data/processed/eventos_meta.json ] || firecal all --mode synthetic; exec uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+CMD ["sh", "-c", "exec uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

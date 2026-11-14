@@ -7,10 +7,10 @@ se midieron en esta máquina en modo sintético.
 
 | Medida | Valor |
 | --- | --- |
-| RAM del servidor (API + datos cargados) | ~250-275 MB |
-| Datos procesados (`data/processed`) | ~80 MB (eventos Parquet: ~10 MB) |
-| Entorno Python (`.venv`) | ~620 MB; la imagen Docker pesa 1,57 GB |
-| Pipeline completo (`firecal all`) | ~3-4 min |
+| RAM del servidor (API + datos de Cusco) | ~170 MB en Docker (antes ~250-275 MB con el modo sintético) |
+| Datos procesados | ~5 MB de Parquet (CSV de Cusco: 10 MB) |
+| Imagen Docker | 1,32 GB; se construye en ~1,5 min |
+| Carga de datos (`firecal plan-events`) | ~2 s |
 | Latencia de `/api/calendario` | 1.ª consulta de un AOI: 160-540 ms; repetida: ~7 ms (caché en memoria) |
 | `/api/v1/calendar` (alternativa B, precalculada) | ~27 ms |
 
@@ -18,13 +18,13 @@ se midieron en esta máquina en modo sintético.
 
 | # | Falencia | Por qué importa en internet | Qué hacer |
 | --- | --- | --- | --- |
-| 1 | **Solo datos sintéticos.** La ingesta real de FIRMS (archivo histórico + NRT con MAP_KEY) no está implementada (Fase R). | Un sitio público con datos simulados puede confundir, aunque tenga el aviso. | Para el concurso: dejar el aviso fijo y decirlo en la presentación. Después: implementar `nrt_fetch.py` y cargar el archivo histórico de FIRMS. Verificar los supuestos de `firms_schema.py`. |
+| 1 | ~~**Solo datos sintéticos.**~~ **RESUELTA (14-nov):** la plataforma usa los datos reales de NASA FIRMS armonizados por Antonio (Cusco, 2000-11-04 a 2025-12-31), validados contra MAESTRO §6 en cada carga y en la construcción de Docker. | — | Serie histórica: no incluye 2026 (decisión del equipo). Ampliar a otras regiones exige recalibrar k y kT (MAESTRO P7). |
 | 2 | ~~**Imagen Docker sin probar.**~~ **RESUELTA.** `firecal-peru:local` se construye en ~3 min la primera vez y ~1,5 min después (caché); pesa 1,57 GB; el pipeline corre dentro en ~75 s; el contenedor usa ~240 MB de RAM. Probados la web, los endpoints, el CSV y los límites (429). | Es la pieza que se despliega en la nube. | Reducir el tamaño: sacar `lightgbm`, `scikit-learn` y `matplotlib` de la imagen de la API (solo los usan la validación y la Fase 7). |
 | 3 | ~~**Sin límite de solicitudes.**~~ **RESUELTA** (ver sección 5). | `/api/hotspots.csv` y los AOI dibujados consumen CPU: unos pocos clientes podían saturar el contenedor. | Protocolo de solicitudes en `backend/api/limits.py`: cubeta de fichas por IP (429), semáforo de consultas pesadas (503), candado por clave y máximo de filas por CSV. |
 | 4 | **CORS solo permite localhost.** | Si el frontend se sirve desde otro dominio (p. ej. el hosting de GoDaddy), el navegador bloquea la API. | Mientras frontend y API vayan en la misma imagen y dominio, no hace falta. Si se separan: agregar el dominio en `settings.yaml → api.cors_origins` y abrir la web con `?api=https://dominio-api`. |
 | 5 | **Mapa base de OpenStreetMap** (`tile.openstreetmap.org`). | La política de uso de OSM no permite tráfico alto de una app pública; pueden bloquear el sitio. | Para el demo vale. En producción: un proveedor con clave (Azure Maps o Google Maps, ver beneficios) o MapTiler o Esri. Solo cambia la URL en `app.js`. |
 | 6 | **Datos dentro de la imagen.** Para actualizar se reconstruye y se vuelve a desplegar. | Con datos reales NRT (diarios) habría que reconstruir cada día. | Fase R: tarea programada (Azure Container Apps Job o Cloud Run Job) que corra el pipeline y suba `data/processed` a Blob Storage o Cloud Storage. La API lo lee al arrancar o lo monta como volumen. |
-| 7 | **Arranque sin datos = 3-4 min.** Si la imagen se construye con `BUILD_DATA=0`, cada contenedor nuevo corre el pipeline. | Los servicios serverless cortan arranques largos y escalar sería lentísimo. | Construir siempre con datos (opción por defecto) o montar los datos ya procesados. |
+| 7 | ~~**Arranque sin datos = 3-4 min.**~~ **RESUELTA:** cargar los datos de Cusco toma ~2 s y la imagen ya los trae validados. | — | — |
 | 8 | **Arranque en frío.** | Si la nube apaga el contenedor (escala a cero), la primera visita espera varios segundos y la primera consulta de cada AOI tarda ~0,5 s. | Mínimo 1 réplica durante el concurso. Opcional: precalentar los 5 departamentos al arrancar. |
 | 9 | **Memoria por réplica.** Cada proceso carga sus propios datos (~275 MB). | Con 512 MB no hay margen; con varios workers se multiplica. | 1 GB de RAM y 1 worker por contenedor; escalar con réplicas, no con workers. |
 | 10 | **`/docs` público.** | Expone toda la API (es útil para el jurado, pero también para abusar de ella). | Dejarlo durante el concurso. Después: `docs_url=None` o protegerlo. |
@@ -111,3 +111,13 @@ Parámetros: `config/settings.yaml → api.rate_limit` y `api.max_csv_rows`.
 - Límite conocido: los contadores viven en la memoria de **cada réplica**. Con 2 réplicas el límite efectivo por IP
   se duplica. Para el demo basta; para producción, un límite compartido en el gateway o en Redis.
 - Pruebas: `backend/tests/test_limits.py` (hilos concurrentes, 429, 503, IP falsificada, liberación del turno).
+
+## 6. Cambios del 14-nov (integración con Antonio)
+
+- Datos reales de Cusco en lugar de sintéticos (falencia 1), carga en ~2 s (falencia 7).
+- Docker: los CSV entran como **contextos adicionales** (`docker-compose.yml → additional_contexts`) desde la raíz
+  del repositorio, sin duplicarlos en `plataforma_local/`. La construcción corre `firecal plan-events`, que falla si
+  los datos no coinciden con MAESTRO §6.
+- Para Cloud Run o Azure: construir desde la raíz del repo (para que los contextos existan) o usar la imagen ya
+  construida (`docker compose build`, luego `docker push` al registro de la nube).
+- El backend anterior sintético (`/api/v1`) quedó apagado (`api.legacy_v1: false`): no hay datos simulados expuestos.

@@ -41,9 +41,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         title="FireCal Perú API",
         version=__version__,
         description=(
-            "Calendario de actividad de quema armonizado MODIS/VIIRS para una región del Perú. "
-            "Unidad: focos equivalentes a MODIS-Aqua **diurno**. Toda respuesta indica "
-            "`data_mode` (synthetic | real). Detalles en `GET /api/v1/meta`."
+            "Calendario armonizado de focos de calor MODIS + VIIRS para **Cusco** (2000-11 a "
+            "2025-12), con datos reales de NASA FIRMS. Unidad: **focos armonizados** (celdas de "
+            "~1 km con fuego por día, en escala MODIS). Detalles en `GET /api/metadatos`."
         ),
     )
     app.state.settings = settings
@@ -86,21 +86,30 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "detail": "Solicitud inválida: revisa los campos indicados en 'errors'.",
             "errors": errors})
 
+    legacy = settings.params.api.legacy_v1
+
     @app.get("/health", response_model=HealthResponse, tags=["meta"])
     def health() -> HealthResponse:
-        """Estado del servicio, modo de datos y si el pipeline ya generó la base."""
-        repo: Repository = app.state.repo
-        ready = repo.ready
-        mode = repo.data_mode if ready else settings.data_mode
-        return HealthResponse(status="ok", data_mode=mode, data_ready=ready)
+        """Estado del servicio: si los datos de Cusco están cargados (o la base sintética, en
+        modo legacy_v1)."""
+        if legacy:
+            repo: Repository = app.state.repo
+            ready = repo.ready
+            mode = repo.data_mode if ready else settings.data_mode
+            return HealthResponse(status="ok", data_mode=mode, data_ready=ready)
+        plan_store: PlanStore = app.state.plan
+        return HealthResponse(status="ok", data_mode="real", data_ready=plan_store.ready)
 
     @app.get("/health/limits", tags=["meta"])
     def health_limits() -> dict:
         """Estado del protocolo de solicitudes: clientes, rechazos 429/503 y pesadas en curso."""
         return {**app.state.limiter.stats(), **app.state.gate.stats()}
 
-    for module in (regions, calendar, anomaly, hotspots, map, forecast, meta):
-        app.include_router(module.router, prefix=API_PREFIX)
+    # Backend anterior (alternativa B, datos SINTÉTICOS de 5 departamentos): apagado por defecto
+    # porque el prototipo usa solo los datos reales de Cusco (MAESTRO §12).
+    if legacy:
+        for module in (regions, calendar, anomaly, hotspots, map, forecast, meta):
+            app.include_router(module.router, prefix=API_PREFIX)
     app.include_router(plan.router)
 
     frontend = Path(os.environ.get("FIRECAL_FRONTEND_DIR", DEFAULT_FRONTEND))

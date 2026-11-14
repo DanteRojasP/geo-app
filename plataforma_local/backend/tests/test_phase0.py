@@ -18,7 +18,8 @@ def test_health_returns_ok_and_data_mode(client):
     resp = client.get("/health")
     assert resp.status_code == 200
     body = resp.json()
-    assert body["status"] == "ok" and body["data_mode"] == "synthetic"
+    # El prototipo sirve los datos reales de Cusco (el modo sintético es legacy_v1).
+    assert body["status"] == "ok" and body["data_mode"] == "real"
     assert isinstance(body["data_ready"], bool)
 
 

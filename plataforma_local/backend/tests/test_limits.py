@@ -114,8 +114,8 @@ def _settings_with_limits(base: Settings, **overrides) -> Settings:
     return Settings(env=base.env, params=ScientificParams.model_validate(raw), paths=base.paths)
 
 
-def test_api_returns_429_with_retry_after(pipeline_home):
-    s = _settings_with_limits(pipeline_home.settings, burst=3, requests_per_minute=1)
+def test_api_returns_429_with_retry_after(plan_home):
+    s = _settings_with_limits(plan_home.settings, burst=3, requests_per_minute=1)
     api = TestClient(create_app(s))
     codes = [api.get("/api/departamentos").status_code for _ in range(5)]
     assert codes[:3] == [200, 200, 200] and codes[3:] == [429, 429]
@@ -126,8 +126,8 @@ def test_api_returns_429_with_retry_after(pipeline_home):
     assert api.get("/health/limits").json()["rechazadas_429"] >= 3
 
 
-def test_api_heavy_bucket_is_separate(pipeline_home):
-    s = _settings_with_limits(pipeline_home.settings, heavy_burst=1, heavy_per_minute=1)
+def test_api_heavy_bucket_is_separate(plan_home):
+    s = _settings_with_limits(plan_home.settings, heavy_burst=1, heavy_per_minute=1)
     api = TestClient(create_app(s))
     q = {"bbox": "-72.6,-13.8,-71.8,-13.2"}
     assert api.get("/api/calendario", params=q).status_code == 200
@@ -135,8 +135,8 @@ def test_api_heavy_bucket_is_separate(pipeline_home):
     assert api.get("/api/calendario", params={"departamento": "PE-CUS"}).status_code == 200
 
 
-def test_api_trusts_forwarded_for_only_when_enabled(pipeline_home):
-    s = _settings_with_limits(pipeline_home.settings, burst=1, requests_per_minute=1,
+def test_api_trusts_forwarded_for_only_when_enabled(plan_home):
+    s = _settings_with_limits(plan_home.settings, burst=1, requests_per_minute=1,
                               trust_proxy_headers=True)
     api = TestClient(create_app(s))
     # El proxy agrega la IP real al final; lo de la izquierda lo controla el cliente.
@@ -147,14 +147,14 @@ def test_api_trusts_forwarded_for_only_when_enabled(pipeline_home):
     assert api.get("/api/departamentos", headers=spoof).status_code == 429  # inventar no sirve
     assert api.get("/api/departamentos", headers=b).status_code == 200      # otra IP real
     # Sin confianza en el proxy la cabecera se ignora: todas son el mismo cliente.
-    s2 = _settings_with_limits(pipeline_home.settings, burst=1, requests_per_minute=1)
+    s2 = _settings_with_limits(plan_home.settings, burst=1, requests_per_minute=1)
     api2 = TestClient(create_app(s2))
     assert api2.get("/api/departamentos", headers=a).status_code == 200
     assert api2.get("/api/departamentos", headers=b).status_code == 429
 
 
-def test_api_gate_returns_503_when_busy(pipeline_home):
-    s = _settings_with_limits(pipeline_home.settings, max_concurrent_heavy=1, queue_timeout_s=0.05)
+def test_api_gate_returns_503_when_busy(plan_home):
+    s = _settings_with_limits(plan_home.settings, max_concurrent_heavy=1, queue_timeout_s=0.05)
     app = create_app(s)
     api = TestClient(app)
     app.state.gate.acquire()                     # simula una descarga larga en curso
@@ -172,11 +172,11 @@ def test_api_gate_returns_503_when_busy(pipeline_home):
     assert app.state.gate.stats()["pesadas_activas"] == 0   # el turno se liberó al terminar el CSV
 
 
-def test_csv_row_cap(pipeline_home):
-    raw = pipeline_home.settings.params.model_dump()
+def test_csv_row_cap(plan_home):
+    raw = plan_home.settings.params.model_dump()
     raw["api"]["max_csv_rows"] = 10
-    s = Settings(env=pipeline_home.settings.env, params=ScientificParams.model_validate(raw),
-                 paths=pipeline_home.settings.paths)
+    s = Settings(env=plan_home.settings.env, params=ScientificParams.model_validate(raw),
+                 paths=plan_home.settings.paths)
     app = create_app(s)
     r = TestClient(app).get("/api/hotspots.csv", params={
         "departamento": "PE-CUS", "fecha_inicio": "2020-08", "fecha_fin": "2020-09"})
