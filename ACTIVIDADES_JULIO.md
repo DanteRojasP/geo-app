@@ -247,6 +247,17 @@ Correcciones aplicadas en la revisión:
 - [x] El panel muestra "Calculando…" al cambiar de área, en vez de los datos anteriores.
 - [x] Una prueba de límites dependía de tener la interfaz compilada.
 
+## Publicado en Google Cloud Run (sáb 14 nov 2026, ~17:15)
+
+- **URL pública:** https://firecal-316891526626.southamerica-east1.run.app (API en `/api/*`, documentación en `/docs`).
+- Proyecto `sonic-mile-514718-r5`, región São Paulo, 1 GB, 1 instancia mínima y 2 como máximo, imagen
+  `firecal-cusco:8fc1f2b` en Artifact Registry. Casos de MAESTRO §12 comprobados contra la URL pública.
+- Variables: `FIRECAL_TRUST_PROXY=1` y `FIRECAL_PROXY_HOPS=2`. Con 1 salto, todos los visitantes compartían el cupo
+  de 120/min, porque Cloud Run agrega la IP de su proxy al final de `X-Forwarded-For`. Corregido en 8fc1f2b.
+- PR #8 unido a `main` (b5768dd).
+- [ ] Probar el límite con dos personas en redes distintas.
+- [ ] Al terminar la evaluación: `--min-instances 0` o borrar el servicio.
+
 ## Pendientes que me afectan
 
 - [x] Datos reales de FIRMS (Cusco, de Antonio).
