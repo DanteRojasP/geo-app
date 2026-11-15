@@ -1,0 +1,58 @@
+﻿grupo,prueba,ok,detalle
+1. Conteos,"manual: total periodo = 15,732",True,15732.03
+1. Conteos,"manual: 36,260 celdas-dia",True,36260
+1. Conteos,"manual: 58,779 focos",True,58779
+1. Conteos,"manual: anio 2005 = 1,355",True,1355.00
+1. Conteos,manual: anio 2012 = 678,True,678.00
+1. Conteos,manual: anio 2013 = 424,True,424.11
+1. Conteos,"manual: anio 2020 = 1,206",True,1205.65
+1. Conteos,manual: anio 2025 = 385,True,385.02
+1. Conteos,API /calendario Cusco responde 200,True,200
+1. Conteos,API total = manual,True,API 15732.03 vs 15732.03
+1. Conteos,meses fuera de cobertura marcados sin_dato (no cero),True,10 meses sin_dato
+1. Conteos,"API por anio = manual (2000-2025, todos)",True,max dif 0.015
+1. Conteos,"API por mes = manual (todos los meses, ceros incluidos)",True,"302 meses, max dif 0.0050"
+1. Conteos,"API rango solo 2005 = 1,355",True,1355.0
+1. Conteos,"API rango solo 2020 = 1,206",True,1205.65
+2. Deduplicacion,una sola fila por celda-dia (sin duplicados),True,0 duplicadas
+2. Deduplicacion,suma eq_foco de cada celda-dia = eq_hotspots,True,"0 celdas difieren, max 0.0006"
+2. Deduplicacion,"cada celda-dia vale 1 (MODIS), k o kT segun estrato",True,
+2. Deduplicacion,fuente de la serie segun periodo (contrato),True,0 filas fuera
+2. Deduplicacion,"VIIRS 2012 y MODIS >=2013 fuera de la serie (en_serie=0, eq_foco=0)",True,"3142 VIIRS-2012, 8173 MODIS>=2013"
+2. Deduplicacion,sin filas totalmente identicas,True,
+2. Deduplicacion,repetidos por posicion/hora dentro de lo esperado (<= 5),True,1 repetidos
+3. Mediana/anomalia,mediana historica por mes = manual (302 meses),True,difieren: []
+3. Mediana/anomalia,"anomalia = (n - mediana)/max(IQR,1) = manual (302 meses)",True,difieren: []
+3. Mediana/anomalia,categoria segun umbrales = manual,True,difieren: []
+3. Mediana/anomalia,mediana excluye meses extrapolados (2000-11 a 2002-06),True,
+3. Mediana/anomalia,control 2020-08 vs calculo manual,True,n=508.38 med=151.50 IQR=117.52 anom=3.037 | API n=508.38 med=151.5 anom=3.04 cat=muy por encima
+3. Mediana/anomalia,control 2010-02 vs calculo manual,True,n=2.00 med=0.74 IQR=2.00 anom=0.629 | API n=2.0 med=0.74 anom=0.63 cat=por encima
+3. Mediana/anomalia,control 2001-08 vs calculo manual,True,"n=176.02 med=151.50 IQR=117.52 anom=0.209 | API n=176.02 med=151.5 anom=0.21 cat=incierta incert=77.4 rango=[98.6, 253.4]"
+4. CSV,2020-01..2020-12 UTF-8 con BOM (Excel),True,
+4. CSV,2020-01..2020-12 18 columnas del contrato en orden,True,"['fecha_local', 'fecha_utc', 'hora_utc', 'latitude']"
+4. CSV,2020-01..2020-12 n filas = manual,True,7295 vs 7295
+4. CSV,2020-01..2020-12 suma eq_foco = total del calendario,True,CSV 1205.647 vs pantalla 1205.65
+4. CSV,2020-01..2020-12 hora_utc con 4 digitos (HHMM),True,
+4. CSV,2001-01..2005-12 UTF-8 con BOM (Excel),True,
+4. CSV,2001-01..2005-12 18 columnas del contrato en orden,True,"['fecha_local', 'fecha_utc', 'hora_utc', 'latitude']"
+4. CSV,2001-01..2005-12 n filas = manual,True,2903 vs 2903
+4. CSV,2001-01..2005-12 suma eq_foco = total del calendario,True,CSV 3200.584 vs pantalla 3200.58
+4. CSV,2001-01..2005-12 hora_utc con 4 digitos (HHMM),True,
+4. CSV,2012-06..2013-06 UTF-8 con BOM (Excel),True,
+4. CSV,2012-06..2013-06 18 columnas del contrato en orden,True,"['fecha_local', 'fecha_utc', 'hora_utc', 'latitude']"
+4. CSV,2012-06..2013-06 n filas = manual,True,3853 vs 3853
+4. CSV,2012-06..2013-06 suma eq_foco = total del calendario,True,CSV 673.476 vs pantalla 673.48
+4. CSV,2012-06..2013-06 hora_utc con 4 digitos (HHMM),True,
+5. Casos limite,antes de 2000-11 -> 'sin datos' (no cero),True,"404 {""detail"":""No data: the series covers 2000-11 (from 2000-11-04) to 2025-12.""}"
+5. Casos limite,otro departamento cargado (Apurimac) -> 404 sin datos,True,404
+5. Casos limite,otro departamento no cargado (Loreto) -> 404 sin datos (MAESTRO 12),True,"404 No data for 'PE-LOR': the prototype only has harmonized, validated data for Cusc"
+5. Casos limite,rectangulo fuera de Cusco -> 404,True,"404 {""detail"":""No data: the area is outside Cusco, the only region with harmonized, validated data.""}"
+5. Casos limite,rango invertido -> 422,True,422
+5. Casos limite,mes invalido (2020-13) -> 422,True,422
+5. Casos limite,"CSV periodo completo: 58,779 focos y suma = 15,732 (MAESTRO 12)",True,"200 58779 filas, 15732.01"
+5. Casos limite,cabeceras X-Row-Count y X-Total-Eq-Foco = contenido,True,"('15732.01', '58779')"
+5. Casos limite,bbox: total calendario = suma CSV,True,cal 51.81 vs CSV 51.810
+5. Casos limite,bbox: total = manual (por posicion del foco o de la celda),True,API 51.81 | manual foco 51.810 | manual celda 51.810
+5. Casos limite,focos.geojson ago-2020: n y suma eq_foco = manual,True,"2984 vs 2984, 508.380 vs 508.380"
+5. Casos limite,focos.geojson sin FRP (decision del equipo),True,
+5. Casos limite,metadatos: total = manual y creditos FIRMS,True,"{'data_mode': 'real', 'version': 'cusco-v1.2', 'generado': '2026-11-15T03:46:01+00:00', 'unidad': {'nombre': 'Harmonized hotspots', 'nombre_en': 'Harmonized hotspots', 'definicion': 'Harmonized hotspo"

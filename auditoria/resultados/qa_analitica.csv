@@ -1,0 +1,27 @@
+﻿grupo,prueba,ok,detalle
+0. Base,anios de referencia = 2003-2025,True,2003-2025
+1. Estacionalidad,mediana por mes = manual,True,max dif 0.041
+1. Estacionalidad,p25/p75 por mes = manual,True,
+1. Estacionalidad,parte del anio por mes = manual (suma 1),True,
+1. Estacionalidad,temporada (meses que suman >=80 %) = manual,True,"manual [7, 8, 9, 10] (88.1%) vs API [7, 8, 9, 10] (88.1%)"
+1. Estacionalidad,mes pico (mayor mediana) = manual,True,9
+2. Ranking,anio tipico = mediana de totales 2003-2025,True,API 555.0 vs 555.00
+2. Ranking,anios completos listados (2001-2025),True,25 anios
+2. Ranking,totales anuales = manual,True,
+2. Ranking,orden descendente por total y puestos 1..N,True,
+2. Ranking,frase: mayor y menor anio firmes = manual,True,"manual mayor 2005 (1355), menor 2004 (370)"
+2. Ranking,2001 extrapolado y 2002 mixto; resto ok,True,2001=extrapolado 2002=mixto
+3. Acumulado,"anio 2020 = manual (total, mediana, p10/p90, curva, veredicto)",True,2020: total 1205.6 normal 555.0 p10-p90 425.3-911.3 -> muy por encima | cruce manual 2020-08-24
+3. Acumulado,"anio 2025 = manual (total, mediana, p10/p90, curva, veredicto)",True,2025: total 385.0 normal 555.0 p10-p90 425.3-911.3 -> muy por debajo | nota 2025 presente
+3. Acumulado,"anio 2010 = manual (total, mediana, p10/p90, curva, veredicto)",True,2010: total 931.0 normal 555.0 p10-p90 425.3-911.3 -> muy por encima
+3. Acumulado,anio fuera de rango -> 422,True,422
+4. Altitud,focos por franja = manual,True,"[7851.8, 1928.4, 1439.6, 4512.2] vs [np.float64(7851.8), np.float64(1928.4), np.float64(1439.6), np.float64(4512.2)]"
+4. Altitud,celdas distintas por franja = manual,True,"[4743, 1840, 1820, 6316]"
+4. Altitud,partes suman 1 y la frase usa >= 2500 m,True,
+5. Recurrencia,lugares = celdas con VIIRS desde 2013 (manual),True,API 12830 | manual solo VIIRS 12830 | contando tambien solo-MODIS 12830
+5. Recurrencia,lugares recurrentes (>= umbral anios) = manual,True,API 1476 vs manual 1476 (umbral 4)
+5. Recurrencia,anios posibles = 13 (2013-2025),True,13
+6. Resumen/AOI,resumen trae 5 frases y nota de no pronostico,True,
+6. Resumen/AOI,"sin palabras prohibidas (riesgo, alerta, evento)",True,
+6. Resumen/AOI,bbox: totales anuales del ranking = suma eq_foco manual,True,2020 API 51.8 vs manual 51.81
+6. Resumen/AOI,otro departamento -> 404,True,404

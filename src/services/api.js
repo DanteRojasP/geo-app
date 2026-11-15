@@ -51,6 +51,16 @@ export const getMonth = (aoi, mes) => request('/api/anomalias', { ...aoi, mes })
 // Analíticas "en simple": cada respuesta trae titulo, en_simple, como_leerlo y los datos.
 export const getResumen = (aoi, extra = {}) => request('/api/resumen', { ...aoi, ...extra })
 export const getAnalitica = (nombre, aoi, extra = {}) => request(`/api/analitica/${nombre}`, { ...aoi, ...extra })
+// Detecciones casi en tiempo real (NASA FIRMS, sin armonizar). Sin reintento: si el servidor no
+// tiene MAP_KEY responde 503 y se muestra el mensaje enseguida.
+export const getTiempoReal = (horas) => request('/api/tiempo-real', { horas }, false)
+// Ámbitos: nivel de peligro por focos de calor (formato CENEPRED) e informes.
+export const getAmbitos = () => request('/api/ambitos')
+export const getAmbitoNivel = (nivel) => request(`/api/ambitos/${nivel}`)
+export const getAmbitoGeojson = (nivel) => request(`/api/ambitos/${nivel}.geojson`)
+export const ambitoUrl = (path) => buildUrl(path).toString()
+// Informe técnico imprimible (HTML) de cualquier área y periodo; opcional mes=AAAA-MM.
+export const informeUrl = (aoi, extra = {}) => buildUrl('/api/informe', { ...aoi, ...extra }).toString()
 export const getFocos = (aoi, fechaInicio, fechaFin) =>
   request('/api/focos.geojson', { ...aoi, fecha_inicio: fechaInicio, fecha_fin: fechaFin })
 

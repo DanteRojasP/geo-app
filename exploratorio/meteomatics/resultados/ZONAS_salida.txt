@@ -1,0 +1,26 @@
+== 1. Agrupamiento (k-means sobre relieve + clima; el fuego no entra) ==
+silueta por k: k=2: 0.409, k=3: 0.463, k=4: 0.422, k=5: 0.427, k=6: 0.359, k=7: 0.356, k=8: 0.346
+       zonas    alt_media  sobre_3500  bajo_1500  pendiente  lluvia_anual  lluvia_dic_mar  vpd_seca  tmax_seca  focos_por_anio  parte_del_fuego  focos_por_zona_anio
+grupo                                                                                                                                                               
+1         22   701.030029        0.00       0.94       3.94       2789.82            0.57     14.11      28.90          179.37             0.31                 8.15
+2         38  2494.949951        0.22       0.22      12.48       2995.07            0.55      6.26      18.04          258.72             0.44                 6.81
+3         39  4164.790039        0.91       0.00       6.73       1384.95            0.65      8.37      12.70          148.94             0.25                 3.82
+
+== 2. Análisis actual: anomalía mensual jul-oct, mismo mes (Spearman, IC 90 % por años) ==
+  Grupo 1: Déficit de presión de vapor +0.33 [+0.18, +0.48] | Lluvia -0.32 [-0.49, -0.12] | Evapotranspiración +0.30 [+0.17, +0.46] | Humedad del suelo a 15 cm -0.27 [-0.42, -0.07]
+  Grupo 2: Lluvia -0.40 [-0.54, -0.24] | Evapotranspiración +0.39 [+0.25, +0.54] | Aviso de incendio forestal +0.38 [+0.21, +0.54] | Humedad del suelo a 15 cm -0.38 [-0.53, -0.21]
+  Grupo 3: Déficit de presión de vapor +0.57 [+0.42, +0.69] | Lluvia -0.56 [-0.69, -0.41] | Aviso de incendio forestal +0.54 [+0.36, +0.69] | Humedad del suelo a 15 cm -0.50 [-0.67, -0.29]
+  Cusco (99 zonas): Aviso de incendio forestal +0.60 [+0.43, +0.71] | Humedad del suelo a 15 cm -0.57 [-0.69, -0.39] | Déficit de presión de vapor +0.54 [+0.39, +0.67] | Lluvia -0.52 [-0.65, -0.37]
+
+== 3. Análisis preventivo: semana siguiente, frente a calendario + fuego reciente (M2) ==
+  zonas-semana evaluadas: 61,479 (con hueco VIIRS: 2,376)
+  M3o | Cusco                              BSS +0.008 [+0.004, +0.012] | mejora 17/23 | peor -0.012 (2009) | AUC 0.826->0.829 | captura 10 % 36->36 % | calib 0.91 | no pasa
+  M3o | Cusco sin semanas con hueco VIIRS  BSS +0.008 [+0.004, +0.012] | mejora 16/23 | peor -0.012 (2009) | AUC 0.828->0.831 | captura 10 % 36->37 % | calib 0.91 | no pasa
+  M3o | Grupo 1                            BSS +0.014 [+0.007, +0.023] | mejora 15/23 | peor -0.025 (2024) | AUC 0.882->0.884 | captura 10 % 37->38 % | calib 0.97 | no pasa
+  M3o | Grupo 2                            BSS +0.005 [+0.001, +0.008] | mejora 17/23 | peor -0.014 (2018) | AUC 0.815->0.817 | captura 10 % 32->32 % | calib 0.88 | no pasa
+  M3o | Grupo 3                            BSS +0.007 [-0.001, +0.016] | mejora 14/23 | peor -0.028 (2018) | AUC 0.774->0.781 | captura 10 % 31->32 % | calib 0.84 | no pasa
+  M3p | Cusco                              BSS +0.039 [+0.027, +0.051] | mejora 20/23 | peor -0.033 (2009) | AUC 0.826->0.844 | captura 10 % 36->37 % | calib 0.90 | PASA
+  M3p | Cusco sin semanas con hueco VIIRS  BSS +0.039 [+0.026, +0.051] | mejora 20/23 | peor -0.037 (2025) | AUC 0.828->0.845 | captura 10 % 36->38 % | calib 0.90 | PASA
+  M3p | Grupo 1                            BSS +0.037 [+0.020, +0.054] | mejora 16/23 | peor -0.087 (2009) | AUC 0.882->0.893 | captura 10 % 37->37 % | calib 0.96 | no pasa
+  M3p | Grupo 2                            BSS +0.031 [+0.018, +0.043] | mejora 15/23 | peor -0.050 (2025) | AUC 0.815->0.829 | captura 10 % 32->33 % | calib 0.88 | no pasa
+  M3p | Grupo 3                            BSS +0.051 [+0.033, +0.069] | mejora 20/23 | peor -0.022 (2023) | AUC 0.774->0.807 | captura 10 % 31->36 % | calib 0.85 | PASA

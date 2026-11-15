@@ -1,0 +1,76 @@
+analisis,variable,rho,n
+perfil estacional (12 meses),fosberg,0.91,12
+perfil estacional (12 meses),aviso_incendio,0.97,12
+perfil estacional (12 meses),indice_sequia,-0.97,12
+perfil estacional (12 meses),deficit_humedad_suelo,0.99,12
+perfil estacional (12 meses),humedad_suelo_15cm,-0.97,12
+perfil estacional (12 meses),vpd,0.92,12
+perfil estacional (12 meses),evapotranspiracion,0.44,12
+perfil estacional (12 meses),rachas_max,0.2,12
+perfil estacional (12 meses),lluvia,-0.78,12
+perfil estacional (12 meses),t_max,0.19,12
+"anomalía mensual, todos los meses",fosberg,0.25,276
+"anomalía mensual, jul-oct",fosberg,0.2,92
+"anomalía mensual, todos los meses",aviso_incendio,0.04,276
+"anomalía mensual, jul-oct",aviso_incendio,0.13,92
+"anomalía mensual, todos los meses",indice_sequia,-0.02,276
+"anomalía mensual, jul-oct",indice_sequia,-0.11,92
+"anomalía mensual, todos los meses",deficit_humedad_suelo,0.02,276
+"anomalía mensual, jul-oct",deficit_humedad_suelo,0.09,92
+"anomalía mensual, todos los meses",humedad_suelo_15cm,-0.04,276
+"anomalía mensual, jul-oct",humedad_suelo_15cm,-0.12,92
+"anomalía mensual, todos los meses",vpd,0.19,276
+"anomalía mensual, jul-oct",vpd,0.14,92
+"anomalía mensual, todos los meses",evapotranspiracion,0.25,276
+"anomalía mensual, jul-oct",evapotranspiracion,0.3,92
+"anomalía mensual, todos los meses",rachas_max,0.09,276
+"anomalía mensual, jul-oct",rachas_max,0.06,92
+"anomalía mensual, todos los meses",lluvia,-0.23,276
+"anomalía mensual, jul-oct",lluvia,-0.4,92
+"anomalía mensual, todos los meses",t_max,-0.04,276
+"anomalía mensual, jul-oct",t_max,-0.01,92
+"rezago 1 mes(es), jul-oct",lluvia,0.05,92
+"rezago 2 mes(es), jul-oct",lluvia,-0.21,92
+"rezago 3 mes(es), jul-oct",lluvia,0.14,92
+"rezago 1 mes(es), jul-oct",indice_sequia,-0.08,92
+"rezago 2 mes(es), jul-oct",indice_sequia,-0.08,92
+"rezago 3 mes(es), jul-oct",indice_sequia,0.01,92
+"rezago 1 mes(es), jul-oct",deficit_humedad_suelo,0.05,92
+"rezago 2 mes(es), jul-oct",deficit_humedad_suelo,0.06,92
+"rezago 3 mes(es), jul-oct",deficit_humedad_suelo,-0.02,92
+"rezago 1 mes(es), jul-oct",humedad_suelo_15cm,-0.02,92
+"rezago 2 mes(es), jul-oct",humedad_suelo_15cm,-0.08,92
+"rezago 3 mes(es), jul-oct",humedad_suelo_15cm,0.03,92
+"rezago 1 mes(es), jul-oct",vpd,-0.17,92
+"rezago 2 mes(es), jul-oct",vpd,0.03,92
+"rezago 3 mes(es), jul-oct",vpd,-0.09,92
+años: clima jul-oct vs fuego jul-oct,fosberg,-0.03,23
+años: clima ene-jun vs fuego jul-oct,fosberg,0.1,23
+años: clima jul-oct vs fuego jul-oct,aviso_incendio,0.21,23
+años: clima ene-jun vs fuego jul-oct,aviso_incendio,0.26,23
+años: clima jul-oct vs fuego jul-oct,indice_sequia,-0.25,23
+años: clima ene-jun vs fuego jul-oct,indice_sequia,-0.18,23
+años: clima jul-oct vs fuego jul-oct,deficit_humedad_suelo,0.15,23
+años: clima ene-jun vs fuego jul-oct,deficit_humedad_suelo,0.15,23
+años: clima jul-oct vs fuego jul-oct,humedad_suelo_15cm,-0.19,23
+años: clima ene-jun vs fuego jul-oct,humedad_suelo_15cm,-0.21,23
+años: clima jul-oct vs fuego jul-oct,vpd,-0.22,23
+años: clima ene-jun vs fuego jul-oct,vpd,0.15,23
+años: clima jul-oct vs fuego jul-oct,evapotranspiracion,0.05,23
+años: clima ene-jun vs fuego jul-oct,evapotranspiracion,0.17,23
+años: clima jul-oct vs fuego jul-oct,rachas_max,0.17,23
+años: clima ene-jun vs fuego jul-oct,rachas_max,0.1,23
+años: clima jul-oct vs fuego jul-oct,lluvia,-0.25,23
+años: clima ene-jun vs fuego jul-oct,lluvia,-0.13,23
+años: clima jul-oct vs fuego jul-oct,t_max,-0.17,23
+años: clima ene-jun vs fuego jul-oct,t_max,0.2,23
+"por punto, anomalía jul-oct (mediana de 8)",fosberg,0.09,736
+"por punto, anomalía jul-oct (mediana de 8)",aviso_incendio,0.22,736
+"por punto, anomalía jul-oct (mediana de 8)",indice_sequia,-0.13,736
+"por punto, anomalía jul-oct (mediana de 8)",deficit_humedad_suelo,0.13,736
+"por punto, anomalía jul-oct (mediana de 8)",humedad_suelo_15cm,-0.23,736
+"por punto, anomalía jul-oct (mediana de 8)",vpd,0.28,736
+"por punto, anomalía jul-oct (mediana de 8)",evapotranspiracion,0.19,736
+"por punto, anomalía jul-oct (mediana de 8)",rachas_max,0.06,736
+"por punto, anomalía jul-oct (mediana de 8)",lluvia,-0.32,736
+"por punto, anomalía jul-oct (mediana de 8)",t_max,0.12,736

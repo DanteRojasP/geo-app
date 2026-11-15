@@ -1,0 +1,10 @@
+== zonas de ~28 km (99 zonas, 61,479 zonas-semana, jun-nov 2003-2025) ==
+   semanas con fuego: 16.9 %
+   calendario frente a tasa media: BSS +0.202 | AUC 0.824
+   + fuego reciente frente a calendario: BSS +0.049 (IC 90 % por años +0.031 a +0.067) | AUC 0.824 | mejora en 19 de 23 años | peor año 2014 (-0.043)
+   10 % de zonas-semana con mayor probabilidad: calendario acierta 56 % y captura 37 % del fuego | con fuego reciente acierta 56 % y captura 36 %
+== zonas de ~11 km (602 zonas, 373,842 zonas-semana, jun-nov 2003-2025) ==
+   semanas con fuego: 4.6 %
+   calendario frente a tasa media: BSS +0.143 | AUC 0.853
+   + fuego reciente frente a calendario: BSS +0.024 (IC 90 % por años +0.015 a +0.033) | AUC 0.856 | mejora en 17 de 23 años | peor año 2014 (-0.017)
+   10 % de zonas-semana con mayor probabilidad: calendario acierta 22 % y captura 57 % del fuego | con fuego reciente acierta 23 % y captura 54 %

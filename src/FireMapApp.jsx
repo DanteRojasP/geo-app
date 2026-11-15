@@ -6,16 +6,20 @@ import { createElement, useCallback, useEffect, useMemo, useRef, useState } from
 import * as maplibregl from 'maplibre-gl'
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import {
-  ArrowLeftRight, CalendarDays, ChevronLeft, ChevronRight, Database, Download, Flame, Gauge,
-  Layers3, Map as MapIcon, MapPin, MessageCircleQuestion, Mountain, Pause, Play, Satellite, Scan, ShieldAlert,
+  ArrowLeftRight, CalendarDays, ChevronLeft, ChevronRight, Database, Download, FileText, Flame, Gauge, Landmark,
+  Layers3, Map as MapIcon, MapPin, MessageCircleQuestion, Mountain, Pause, Play, Radio, Satellite, Scan, ShieldAlert,
   SlidersHorizontal,
   ThermometerSun, Trash2, X,
 } from 'lucide-react'
+import AmbitosPanel from './AmbitosPanel.jsx'
 import SimplePanel from './SimplePanel.jsx'
 import ComparisonWorkspace from './ComparisonWorkspace.jsx'
 import IntroScreen from './IntroScreen.jsx'
 import { LANGS, getLang, locale, months, setLang, tr } from './i18n.js'
-import { CUSCO, downloadCsv, getCalendar, getDepartments, getFocos, getMonth } from './services/api.js'
+import { CUSCO, downloadCsv, getCalendar, getDepartments, getFocos, getMonth, getTiempoReal, informeUrl } from './services/api.js'
+
+// Informe técnico (HTML imprimible) en una pestaña nueva (Antonio, PR #14).
+const openReport = (url) => window.open(url, '_blank', 'noopener')
 
 maplibregl.setWorkerUrl(maplibreWorkerUrl)
 
@@ -202,7 +206,7 @@ function SatelliteSelectionMap({ bounds, focos }) {
   return <div className="fw-satellite-preview"><div ref={containerRef} className="fw-satellite-map"/><span className="fw-satellite-badge"><i/>{tr('sat.badge')}</span><div className="fw-satellite-legend"><span><i className="heat"/>{tr('sat.density')}</span><span><i className="point"/>{tr('sat.point')}</span></div></div>
 }
 
-function CalendarPanel({ calendar, mode, setMode, selected, onSelect, onClose }) {
+function CalendarPanel({ calendar, mode, setMode, selected, onSelect, onClose, reportUrl }) {
   const byKey = useMemo(() => new Map((calendar?.celdas || []).map((c) => [`${c.anio}-${c.mes}`, c])), [calendar])
   if (!calendar) return null
   const MESES = months()
@@ -215,6 +219,7 @@ function CalendarPanel({ calendar, mode, setMode, selected, onSelect, onClose })
         <div className="fc-toggle">
           <button className={mode === 'valor' ? 'is-active' : ''} onClick={() => setMode('valor')}>{tr('cal.hotspots')}</button>
           <button className={mode === 'anomalia' ? 'is-active' : ''} onClick={() => setMode('anomalia')}>{tr('cal.anomaly')}</button>
+          {reportUrl && <button onClick={() => openReport(reportUrl)} title={tr('report.tip')} aria-label={tr('report.tip')}><FileText size={14}/> {tr('report.short')}</button>}
           <button onClick={onClose} title={tr('cal.close')}><X size={15}/></button>
         </div>
       </div>
@@ -296,8 +301,14 @@ function FireMapApp() {
   const [playing, setPlaying] = useState(false)
   const playableRef = useRef(new Set())
   const yearsRef = useRef(null)
+  // Tiempo real (NASA FIRMS NRT, revisiones 10-11): capa aparte de la serie armonizada.
+  const [liveOn, setLiveOn] = useState(false)
+  const [liveHours, setLiveHours] = useState(24)
+  const [live, setLive] = useState(null)              // { body } | { error } | null
+  const liveRef = useRef(EMPTY)
   const [simpleOpen, setSimpleOpen] = useState(false)
   const [compareOpen, setCompareOpen] = useState(false)
+  const [ambitosOpen, setAmbitosOpen] = useState(false)
   const [introOpen, setIntroOpen] = useState(() => new URLSearchParams(window.location.search).get('intro') !== '0')
   const [detailsOpen, setDetailsOpen] = useState(true)
   const [layersOpen, setLayersOpen] = useState(false)
@@ -317,6 +328,9 @@ function FireMapApp() {
       : { inicio: ym(selected.year, selected.year === FIRST_YEAR ? 11 : 1), fin: ym(selected.year, 12), label: tr('period.year', { y: selected.year }) }
   }, [selected, lang, customPeriod]) // eslint-disable-line react-hooks/exhaustive-deps
   const aoi = { departamento: selectedRegionCode }
+  // Informe técnico: toda la serie; con un mes elegido, ese mes en detalle; con el filtro, ese rango.
+  const reportExtra = customPeriod ? { fecha_inicio: periodo.inicio, fecha_fin: periodo.fin }
+    : selected.month ? { mes: periodo.inicio } : {}
   const yearCells = useMemo(() => (calendar?.celdas || []).filter((c) => c.anio === selected.year), [calendar, selected.year])
   const yearTotal = useMemo(() => yearCells.reduce((s, c) => s + (c.focos_armonizados || 0), 0), [yearCells])
   const yearMax = useMemo(() => Math.max(1, ...yearCells.map((c) => c.focos_armonizados || 0)), [yearCells])
@@ -381,6 +395,24 @@ function FireMapApp() {
       .catch((e) => active && setSelection({ bbox, error: e.message }))
     return () => { active = false }
   }, [selectionBounds, periodo, playing, customPeriod])
+
+  // Tiempo real: pide al abrir y cada 5 min (el servidor renueva desde FIRMS cada 15 min).
+  useEffect(() => {
+    if (!liveOn) { setLive(null); return undefined }
+    let active = true
+    const load = () => getTiempoReal(liveHours)
+      .then((r) => active && setLive({ body: r.body }))
+      .catch((e) => active && setLive({ error: e.message }))
+    load()
+    const timer = window.setInterval(load, 5 * 60 * 1000)
+    return () => { active = false; window.clearInterval(timer) }
+  }, [liveOn, liveHours, lang])
+
+  useEffect(() => {
+    liveRef.current = (liveOn && live?.body) ? live.body : EMPTY
+    const map = mapRef.current
+    if (mapReadyRef.current && map?.getSource('live')) map.getSource('live').setData(liveRef.current)
+  }, [live, liveOn])
 
   // Mantener visible el año elegido en la escala de años (se desplaza si no cabe).
   useEffect(() => {
@@ -515,6 +547,31 @@ function FireMapApp() {
           'circle-stroke-color': '#fff4df', 'circle-stroke-width': 1,
         },
       })
+      map.addSource('live', { type: 'geojson', data: EMPTY })
+      map.addLayer({
+        id: 'live-points', type: 'circle', source: 'live', layout: { visibility: 'none' },
+        paint: {
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, 4, 10, 8],
+          // Color por antigüedad: < 6 h, 6-24 h, más de 24 h.
+          'circle-color': ['step', ['get', 'horas_atras'], '#ff1f4b', 6, '#ff7a1a', 24, '#ffc24b'],
+          'circle-stroke-color': '#ffffff', 'circle-stroke-width': 1.6, 'circle-opacity': 0.95,
+        },
+      })
+      map.on('mouseenter', 'live-points', () => { map.getCanvas().style.cursor = 'pointer' })
+      map.on('mouseleave', 'live-points', () => { map.getCanvas().style.cursor = '' })
+      map.on('click', 'live-points', (event) => {
+        if (suppressNextClick) return
+        const p = event.features?.[0]?.properties
+        if (!p) return
+        new maplibregl.Popup({ offset: 12, className: 'fw-map-popup' })
+          .setLngLat(event.features[0].geometry.coordinates)
+          .setDOMContent(createPopupContent(tr('liveLayer.popupTitle', { inst: p.instrumento, sat: p.satelite }), [
+            { value: `${p.fecha_hora_local} · ${tr('liveLayer.ago', { h: fmt(Number(p.horas_atras), 1) })}`, strong: true },
+            { value: tr('liveLayer.conf', { c: tr(`conf.${p.confianza}`) }) },
+            { value: tr('liveLayer.notHarm') },
+          ]))
+          .addTo(map)
+      })
       map.addLayer({ id: 'selection-area-fill', type: 'fill', source: 'selection-area', paint: { 'fill-color': '#5ee7d7', 'fill-opacity': 0.12 } })
       map.addLayer({ id: 'selection-area-line', type: 'line', source: 'selection-area', paint: { 'line-color': '#5ee7d7', 'line-width': 2.5, 'line-dasharray': [2, 1.4] } })
 
@@ -535,6 +592,7 @@ function FireMapApp() {
       })
       mapReadyRef.current = true
       map.getSource('focos').setData(focosRef.current)
+      map.getSource('live').setData(liveRef.current)
       if (regionRef.current) {
         map.getSource('cusco-area').setData(regionRef.current)
         map.getSource('cusco-mask').setData(maskOf(regionRef.current))
@@ -589,9 +647,14 @@ function FireMapApp() {
   useEffect(() => {
     const map = mapRef.current
     if (!mapReadyRef.current || !map) return
-    map.setLayoutProperty('fire-heat', 'visibility', activeLayer === 'surface' ? 'visible' : 'none')
-    map.setLayoutProperty('fire-points', 'visibility', activeLayer === 'points' ? 'visible' : 'none')
-  }, [activeLayer])
+    // Dos modos que no se mezclan: la serie histórica o las detecciones en vivo.
+    const vis = (on) => (on ? 'visible' : 'none')
+    map.setLayoutProperty('fire-heat', 'visibility', vis(!liveOn && activeLayer === 'surface'))
+    map.setLayoutProperty('fire-points', 'visibility', vis(!liveOn && activeLayer === 'points'))
+    map.setLayoutProperty('selection-area-fill', 'visibility', vis(!liveOn))
+    map.setLayoutProperty('selection-area-line', 'visibility', vis(!liveOn))
+    map.setLayoutProperty('live-points', 'visibility', vis(liveOn))
+  }, [activeLayer, liveOn])
 
   useEffect(() => {
     const map = mapRef.current
@@ -616,6 +679,9 @@ function FireMapApp() {
     setSelectionMode((active) => { if (!active) setSelectionBounds(null); return !active })
   }
   const clearSelection = () => { setSelectionMode(false); setSelectionBounds(null) }
+  // Cambiar de modo: lo abierto del histórico se conserva para cuando se vuelva.
+  const goLive = () => { setPlaying(false); setSelectionMode(false); setCompareOpen(false); setLiveOn(true) }
+  const goHistoric = () => setLiveOn(false)
   const focusRegion = () => { if (mapReadyRef.current && region) fitTo(mapRef.current, boundsOf(region)) }
   const applyFilters = (event) => {
     event.preventDefault()
@@ -651,17 +717,41 @@ function FireMapApp() {
     ? (focos.features || []).reduce((sum, feature) => sum + (Number(feature.properties?.eq_foco) || 0), 0)
     : selected.month ? month?.focos_armonizados : yearTotal
   return (
-    <div className="fw-app">
+    <div className={`fw-app ${liveOn ? 'is-live' : ''}`}>
       <div ref={mapContainerRef} className="fw-map" aria-label={tr('map.aria')} />
       {introOpen && <IntroScreen key={lang} lang={lang} mapReady={Boolean(region && !loading)} onLanguage={changeLang} onEnter={() => setIntroOpen(false)}/>}
       <div className="fw-nubel-brand" aria-label="Nubel Team · FireCal Cusco"><img src="./nubel-team-logo.png" alt="Nubel Team"/></div>
-      <button className={`fc-data-launcher ${detailsOpen ? 'is-active' : ''}`} aria-label={tr('data.open')} aria-expanded={detailsOpen} onClick={() => { setSimpleOpen(false); setCompareOpen(false); setDetailsOpen((v) => !v) }}><Database size={19}/><span>{tr('data.label')}</span></button>
-      <button className={`fc-data-launcher fc-simple-launcher ${simpleOpen ? 'is-active' : ''}`} aria-label={tr('rail.simpleTitle')} aria-expanded={simpleOpen} onClick={() => { setDetailsOpen(false); setCompareOpen(false); setSimpleOpen((v) => !v) }}><MessageCircleQuestion size={19}/><span>{tr('rail.simple')}</span></button>
-      <button className={`fc-data-launcher fc-compare-launcher ${compareOpen ? 'is-active' : ''}`} aria-label={tr('compare.open')} aria-expanded={compareOpen} onClick={() => { setDetailsOpen(false); setSimpleOpen(false); setCompareOpen((v) => !v) }}><ArrowLeftRight size={19}/><span>{tr('compare.button')}</span></button>
+      <div className="fc-mode" role="group" aria-label={tr('mode.label')}>
+        <button className={!liveOn ? 'is-active' : ''} aria-pressed={!liveOn} title={tr('mode.historic')} onClick={goHistoric}><CalendarDays size={14}/><span>{tr('mode.historic')}</span></button>
+        <button className={liveOn ? 'is-active live' : ''} aria-pressed={liveOn} title={tr('mode.live')} onClick={goLive}><Radio size={14}/><span>{tr('mode.live')}</span></button>
+      </div>
+      {liveOn && <aside className="fc-live-panel" aria-label={tr('rail.liveTitle')}>
+        <header><p><i/>{tr('liveLayer.kicker')}</p><button onClick={goHistoric} title={tr('mode.backHistoric')} aria-label={tr('mode.backHistoric')}><X size={15}/></button></header>
+        <div className="fc-live-hours" role="group" aria-label={tr('liveLayer.window')}>
+          {[24, 48, 120].map((h) => <button key={h} className={liveHours === h ? 'is-active' : ''} aria-pressed={liveHours === h} onClick={() => setLiveHours(h)}>{tr(`liveLayer.h${h}`)}</button>)}
+        </div>
+        {!live && <p className="fc-live-msg">{tr('summary.loading')}</p>}
+        {live?.error && <p className="fc-live-msg is-error">{live.error}</p>}
+        {live?.body && (() => {
+          const m = live.body.metadata
+          const upd = new Date(m.actualizado_utc.replace('Z', ':00Z')).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit', timeZone: 'America/Lima' })
+          return <>
+            <h3>{m.detecciones === 1 ? tr('liveLayer.count1') : tr('liveLayer.count', { n: fmt(m.detecciones) })}</h3>
+            <p className="fc-live-msg">{m.ultima_deteccion_local ? tr('liveLayer.last', { t: m.ultima_deteccion_local }) : tr('liveLayer.none')}</p>
+            {m.desactualizado && <p className="fc-live-msg is-error">{tr('liveLayer.stale')}</p>}
+            <small>{tr('liveLayer.updated', { t: upd })} · {m.fuentes.join(', ')}</small>
+            <button className="fc-live-back" onClick={goHistoric}><CalendarDays size={14}/>{tr('mode.backHistoric')}</button>
+          </>
+        })()}
+      </aside>}
+      <button className={`fc-data-launcher ${detailsOpen ? 'is-active' : ''}`} aria-label={tr('data.open')} aria-expanded={detailsOpen} onClick={() => { setAmbitosOpen(false); setSimpleOpen(false); setCompareOpen(false); setDetailsOpen((v) => !v) }}><Database size={19}/><span>{tr('data.label')}</span></button>
+      <button className={`fc-data-launcher fc-simple-launcher ${simpleOpen ? 'is-active' : ''}`} aria-label={tr('rail.simpleTitle')} aria-expanded={simpleOpen} onClick={() => { setAmbitosOpen(false); setDetailsOpen(false); setCompareOpen(false); setSimpleOpen((v) => !v) }}><MessageCircleQuestion size={19}/><span>{tr('rail.simple')}</span></button>
+      <button className={`fc-data-launcher fc-compare-launcher ${compareOpen ? 'is-active' : ''}`} aria-label={tr('compare.open')} aria-expanded={compareOpen} onClick={() => { setAmbitosOpen(false); setDetailsOpen(false); setSimpleOpen(false); setCompareOpen((v) => !v) }}><ArrowLeftRight size={19}/><span>{tr('compare.button')}</span></button>
+      <button className={`fc-data-launcher fc-ambitos-launcher ${ambitosOpen ? 'is-active' : ''}`} aria-label={tr('rail.ambitosTitle')} title={tr('rail.ambitosTitle')} aria-expanded={ambitosOpen} onClick={() => { setDetailsOpen(false); setSimpleOpen(false); setCompareOpen(false); clearSelection(); setAmbitosOpen((v) => !v) }}><Landmark size={19}/><span>{tr('rail.ambitos')}</span></button>
       <div className="fc-map-menu">
         <div className="fc-lang" role="group" aria-label={tr('lang.title')}>{LANGS.map((l) => <button key={l} className={l === lang ? 'is-active' : ''} aria-pressed={l === lang} onClick={() => changeLang(l)}>{l.toUpperCase()}</button>)}</div>
         <button className={`fc-menu-toggle ${toolsOpen ? 'is-open' : ''}`} aria-label={tr('rail.label')} aria-expanded={toolsOpen} onClick={() => setToolsOpen((v) => !v)}><Layers3 size={21}/></button>
-        {toolsOpen && <nav className="fw-rail" aria-label={tr('rail.label')}>
+        {toolsOpen && <nav className="fw-rail" aria-label={tr('rail.label')} onClickCapture={goHistoric}>
           <button className="is-active" title={tr('rail.hotspotsTitle')} onClick={() => { focusRegion(); setDetailsOpen(true); setActiveLayer('surface') }}><Flame size={19}/><span>{tr('rail.hotspots')}</span></button>
           <button className={calendarOpen ? 'is-active' : ''} title={tr('rail.calendar')} onClick={() => setCalendarOpen((v) => !v)}><CalendarDays size={19}/><span>{tr('rail.calendar')}</span></button>
           <button className={selectionMode ? 'is-active select' : ''} title={tr('rail.areaTitle')} onClick={toggleSelectionMode}><Scan size={19}/><span>{tr('rail.area')}</span></button>
@@ -691,7 +781,7 @@ function FireMapApp() {
         </div>
         {!customPeriod && selected.month && month?.incertidumbre > 0 && <p className="fc-margin">{tr('summary.margin', { a: fmt(month.rango[0], 1), b: fmt(month.rango[1], 1) })}</p>}
         <div className="fw-sensor-row"><span><i className="modis"/>MODIS · 1 km</span><span><i className="viirs"/>VIIRS · 375 m</span></div>
-        <div className="fw-summary-actions"><button onClick={() => setCalendarOpen(true)}><CalendarDays size={16}/>{tr('rail.calendar')}</button><button onClick={() => runDownload(aoi, selectedRegion.name)}><Download size={16}/>CSV</button></div>
+        <div className="fw-summary-actions"><button onClick={() => setCalendarOpen(true)}><CalendarDays size={16}/>{tr('rail.calendar')}</button><button onClick={() => runDownload(aoi, selectedRegion.name)}><Download size={16}/>CSV</button><button onClick={() => openReport(informeUrl(aoi, reportExtra))} title={tr('report.tip')}><FileText size={16}/>{tr('report.short')}</button></div>
         {notice && <p className="fc-notice">{notice}</p>}
       </aside>}
       {layersOpen && !selectionBounds && <aside className="fw-layers">
@@ -705,7 +795,8 @@ function FireMapApp() {
           <button className={baseMap === 'standard' ? 'is-active' : ''} aria-pressed={baseMap === 'standard'} title={tr('basemap.standard')} onClick={() => setBaseMap('standard')}><MapIcon size={14}/><span>{tr('basemap.standard')}</span></button>
           <button className={baseMap === 'relief' ? 'is-active' : ''} aria-pressed={baseMap === 'relief'} title={tr('basemap.relief')} onClick={() => setBaseMap('relief')}><Mountain size={14}/><span>{tr('basemap.relief')}</span></button>
         </div>
-        {activeLayer === 'points'
+        {liveOn ? <div className="fw-heat-legend fc-dock-points"><header><span>{tr('liveLayer.age')}</span></header><p><i style={{ background: '#ff1f4b' }}/>{'< 6 h'}</p><p><i style={{ background: '#ff7a1a' }}/>6–24 h</p><p><i style={{ background: '#ffc24b' }}/>{'> 24 h'}</p></div>
+          : activeLayer === 'points'
           ? <div className="fw-heat-legend fc-dock-points"><header><span>{tr('layers.pointsLegend')}</span></header><p><i className="modis"/>MODIS</p><p><i className="viirs"/>VIIRS</p><p><i className="outside"/>{tr('layers.outside')}</p></div>
           : <div className="fw-heat-legend"><header><span>{tr('layers.scaleDensity')}</span></header><i/><div><span>{tr('scale.low')}</span><span>{tr('scale.mid')}</span><span>{tr('scale.high')}</span></div></div>}
       </aside>
@@ -724,11 +815,12 @@ function FireMapApp() {
           <article><span>{tr('sel.boxArea')}</span><b>{selectionArea >= 1000 ? tr('sel.thousandKm2', { v: fmt(selectionArea / 1000, 1) }) : `${fmt(selectionArea)} km²`}</b></article>
           <article><span>{tr('sel.monthAnomaly')}</span><b>{selected.month && selection?.calendar ? (selection.calendar.celdas[0]?.categoria ? catLabel(selection.calendar.celdas[0].categoria) : '–') : tr('sel.pickMonth')}</b></article>
         </div>}
-        <div className="fw-selection-actions"><button onClick={toggleSelectionMode}><Scan size={15}/>{tr('sel.redraw')}</button><button onClick={() => selection?.bbox && runDownload(selection.bbox, tr('csv.area'))} disabled={!selection?.calendar}><Download size={15}/>CSV</button></div>
+        <div className="fw-selection-actions"><button onClick={toggleSelectionMode}><Scan size={15}/>{tr('sel.redraw')}</button><button onClick={() => selection?.bbox && runDownload(selection.bbox, tr('csv.area'))} disabled={!selection?.calendar}><Download size={15}/>CSV</button><button onClick={() => selection?.bbox && openReport(informeUrl(selection.bbox, reportExtra))} disabled={!selection?.calendar} title={tr('report.tip')}><FileText size={15}/>{tr('report.short')}</button></div>
       </aside>}
       {simpleOpen && <SimplePanel key={lang} aoi={selection?.bbox || aoi} etiqueta={selection?.bbox ? 'area' : 'cusco'} onClose={() => setSimpleOpen(false)}/>}
+      {ambitosOpen && !liveOn && <AmbitosPanel key={lang} map={mapRef.current} onClose={() => setAmbitosOpen(false)}/>}
       {compareOpen && <ComparisonWorkspace key={lang} calendar={calendar} region={region} regionName={selectedRegion.name} onClose={() => setCompareOpen(false)}/>}
-      {calendarOpen && <CalendarPanel calendar={calendar} mode={calendarMode} setMode={setCalendarMode} selected={selected} onSelect={selectMonth} onClose={() => setCalendarOpen(false)}/>}
+      {calendarOpen && <CalendarPanel calendar={calendar} mode={calendarMode} setMode={setCalendarMode} selected={selected} onSelect={selectMonth} onClose={() => setCalendarOpen(false)} reportUrl={informeUrl(aoi, reportExtra)}/>}
       <section className="fw-timeline fc-timeline">
         <button className="fw-play" onClick={() => { setCustomPeriod(null); setPlaying((v) => !v) }} title={playing ? tr('timeline.pause') : tr('timeline.play')}>{playing ? <Pause size={19}/> : <Play size={19}/>}</button>
         <div className="fw-timeline-panel" style={{ '--progress': `${selected.month ? ((selected.month - 1) / 11) * 100 : 100}%` }}>

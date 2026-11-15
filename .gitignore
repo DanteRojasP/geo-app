@@ -1,3 +1,19 @@
 node_modules/
 dist/
 .vite/
+
+# Datos crudos, salidas temporales y cachés del modelo
+data/raw/
+firms_raw/
+clima_out/
+armoniza_out*/
+*.npz
+__pycache__/
+*.pyc
+
+# Credenciales y descargas locales
+.env
+*credentials*
+*.key
+*credenciales*
+exploratorio/meteomatics/datos/
