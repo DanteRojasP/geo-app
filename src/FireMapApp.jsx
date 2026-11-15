@@ -729,19 +729,19 @@ function FireMapApp() {
       </aside>}
       {layersOpen && !selectionBounds && <aside className="fw-layers">
         <div className="fw-layers-title"><span>CAPAS DEL MAPA</span><SlidersHorizontal size={15}/></div>
-        <div className="fw-basemap-switch" role="group" aria-label="Fondo cartográfico">
-          <span>FONDO CARTOGRÁFICO</span>
-          <div>
-            <button aria-label="Mapa estándar" title="Mapa estándar" className={baseMap === 'standard' ? 'is-active' : ''} onClick={() => setBaseMap('standard')}><MapIcon size={16}/><b>Estándar</b></button>
-            <button aria-label="Mapa con relieve" title="Mapa con relieve" className={baseMap === 'relief' ? 'is-active' : ''} onClick={() => setBaseMap('relief')}><Mountain size={16}/><b>Relieve</b></button>
-          </div>
-        </div>
         <LayerButton active={activeLayer === 'surface'} icon={ThermometerSun} label="Superficie" tone="heat" onClick={() => setActiveLayer('surface')}/>
         <LayerButton active={activeLayer === 'activity'} icon={Gauge} label="Regiones" tone="activity" onClick={() => setActiveLayer('activity')}/>
         <LayerButton active={activeLayer === 'points'} icon={MapPin} label="Puntos" tone="points" onClick={() => setActiveLayer('points')}/>
         <LayerButton active={activeLayer === 'aoi'} icon={Layers3} label="Límite" tone="boundary" onClick={() => setActiveLayer('aoi')}/>
         <LayerButton active={selectionMode} icon={Scan} label="Área" tone="select" onClick={toggleSelectionMode}/>
         <div className="fw-scale"><span>{activeLayer === 'surface' ? 'INTENSIDAD CONTINUA' : activeLayer === 'activity' ? 'ACTIVIDAD POR REGIÓN' : 'INTENSIDAD FRP'}</span><div/><section><small>Baja</small><small>Media</small><small>Alta</small></section></div>
+      </aside>}
+      {layersOpen && !selectionBounds && <aside className="fw-display-dock" aria-label="Fondo y escala del mapa">
+        <div className="fw-display-modes" role="group" aria-label="Fondo cartográfico">
+          <button className={baseMap === 'standard' ? 'is-active' : ''} onClick={() => setBaseMap('standard')}><MapIcon size={14}/><span>Mapa</span></button>
+          <button className={baseMap === 'relief' ? 'is-active' : ''} onClick={() => setBaseMap('relief')}><Mountain size={14}/><span>Relieve</span></button>
+        </div>
+        <div className="fw-heat-legend"><header><span>INTENSIDAD TÉRMICA</span><b>FRP</b></header><i/><div><span>Baja</span><span>Media</span><span>Alta</span></div></div>
       </aside>}
       <div className="fw-map-meta"><button onClick={focusStudyArea} className={studySelected ? 'is-active' : ''}><MapPin size={13}/>{activeScope === 'peru' ? 'Abrir piloto · Cusco' : 'Volver a Perú'}</button><span><Satellite size={13}/>MODIS + VIIRS</span><span><CloudSun size={13}/>Últimos 5 días</span></div>
       {selectionMode && <div className="fw-draw-hint"><Scan size={20}/><div><b>Selecciona un área</b><span>Arrastra sobre el mapa para dibujar el cuadro</span></div><button onClick={() => setSelectionMode(false)} title="Cancelar"><X size={16}/></button></div>}

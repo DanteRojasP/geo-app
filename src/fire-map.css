@@ -203,3 +203,15 @@
 
 @media(max-width:950px){.fw-year-scale{margin-left:7px}.fw-year-scale button{min-width:34px;padding:0 5px}.fw-timeline-source span{display:none}}
 @media(max-width:650px){.fw-timeline-options>button span{display:none}.fw-timeline-options>button{width:27px;padding:0;justify-content:center}.fw-year-scale{margin-left:4px;flex:1}.fw-year-scale button{min-width:31px;height:22px;padding:0 4px;font-size:7px}.fw-year-scale button:first-child{min-width:37px}.fw-timeline-source{display:none}.fw-no-history{height:29px;padding:0 8px;text-align:center;font-size:7px}}
+
+/* Bottom-right basemap and thermal scale */
+.fw-display-dock{position:absolute;z-index:645;right:18px;bottom:104px;width:212px;color:#edf6fb;filter:drop-shadow(0 8px 18px rgba(5,27,42,.24))}
+.fw-display-modes{height:34px;padding:3px;display:grid;grid-template-columns:1fr 1fr;gap:3px;border:1px solid rgba(180,210,226,.25);border-radius:18px;background:rgba(12,36,56,.94);backdrop-filter:blur(12px)}
+.fw-display-modes button{border:0;border-radius:14px;background:transparent;color:#b5cad7;display:flex;align-items:center;justify-content:center;gap:6px;font:500 9px 'IBM Plex Sans',sans-serif;cursor:pointer}.fw-display-modes button:hover{background:rgba(255,255,255,.08);color:#fff}.fw-display-modes button.is-active{background:#197eb7;color:#fff;box-shadow:0 2px 8px rgba(4,34,52,.28)}
+.fw-heat-legend{margin-top:6px;padding:7px 10px 6px;border:1px solid rgba(180,210,226,.25);border-radius:8px;background:rgba(12,36,56,.94);backdrop-filter:blur(12px)}
+.fw-heat-legend header{display:flex;align-items:center;justify-content:space-between;margin-bottom:5px}.fw-heat-legend header span{color:#b8ccd8;font:500 6px 'IBM Plex Mono',monospace;letter-spacing:.08em}.fw-heat-legend header b{color:#fff;font:600 7px 'IBM Plex Mono',monospace}
+.fw-heat-legend>i{display:block;height:6px;border-radius:6px;background:linear-gradient(90deg,#fff0a2 0%,#f6c34a 30%,#f1842d 56%,#db3c2e 78%,#8c1327 100%);box-shadow:inset 0 0 0 1px rgba(255,255,255,.18)}
+.fw-heat-legend>div{display:flex;justify-content:space-between;margin-top:4px;color:#9eb5c3}.fw-heat-legend>div span{font-size:6px}
+
+@media(max-width:950px){.fw-display-dock{right:12px;bottom:126px;width:196px}}
+@media(max-width:650px){.fw-display-dock{right:8px;bottom:118px;width:176px}.fw-display-modes{height:31px}.fw-display-modes button{font-size:8px}.fw-heat-legend{padding:6px 8px 5px}}
