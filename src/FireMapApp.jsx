@@ -6,8 +6,8 @@ import { createElement, useCallback, useEffect, useMemo, useRef, useState } from
 import * as maplibregl from 'maplibre-gl'
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import {
-  CalendarDays, ChevronLeft, ChevronRight, Database, Download, Flame, Gauge, Info,
-  Layers3, Map as MapIcon, MapPin, MessageCircleQuestion, Mountain, Pause, Play, Satellite, Scan, ShieldAlert,
+  CalendarDays, ChevronLeft, ChevronRight, Database, Download, Flame, Gauge,
+  Layers3, Map as MapIcon, MapPin, Mountain, Pause, Play, Satellite, Scan, ShieldAlert,
   SlidersHorizontal,
   ThermometerSun, Trash2, X,
 } from 'lucide-react'
@@ -611,9 +611,7 @@ function FireMapApp() {
           <button className="is-active" title={tr('rail.hotspotsTitle')} onClick={() => { focusRegion(); setDetailsOpen(true); setActiveLayer('surface') }}><Flame size={19}/><span>{tr('rail.hotspots')}</span></button>
           <button className={calendarOpen ? 'is-active' : ''} title={tr('rail.calendar')} onClick={() => setCalendarOpen((v) => !v)}><CalendarDays size={19}/><span>{tr('rail.calendar')}</span></button>
           <button className={selectionMode ? 'is-active select' : ''} title={tr('rail.areaTitle')} onClick={toggleSelectionMode}><Scan size={19}/><span>{tr('rail.area')}</span></button>
-          <button className={simpleOpen ? 'is-active' : ''} title={tr('rail.simpleTitle')} onClick={() => setSimpleOpen((v) => !v)}><MessageCircleQuestion size={19}/><span>{tr('rail.simple')}</span></button>
           <button className={layersOpen ? 'is-active' : ''} title={tr('rail.layers')} onClick={() => setLayersOpen((v) => !v)}><SlidersHorizontal size={19}/><span>{tr('rail.layers')}</span></button>
-          <button className={detailsOpen ? 'is-active' : ''} title={tr('rail.infoTitle')} onClick={() => setDetailsOpen((v) => !v)}><Info size={19}/><span>{tr('rail.info')}</span></button>
         </nav>}
       </div>
       {detailsOpen && <aside className="fw-summary">
@@ -655,9 +653,8 @@ function FireMapApp() {
         <LayerButton active={activeLayer === 'surface'} icon={ThermometerSun} label={tr('layers.density')} tone="heat" onClick={() => setActiveLayer('surface')}/>
         <LayerButton active={activeLayer === 'points'} icon={MapPin} label={tr('layers.points')} tone="points" onClick={() => setActiveLayer('points')}/>
         <LayerButton active={showBoundary} icon={Layers3} label={tr('layers.boundary')} tone="boundary" onClick={() => setShowBoundary((v) => !v)}/>
-        <LayerButton active={selectionMode} icon={Scan} label={tr('layers.area')} tone="select" onClick={toggleSelectionMode}/>
       </aside>}
-      {layersOpen && !selectionBounds && <aside className="fw-display-dock" aria-label={tr('basemap.dock')}>
+      {!selectionBounds && <aside className="fw-display-dock" aria-label={tr('basemap.dock')}>
         <div className="fw-display-modes" role="group" aria-label={tr('basemap.title')}>
           <button className={baseMap === 'standard' ? 'is-active' : ''} aria-pressed={baseMap === 'standard'} title={tr('basemap.standard')} onClick={() => setBaseMap('standard')}><MapIcon size={14}/><span>{tr('basemap.standard')}</span></button>
           <button className={baseMap === 'relief' ? 'is-active' : ''} aria-pressed={baseMap === 'relief'} title={tr('basemap.relief')} onClick={() => setBaseMap('relief')}><Mountain size={14}/><span>{tr('basemap.relief')}</span></button>
