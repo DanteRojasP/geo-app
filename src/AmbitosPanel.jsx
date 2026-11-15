@@ -33,6 +33,82 @@ function hide(map) {
   }
 }
 
+async function captureReportMap(map, codigo) {
+  if (!map?.getCanvas?.()) return ''
+  const pointsLayer = map.getLayer('fire-points') ? map.getLayoutProperty('fire-points', 'visibility') : null
+  const fillFilter = map.getLayer('ambitos-fill') ? map.getFilter('ambitos-fill') : null
+  const lineFilter = map.getLayer('ambitos-line') ? map.getFilter('ambitos-line') : null
+  try {
+    if (map.getLayer('fire-points')) map.setLayoutProperty('fire-points', 'visibility', 'visible')
+    if (codigo && map.getLayer('ambitos-fill')) map.setFilter('ambitos-fill', ['==', ['get', 'codigo'], codigo])
+    if (codigo && map.getLayer('ambitos-line')) map.setFilter('ambitos-line', ['==', ['get', 'codigo'], codigo])
+    await new Promise((resolve) => {
+      let finished = false
+      const done = () => { if (!finished) { finished = true; resolve() } }
+      map.once('render', done)
+      map.triggerRepaint()
+      window.setTimeout(done, 500)
+    })
+    return map.getCanvas().toDataURL('image/jpeg', 0.9)
+  } finally {
+    if (map.getLayer('fire-points')) map.setLayoutProperty('fire-points', 'visibility', pointsLayer || 'none')
+    if (map.getLayer('ambitos-fill')) map.setFilter('ambitos-fill', fillFilter || null)
+    if (map.getLayer('ambitos-line')) map.setFilter('ambitos-line', lineFilter || null)
+    map.triggerRepaint()
+  }
+}
+
+function addMapToReport(html, image, caption) {
+  if (!image) return html
+  const doc = new DOMParser().parseFromString(html, 'text/html')
+  const style = doc.createElement('style')
+  style.textContent = '.fc-report-summary{display:grid;grid-template-columns:minmax(0,.86fr) minmax(280px,1.14fr);gap:18px;align-items:start}.fc-report-summary>p{margin-top:0}.fc-report-map{margin:0;border:1px solid #cdd9df;background:#f4f7f8;break-inside:avoid}.fc-report-map img{display:block;width:100%;aspect-ratio:16/10;object-fit:cover}.fc-report-map figcaption{padding:7px 9px;color:#526671;font-size:9px;line-height:1.35}@media(max-width:720px){.fc-report-summary{grid-template-columns:1fr}}'
+  doc.head.append(style)
+  const heading = doc.querySelector('h2')
+  const summary = heading?.nextElementSibling
+  if (summary) {
+    const grid = doc.createElement('div')
+    grid.className = 'fc-report-summary'
+    const figure = doc.createElement('figure')
+    figure.className = 'fc-report-map'
+    const img = doc.createElement('img')
+    img.src = image
+    img.alt = caption
+    const figcaption = doc.createElement('figcaption')
+    figcaption.textContent = caption
+    figure.append(img, figcaption)
+    summary.replaceWith(grid)
+    grid.append(summary, figure)
+  }
+  return `<!doctype html>${doc.documentElement.outerHTML}`
+}
+
+async function downloadReportPdf(html, filename) {
+  const frame = document.createElement('iframe')
+  frame.setAttribute('aria-hidden', 'true')
+  frame.style.cssText = 'position:fixed;left:-12000px;top:0;width:1000px;height:1400px;border:0;opacity:0;pointer-events:none'
+  document.body.append(frame)
+  try {
+    const doc = frame.contentDocument
+    doc.open()
+    doc.write(html)
+    doc.close()
+    await new Promise((resolve) => window.setTimeout(resolve, 350))
+    if (doc.fonts?.ready) await doc.fonts.ready
+    const module = await import('html2pdf.js')
+    const html2pdf = module.default || module
+    await html2pdf().set({
+      margin: [8, 8, 8, 8], filename,
+      image: { type: 'jpeg', quality: 0.95 },
+      html2canvas: { scale: 1.45, useCORS: true, logging: false, windowWidth: 1000 },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak: { mode: ['css', 'legacy'] },
+    }).from(doc.body).save()
+  } finally {
+    frame.remove()
+  }
+}
+
 function AmbitosPanel({ map, onClose }) {
   const [niveles, setNiveles] = useState([])
   const [nivel, setNivel] = useState('provincia')
@@ -113,25 +189,35 @@ function AmbitosPanel({ map, onClose }) {
   const openGeneratedReport = async (mode, codigo = elegido) => {
     const url = reportUrl(codigo)
     if (!url || reportLoading) return
-    const popup = window.open('', '_blank')
-    if (!popup) { setError(tr('amb.popupBlocked')); return }
+    const popup = mode === 'view' ? window.open('', '_blank') : null
+    if (mode === 'view' && !popup) { setError(tr('amb.popupBlocked')); return }
     const loadingText = tr(mode === 'pdf' ? 'amb.preparingPdf' : 'amb.preparingReport')
     setReportLoading(mode)
-    popup.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${loadingText}</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#f5f8fa;color:#29404d;font:14px system-ui}.loader{text-align:center}.spin{width:34px;height:34px;margin:0 auto 16px;border:3px solid #d5e2e9;border-top-color:#2c86ad;border-radius:50%;animation:s .8s linear infinite}@keyframes s{to{transform:rotate(360deg)}}small{display:block;margin-top:7px;color:#71838d}</style></head><body><div class="loader"><div class="spin"></div><b>${loadingText}</b><small>${tr('amb.loadingWait')}</small></div></body></html>`)
-    popup.document.close()
+    if (popup) {
+      popup.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${loadingText}</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#f5f8fa;color:#29404d;font:14px system-ui}.loader{text-align:center}.spin{width:34px;height:34px;margin:0 auto 16px;border:3px solid #d5e2e9;border-top-color:#2c86ad;border-radius:50%;animation:s .8s linear infinite}@keyframes s{to{transform:rotate(360deg)}}small{display:block;margin-top:7px;color:#71838d}</style></head><body><div class="loader"><div class="spin"></div><b>${loadingText}</b><small>${tr('amb.loadingWait')}</small></div></body></html>`)
+      popup.document.close()
+    }
     try {
-      const response = await fetch(url)
+      const [response, mapImage] = await Promise.all([fetch(url), captureReportMap(map, codigo)])
       if (!response.ok) throw new Error(`${response.status} ${response.statusText}`)
       let html = await response.text()
       html = html.replace('<head>', `<head><base href="${window.location.origin}/">`)
-      if (mode === 'pdf') html = html.replace('</body>', `<script>window.addEventListener('load',()=>setTimeout(()=>window.print(),450))</script></body>`)
-      popup.document.open()
-      popup.document.write(html)
-      popup.document.close()
+      const unit = datos?.unidades?.find((u) => u.codigo === codigo)
+      html = addMapToReport(html, mapImage, tr('amb.mapCaption', { u: unit?.nombre || codigo, a: inicioMes, b: finMes }))
+      if (mode === 'pdf') {
+        const safeName = (unit?.nombre || codigo).toLowerCase().replace(/[^a-z0-9]+/gi, '-')
+        await downloadReportPdf(html, `firecal-${nivel}-${safeName}-${inicioMes}-${finMes}.pdf`)
+      } else {
+        popup.document.open()
+        popup.document.write(html)
+        popup.document.close()
+      }
     } catch (e) {
-      popup.document.open()
-      popup.document.write(`<p style="font:14px system-ui;padding:24px;color:#9f2424">${tr('amb.reportError')}: ${e.message}</p>`)
-      popup.document.close()
+      if (popup) {
+        popup.document.open()
+        popup.document.write(`<p style="font:14px system-ui;padding:24px;color:#9f2424">${tr('amb.reportError')}: ${e.message}</p>`)
+        popup.document.close()
+      } else setError(`${tr('amb.reportError')}: ${e.message}`)
     } finally {
       setReportLoading('')
     }
