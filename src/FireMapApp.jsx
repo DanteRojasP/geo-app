@@ -27,6 +27,7 @@ const SATELLITE_STYLE = {
   layers: [{ id: 'satellite-imagery', type: 'raster', source: 'imagery', paint: { 'raster-saturation': 0.08, 'raster-contrast': 0.08 } }],
 }
 const CUSCO_CENTER = [-71.97, -13.53]
+const HISTORICAL_YEARS = [2021, 2022, 2023, 2024, 2025, 2026]
 const PERU_BOUNDS = new maplibregl.LngLatBounds([-81.45, -18.5], [-68.55, 0.25])
 const CUSCO_FEATURE = { ...cuscoBoundaryRaw.features[0], id: 'cusco' }
 const CUSCO_BOUNDARY = { type: 'FeatureCollection', features: [CUSCO_FEATURE] }
@@ -262,6 +263,7 @@ function FireMapApp() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [activeLayer, setActiveLayer] = useState('surface')
+  const [selectedYear, setSelectedYear] = useState(2026)
   const [selectedDate, setSelectedDate] = useState('all')
   const [playing, setPlaying] = useState(false)
   const [detailsOpen, setDetailsOpen] = useState(true)
@@ -274,14 +276,16 @@ function FireMapApp() {
     setLoading(true)
     setError('')
     try {
-      const data = await getFireOverview({ department: 'peru', startYear: 2021, endYear: 2026 })
+      const startYear = selectedYear === 'all' ? HISTORICAL_YEARS[0] : selectedYear
+      const endYear = selectedYear === 'all' ? HISTORICAL_YEARS.at(-1) : selectedYear
+      const data = await getFireOverview({ department: 'peru', startYear, endYear })
       setResult(data)
     } catch (caught) {
       setError(caught.message || 'No se pudieron consultar las detecciones.')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [selectedYear])
 
   useEffect(() => { loadData() }, [loadData])
 
@@ -303,8 +307,11 @@ function FireMapApp() {
   const scopedHotspots = useMemo(() => activeScope === 'cusco'
     ? peruHotspots.filter(isInsideCusco)
     : peruHotspots, [activeScope, peruHotspots])
-  const dates = useMemo(() => [...new Set(scopedHotspots.map((point) => point.date).filter(Boolean))].sort().slice(-5), [scopedHotspots])
-  const visibleHotspots = useMemo(() => selectedDate === 'all' ? scopedHotspots : scopedHotspots.filter((point) => point.date === selectedDate), [scopedHotspots, selectedDate])
+  const yearHotspots = useMemo(() => selectedYear === 'all'
+    ? scopedHotspots
+    : scopedHotspots.filter((point) => String(point.date || '').startsWith(`${selectedYear}-`)), [scopedHotspots, selectedYear])
+  const dates = useMemo(() => [...new Set(yearHotspots.map((point) => point.date).filter(Boolean))].sort().slice(-5), [yearHotspots])
+  const visibleHotspots = useMemo(() => selectedDate === 'all' ? yearHotspots : yearHotspots.filter((point) => point.date === selectedDate), [yearHotspots, selectedDate])
   const mappedDepartments = useMemo(() => addActivityToDepartments(departments, visibleHotspots), [departments, visibleHotspots])
   const selectedHotspots = useMemo(() => selectionBounds ? visibleHotspots.filter((point) => point.lon >= selectionBounds.west && point.lon <= selectionBounds.east && point.lat >= selectionBounds.south && point.lat <= selectionBounds.north) : [], [selectionBounds, visibleHotspots])
   hotspotsRef.current = visibleHotspots
@@ -691,6 +698,9 @@ function FireMapApp() {
   const formatDate = (date) => date ? new Intl.DateTimeFormat('es-PE', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(`${date}T12:00:00`)) : 'Últimos 5 días'
   const timelineIndex = selectedDate === 'all' ? Math.max(0, dates.length - 1) : Math.max(0, dates.indexOf(selectedDate))
   const timelineProgress = dates.length > 1 ? (timelineIndex / (dates.length - 1)) * 100 : 0
+  const timelineLabel = selectedDate !== 'all'
+    ? formatDate(selectedDate)
+    : selectedYear === 'all' ? '2021 – 2026' : selectedYear === 2026 ? 'Últimos 5 días' : String(selectedYear)
 
   return (
     <div className="fw-app">
@@ -704,7 +714,7 @@ function FireMapApp() {
         <button title="Información" onClick={() => setDetailsOpen((value) => !value)}><Info size={20}/><span>Info</span></button>
       </nav>
       {detailsOpen && <aside className="fw-summary">
-        <div className="fw-summary-head"><div><p>{activeScope === 'peru' ? 'MONITOREO NACIONAL' : 'ZONA PILOTO'}</p><h1>Actividad térmica</h1><span>{activeScope === 'peru' ? 'Perú' : 'Cusco'} · {formatDate(selectedDate === 'all' ? null : selectedDate)}</span></div><button onClick={() => setDetailsOpen(false)}><X size={17}/></button></div>
+        <div className="fw-summary-head"><div><p>{activeScope === 'peru' ? 'MONITOREO NACIONAL' : 'ZONA PILOTO'}</p><h1>Actividad térmica</h1><span>{activeScope === 'peru' ? 'Perú' : 'Cusco'} · {timelineLabel}</span></div><button onClick={() => setDetailsOpen(false)}><X size={17}/></button></div>
         <div className="fw-summary-status"><RiskBadge level={stats.risk}/><span>{loading ? 'Actualizando satélites…' : `${visibleHotspots.length} detecciones visibles`}</span></div>
         {error && <div className="fw-error"><ShieldAlert size={16}/>{error}</div>}
         <div className="fw-metrics">
@@ -752,16 +762,16 @@ function FireMapApp() {
       <section className="fw-timeline">
         <button className="fw-play" onClick={() => setPlaying((value) => !value)} title={playing ? 'Pausar' : 'Reproducir'}>{playing ? <Pause size={19}/> : <Play size={19}/>}</button>
         <div className="fw-timeline-panel" style={{ '--progress': `${timelineProgress}%` }}>
-          <div className={`fw-time-callout ${timelineIndex === 0 ? 'is-start' : timelineIndex === dates.length - 1 ? 'is-end' : ''}`}><b>{selectedDate === 'all' ? 'Últimos 5 días' : formatDate(selectedDate)}</b><span>{visibleHotspots.length} focos</span></div>
-          <div className="fw-days">{dates.map((date) => {
-            const count = scopedHotspots.filter((point) => point.date === date).length
+          <div className={`fw-time-callout ${timelineIndex === 0 ? 'is-start' : timelineIndex === dates.length - 1 ? 'is-end' : ''}`}><b>{timelineLabel}</b><span>{visibleHotspots.length ? `${visibleHotspots.length} focos` : 'sin detalle'}</span></div>
+          <div className="fw-days">{dates.length ? dates.map((date) => {
+            const count = yearHotspots.filter((point) => point.date === date).length
             const [weekday, day] = formatDay(date).split(' ')
             return <button className={selectedDate === date ? 'is-active' : ''} key={date} onClick={() => { setSelectedDate(date); setPlaying(false) }}><span>{weekday} {day}</span><small>{count} focos</small></button>
-          })}</div>
+          }) : <div className="fw-no-history">Sin focos georreferenciados cargados para {selectedYear === 'all' ? 'este periodo' : selectedYear}</div>}</div>
           <div className="fw-timeline-options">
             <button className={selectedDate === 'all' ? 'is-active' : ''} onClick={() => { setSelectedDate('all'); setPlaying(false) }}><Layers3 size={13}/><span>Superficie térmica</span></button>
-            <div className="fw-sensor-tabs"><b>Todos</b><span>MODIS</span><span>VIIRS</span></div>
-            <div className="fw-timeline-source"><span>UTC−5 · NASA FIRMS</span><b>{result.mode === 'api' ? 'EN VIVO' : 'DEMO'}</b></div>
+            <div className="fw-year-scale" aria-label="Periodo histórico"><button className={selectedYear === 'all' ? 'is-active' : ''} onClick={() => { setSelectedYear('all'); setSelectedDate('all'); setPlaying(false) }}>Todos</button>{HISTORICAL_YEARS.map((year) => <button key={year} className={selectedYear === year ? 'is-active' : ''} onClick={() => { setSelectedYear(year); setSelectedDate('all'); setPlaying(false) }}>{year}</button>)}</div>
+            <div className="fw-timeline-source"><span>NASA FIRMS · UTC−5</span><b>{result.mode !== 'api' ? 'DEMO' : selectedYear === 2026 ? 'EN VIVO' : 'HISTÓRICO'}</b></div>
           </div>
         </div>
       </section>
