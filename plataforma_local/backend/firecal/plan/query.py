@@ -263,6 +263,12 @@ class PlanStore:
         return self._meta
 
     @property
+    def region_geom(self):
+        """Contorno de Cusco (shapely); lo usa la capa en tiempo real (firecal.nrt)."""
+        self._ensure()
+        return self._region
+
+    @property
     def region_geojson(self) -> dict:
         self._ensure()
         return self._region_geojson

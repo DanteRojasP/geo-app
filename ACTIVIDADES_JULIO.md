@@ -315,6 +315,19 @@ Revisión **`firecal-00009`** (imagen `firecal-cusco:gabriel-dante-v1`).
       (`exploratorio/meteomatics/resultados/PREVENTIVO.md`).
 - [ ] Decidir la configuración de Cloud Run que sugiere Gabriel (ver `CAMBIOS_Y_RECOMENDACIONES.md`).
 
+## Tiempo real con la MAP_KEY de FIRMS (sáb 14 nov 2026, noche)
+
+- [x] `GET /api/tiempo-real?horas=24|48|120` (`firecal/nrt.py`): detecciones NRT de las 4 fuentes de FIRMS, recortadas
+      al contorno de Cusco. El servidor las pide cada 15 min y las comparte con todos (~16 transacciones por hora
+      frente al límite de 5000 cada 10 min). Si FIRMS falla, se muestra lo último con aviso. Sin FRP.
+- [x] Es una capa aparte de la serie armonizada: cada punto es una detección cruda y no se suma al calendario
+      (MAESTRO).
+- [x] La clave solo vive en el servidor: no llega al navegador, no queda en los logs (`httpx` registraba la URL con la
+      clave; ahora se redacta) ni en los errores. 7 pruebas nuevas con FIRMS simulado (110 en verde).
+- [x] Interfaz: botón **En vivo** en la barra lateral, panel con ventana de 24 h, 48 h o 5 días, color por
+      antigüedad, detalle al hacer clic y renovación cada 5 min.
+- [ ] Desplegar con la MAP_KEY en Secret Manager (decidido por Julio) cuando esté la clave.
+
 ## Pendientes que me afectan
 
 - [x] Datos reales de FIRMS (Cusco, de Antonio).

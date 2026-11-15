@@ -25,7 +25,8 @@ from collections import OrderedDict
 from collections.abc import Callable
 from urllib.parse import parse_qsl
 
-SKIP_PATHS = {"/api/hotspots.csv"}
+# tiempo-real cambia cada 15 min: tiene su propio refresco (firecal.nrt), no esta caché.
+SKIP_PATHS = {"/api/hotspots.csv", "/api/tiempo-real"}
 CUSTOM_AOI_PARAMS = {"bbox", "lat", "lon", "radio_km"}
 # Cabeceras que describen a la solicitud original, no a la respuesta: no se repiten.
 DROP_HEADERS = {b"x-process-time-ms", b"x-ratelimit-remaining"}

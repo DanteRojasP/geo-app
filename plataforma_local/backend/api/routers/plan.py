@@ -27,6 +27,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 
 from firecal.i18n import t
+from firecal.nrt import HORAS_VALIDAS, NrtNotConfigured, NrtStore, NrtUnavailable
 from firecal.plan.events import PLAN_VERSION
 from firecal.plan.query import (
     CATEGORY_EDGES,
@@ -42,7 +43,7 @@ from firecal.plan.query import (
 from firecal.plan.sources import COLS_FOCOS
 
 KNOWN_PARAMS = {"departamento", "bbox", "lat", "lon", "radio_km", "fecha_inicio", "fecha_fin",
-                "mes", "anio", "limite", "graficos", "lang"}
+                "mes", "anio", "limite", "graficos", "lang", "horas"}
 
 
 def _known_params(request: Request) -> None:
@@ -272,6 +273,40 @@ def analitica_recurrencia(request: Request,
     """En cuántos años distintos ardió cada celda de ~1 km (desde 2013)."""
     return _analitica(request, "recurrencia", departamento, bbox, lat, lon, radio_km,
                       limite=limite)
+
+
+def _nrt(request: Request) -> NrtStore:
+    """Capa en tiempo real: se crea una vez (necesita el contorno de Cusco y la MAP_KEY)."""
+    app = request.app
+    if getattr(app.state, "nrt", None) is None:
+        store = _store(request)
+        key = store.settings.env.firms_map_key
+        app.state.nrt = NrtStore(key.get_secret_value() if key else None, store.region_geom)
+    return app.state.nrt
+
+
+@router.get("/tiempo-real")
+def tiempo_real(request: Request,
+                horas: Annotated[int, Query(description="Ventana: 24, 48 o 120 horas")] = 24
+                ) -> dict:
+    """Detecciones casi en tiempo real de NASA FIRMS en Cusco (VIIRS y MODIS), SIN armonizar.
+
+    Capa aparte de la serie histórica: cada punto es una detección; no se suman al calendario.
+    Se actualiza cada 15 minutos para todos los visitantes. Sin FRP."""
+    if horas not in HORAS_VALIDAS:
+        raise HTTPException(status_code=422, detail=t(
+            es=f"horas debe ser una de {', '.join(map(str, HORAS_VALIDAS))}.",
+            en=f"horas must be one of {', '.join(map(str, HORAS_VALIDAS))}."))
+    nrt = _nrt(request)
+    try:
+        body = nrt.geojson(horas)
+    except NrtNotConfigured as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except NrtUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc),
+                            headers={"Retry-After": "120"}) from exc
+    body["metadata"]["credito"] = FIRMS_CREDIT
+    return body
 
 
 @router.get("/metadatos")

@@ -47,6 +47,9 @@ export const getMonth = (aoi, mes) => request('/api/anomalias', { ...aoi, mes })
 // Analíticas "en simple": cada respuesta trae titulo, en_simple, como_leerlo y los datos.
 export const getResumen = (aoi, extra = {}) => request('/api/resumen', { ...aoi, ...extra })
 export const getAnalitica = (nombre, aoi, extra = {}) => request(`/api/analitica/${nombre}`, { ...aoi, ...extra })
+// Detecciones casi en tiempo real (NASA FIRMS, sin armonizar). Sin reintento: si el servidor no
+// tiene MAP_KEY responde 503 y se muestra el mensaje enseguida.
+export const getTiempoReal = (horas) => request('/api/tiempo-real', { horas }, false)
 export const getFocos = (aoi, fechaInicio, fechaFin) =>
   request('/api/focos.geojson', { ...aoi, fecha_inicio: fechaInicio, fecha_fin: fechaFin })
 

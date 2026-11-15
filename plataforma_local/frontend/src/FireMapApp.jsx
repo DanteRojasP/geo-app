@@ -7,13 +7,13 @@ import * as maplibregl from 'maplibre-gl'
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import {
   CalendarDays, ChevronLeft, ChevronRight, CircleHelp, Download, Flame, Gauge, Info,
-  Layers3, Map as MapIcon, MapPin, MessageCircleQuestion, Mountain, Pause, Play, Satellite, Scan, ShieldAlert,
+  Layers3, Map as MapIcon, MapPin, MessageCircleQuestion, Mountain, Pause, Play, Radio, Satellite, Scan, ShieldAlert,
   SlidersHorizontal,
   ThermometerSun, Trash2, X,
 } from 'lucide-react'
 import SimplePanel from './SimplePanel.jsx'
 import { LANGS, getLang, locale, months, setLang, tr } from './i18n.js'
-import { CUSCO, downloadCsv, getCalendar, getFocos, getMetadata, getMonth, getRegion } from './services/api.js'
+import { CUSCO, downloadCsv, getCalendar, getFocos, getMetadata, getMonth, getRegion, getTiempoReal } from './services/api.js'
 
 maplibregl.setWorkerUrl(maplibreWorkerUrl)
 
@@ -280,6 +280,11 @@ function FireMapApp() {
     && new URLSearchParams(window.location.search).get('calendario') !== '0')
   const [playing, setPlaying] = useState(false)
   const playableRef = useRef(new Set())
+  // Tiempo real (NASA FIRMS NRT): capa aparte de la serie armonizada.
+  const [liveOn, setLiveOn] = useState(false)
+  const [liveHours, setLiveHours] = useState(24)
+  const [live, setLive] = useState(null)              // { body } | { error } | null
+  const liveRef = useRef(EMPTY)
   const yearsRef = useRef(null)
   const [simpleOpen, setSimpleOpen] = useState(false)
   const [detailsOpen, setDetailsOpen] = useState(true)
@@ -347,6 +352,24 @@ function FireMapApp() {
       .catch((e) => active && setSelection({ bbox, error: e.message }))
     return () => { active = false }
   }, [selectionBounds, periodo, playing])
+
+  // Tiempo real: pide al abrir y cada 5 min (el servidor renueva desde FIRMS cada 15 min).
+  useEffect(() => {
+    if (!liveOn) { setLive(null); return undefined }
+    let active = true
+    const load = () => getTiempoReal(liveHours)
+      .then((r) => active && setLive({ body: r.body }))
+      .catch((e) => active && setLive({ error: e.message }))
+    load()
+    const timer = window.setInterval(load, 5 * 60 * 1000)
+    return () => { active = false; window.clearInterval(timer) }
+  }, [liveOn, liveHours, lang])
+
+  useEffect(() => {
+    liveRef.current = (liveOn && live?.body) ? live.body : EMPTY
+    const map = mapRef.current
+    if (mapReadyRef.current && map?.getSource('live')) map.getSource('live').setData(liveRef.current)
+  }, [live, liveOn])
 
   // Mantener visible el año elegido en la escala de años (se desplaza si no cabe).
   useEffect(() => {
@@ -470,6 +493,31 @@ function FireMapApp() {
           'circle-stroke-color': '#fff4df', 'circle-stroke-width': 1,
         },
       })
+      map.addSource('live', { type: 'geojson', data: EMPTY })
+      map.addLayer({
+        id: 'live-points', type: 'circle', source: 'live',
+        paint: {
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, 4, 10, 8],
+          // Color por antigüedad: < 6 h, 6-24 h, más de 24 h.
+          'circle-color': ['step', ['get', 'horas_atras'], '#ff1f4b', 6, '#ff7a1a', 24, '#ffc24b'],
+          'circle-stroke-color': '#ffffff', 'circle-stroke-width': 1.6, 'circle-opacity': 0.95,
+        },
+      })
+      map.on('mouseenter', 'live-points', () => { map.getCanvas().style.cursor = 'pointer' })
+      map.on('mouseleave', 'live-points', () => { map.getCanvas().style.cursor = '' })
+      map.on('click', 'live-points', (event) => {
+        if (suppressNextClick) return
+        const p = event.features?.[0]?.properties
+        if (!p) return
+        new maplibregl.Popup({ offset: 12, className: 'fw-map-popup' })
+          .setLngLat(event.features[0].geometry.coordinates)
+          .setDOMContent(createPopupContent(tr('liveLayer.popupTitle', { inst: p.instrumento, sat: p.satelite }), [
+            { value: `${p.fecha_hora_local} · ${tr('liveLayer.ago', { h: fmt(Number(p.horas_atras), 1) })}`, strong: true },
+            { value: tr('liveLayer.conf', { c: tr(`conf.${p.confianza}`) }) },
+            { value: tr('liveLayer.notHarm') },
+          ]))
+          .addTo(map)
+      })
       map.addLayer({ id: 'selection-area-fill', type: 'fill', source: 'selection-area', paint: { 'fill-color': '#5ee7d7', 'fill-opacity': 0.12 } })
       map.addLayer({ id: 'selection-area-line', type: 'line', source: 'selection-area', paint: { 'line-color': '#5ee7d7', 'line-width': 2.5, 'line-dasharray': [2, 1.4] } })
 
@@ -490,6 +538,7 @@ function FireMapApp() {
       })
       mapReadyRef.current = true
       map.getSource('focos').setData(focosRef.current)
+      map.getSource('live').setData(liveRef.current)
       if (regionRef.current) {
         map.getSource('cusco-area').setData(regionRef.current)
         map.getSource('cusco-mask').setData(maskOf(regionRef.current))
@@ -598,18 +647,39 @@ function FireMapApp() {
       <div className="fw-nubel-brand" aria-label="Nubel Team · FireCal Cusco"><img src="./nubel-team-logo.png" alt="Nubel Team"/></div>
       <div className="fc-topright">
         <div className="fc-app-name"><b>FireCal Cusco</b><small>{tr('brand.subtitle')}</small></div>
-        <span className="fc-live"><i/>{metadata ? tr('live.ok') : tr('live.connecting')}</span>
+        <span className={`fc-live ${liveOn && live?.body ? 'is-live' : ''}`}><i/>{liveOn && live?.body ? tr('live.chip', { n: fmt(live.body.metadata.detecciones) }) : metadata ? tr('live.ok') : tr('live.connecting')}</span>
         <div className="fc-lang" role="group" aria-label={tr('lang.title')}>{LANGS.map((l) => <button key={l} className={l === lang ? 'is-active' : ''} aria-pressed={l === lang} onClick={() => changeLang(l)}>{l.toUpperCase()}</button>)}</div>
         <button className="fc-help" title={tr('btn.method')} onClick={() => setDetailsOpen(true)}><CircleHelp size={18}/></button>
       </div>
       <nav className="fw-rail" aria-label={tr('rail.label')}>
         <button className="is-active" title={tr('rail.hotspotsTitle')} onClick={() => { focusCusco(); setDetailsOpen(true); setActiveLayer('surface') }}><Flame size={20}/><span>{tr('rail.hotspots')}</span></button>
+        <button className={liveOn ? 'is-active live' : ''} title={tr('rail.liveTitle')} aria-pressed={liveOn} onClick={() => { if (!liveOn && window.innerWidth < 950) setDetailsOpen(false); setLiveOn((v) => !v) }}><Radio size={20}/><span>{tr('rail.live')}</span></button>
         <button className={calendarOpen ? 'is-active' : ''} title={tr('rail.calendar')} onClick={() => setCalendarOpen((v) => !v)}><CalendarDays size={20}/><span>{tr('rail.calendar')}</span></button>
         <button className={selectionMode ? 'is-active select' : ''} title={tr('rail.areaTitle')} onClick={toggleSelectionMode}><Scan size={20}/><span>{tr('rail.area')}</span></button>
         <button className={simpleOpen ? 'is-active' : ''} title={tr('rail.simpleTitle')} onClick={() => setSimpleOpen((v) => !v)}><MessageCircleQuestion size={20}/><span>{tr('rail.simple')}</span></button>
         <button title={tr('rail.layers')} onClick={() => setLayersOpen((v) => !v)}><Layers3 size={20}/><span>{tr('rail.layers')}</span></button>
         <button title={tr('rail.infoTitle')} onClick={() => setDetailsOpen((v) => !v)}><Info size={20}/><span>{tr('rail.info')}</span></button>
       </nav>
+      {liveOn && <aside className="fc-live-panel" aria-label={tr('rail.liveTitle')}>
+        <header><p><i/>{tr('liveLayer.kicker')}</p><button onClick={() => setLiveOn(false)} title={tr('btn.close')} aria-label={tr('btn.close')}><X size={15}/></button></header>
+        <div className="fc-live-hours" role="group" aria-label={tr('liveLayer.window')}>
+          {[24, 48, 120].map((h) => <button key={h} className={liveHours === h ? 'is-active' : ''} aria-pressed={liveHours === h} onClick={() => setLiveHours(h)}>{tr(`liveLayer.h${h}`)}</button>)}
+        </div>
+        {!live && <p className="fc-live-msg">{tr('summary.loading')}</p>}
+        {live?.error && <p className="fc-live-msg is-error">{live.error}</p>}
+        {live?.body && (() => {
+          const m = live.body.metadata
+          const upd = new Date(m.actualizado_utc.replace('Z', ':00Z')).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit', timeZone: 'America/Lima' })
+          return <>
+            <h3>{m.detecciones === 1 ? tr('liveLayer.count1') : tr('liveLayer.count', { n: fmt(m.detecciones) })}</h3>
+            <p className="fc-live-msg">{m.ultima_deteccion_local ? tr('liveLayer.last', { t: m.ultima_deteccion_local }) : tr('liveLayer.none')}</p>
+            {m.desactualizado && <p className="fc-live-msg is-error">{tr('liveLayer.stale')}</p>}
+            <div className="fc-live-legend"><span>{tr('liveLayer.age')}</span><p><i style={{ background: '#ff1f4b' }}/>{'< 6 h'}</p><p><i style={{ background: '#ff7a1a' }}/>6–24 h</p><p><i style={{ background: '#ffc24b' }}/>{'> 24 h'}</p></div>
+            <ul>{m.notes.slice(0, 2).map((n) => <li key={n}>{n}</li>)}</ul>
+            <small>{tr('liveLayer.updated', { t: upd })} · {m.fuentes.join(', ')}</small>
+          </>
+        })()}
+      </aside>}
       {detailsOpen && <aside className="fw-summary">
         <div className="fw-summary-head"><div><p>{tr('summary.kicker')}</p><h1>{unidad?.nombre || tr('unit.name')}</h1><span>{periodo.label}{month?.calidad ? ` · ${calidadLabel(month.calidad)}` : ''}</span></div><button onClick={() => setDetailsOpen(false)} title={tr('btn.close')} aria-label={tr('btn.close')}><X size={17}/></button></div>
         <div className="fw-summary-status">{selected.month ? <CategoryBadge categoria={month?.categoria}/> : <span className="fw-risk fw-risk--bajo"><i/>{tr('summary.yearTotal')}</span>}<span>{loading ? tr('summary.loading') : tr('summary.onMap', { n: fmt(focos.n_focos || 0) })}</span></div>

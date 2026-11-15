@@ -11,7 +11,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 LOG_METHODS = {"debug", "info", "warning", "error", "exception", "critical"}
-API_ERRORS = {"AOIError", "HTTPException", "PlanError", "PlanNoData", "PlanNotReady"}
+API_ERRORS = {"AOIError", "HTTPException", "PlanError", "PlanNoData", "PlanNotReady",
+              "NrtNotConfigured", "NrtUnavailable"}
 
 
 def _strings(node: ast.AST) -> list[str]:

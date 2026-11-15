@@ -50,6 +50,8 @@ def cache_control(request: Request, status: int) -> str:
     path = request.url.path
     if request.method != "GET" or status != 200 or path.startswith("/health"):
         return "no-store"
+    if path == "/api/tiempo-real":
+        return "public, max-age=300"                    # se refresca cada 15 min en el servidor
     if path.startswith("/api/"):
         return "public, max-age=3600"
     if path.startswith("/assets/"):

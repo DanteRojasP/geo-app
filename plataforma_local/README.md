@@ -133,6 +133,7 @@ AOI: `departamento=PE-CUS` **o** `bbox=oeste,sur,este,norte` **o** `lat=..&lon=.
 | `GET /api/hotspots.csv` | AOI, `fecha_inicio`, `fecha_fin` | CSV de focos (18 columnas del contrato); cabeceras `X-Row-Count` y `X-Total-Eq-Foco` |
 | `GET /api/metadatos` | — | unidad, método (k, kT, margen), cobertura, sumas de control y créditos |
 | `GET /health`, `GET /health/limits` | — | estado de los datos y del protocolo de solicitudes |
+| `GET /api/tiempo-real` | `horas` = 24, 48 o 120 | **Capa aparte, sin armonizar:** detecciones casi en tiempo real de NASA FIRMS en Cusco (VIIRS S-NPP, NOAA-20, NOAA-21 y MODIS) como GeoJSON, con hora local, satélite y confianza (sin FRP). El servidor las renueva cada 15 min para todos. Necesita `FIRMS_MAP_KEY` (en Cloud Run, desde Secret Manager); sin clave responde 503. |
 
 Celda del calendario:
 ```json
