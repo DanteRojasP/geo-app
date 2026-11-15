@@ -283,7 +283,7 @@ function FireMapApp() {
   const yearsRef = useRef(null)
   const [simpleOpen, setSimpleOpen] = useState(false)
   const [detailsOpen, setDetailsOpen] = useState(true)
-  const [layersOpen, setLayersOpen] = useState(true)
+  const [layersOpen, setLayersOpen] = useState(false)
   const [toolsOpen, setToolsOpen] = useState(false)
   const [selectionMode, setSelectionMode] = useState(false)
   const [selectionBounds, setSelectionBounds] = useState(null)
