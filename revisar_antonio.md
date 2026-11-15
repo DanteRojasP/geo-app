@@ -46,6 +46,24 @@ Consecuencias:
 4. **Publicarlo como una nueva versión de los datos** (P6): cambian las filas y las sumas de control de MAESTRO §6,
    `verificar_datos.py` y los casos de §12 que caigan en esos meses. Avísame y actualizo la app y sus pruebas.
 
+## Actualización (15-nov, tarde): NOAA-20 cubre los huecos y S-NPP dejó de publicar
+
+Comprobado con la API de FIRMS, en el rectángulo de Cusco:
+
+| Ventana de 5 días | VIIRS S-NPP | VIIRS NOAA-20 | MODIS |
+|---|---|---|---|
+| Desde el 28-jul-2022 | 0 filas | **348 filas** | 63 filas |
+| Desde el 10-jul-2024 | 0 filas | **91 filas** | no consultado |
+
+- **NOAA-20 tiene datos en los días sin S-NPP.** Es la opción recomendada para rellenarlos, con su propio `k`
+  calibrado sobre el solapamiento S-NPP/NOAA-20 (2018–2026). MODIS con peso 1,0 sigue siendo la opción simple.
+- **FIRMS lista S-NPP en tiempo casi real solo hasta el 2-nov-2026.** NOAA-20 y NOAA-21 siguen al día. No sabemos si
+  el corte es temporal o definitivo. Si es definitivo, la serie desde 2013 (solo S-NPP) no podrá extenderse sin un
+  factor NOAA-20 → escala MODIS. Esto también afecta a cualquier actualización con 2026 (P6).
+- El archivo procesado de S-NPP llega hasta el 31-jul-2026, igual que los de NOAA-20 y NOAA-21.
+
+Detalle en `PROTOCOLO_PREVENTIVO.md` §6.1 y §6.2.
+
 ## Otra cosa, para cuando se amplíe a otras regiones
 
 En 2022, aun sin los días del hueco, la razón MODIS/VIIRS sube a la vez en Cusco, Puno, Ayacucho y Apurímac (en la
