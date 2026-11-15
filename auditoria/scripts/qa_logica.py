@@ -55,11 +55,12 @@ fo["anio"] = fo.fecha_local.str[:4].astype(int)
 
 # ------------------------------------------------------------------ 1. conteos (MAESTRO 12)
 G = "1. Conteos"
-esperado = {"total": 15732, 2005: 1355, 2012: 678, 2013: 424, 2020: 1206, 2025: 385}
+esperado = {"total": 15818, 2005: 1355, 2012: 678, 2013: 424, 2020: 1206, 2022: 850, 2024: 640,
+            2025: 387}   # MAESTRO §12, datos v1.3
 man_total = cd.eq_hotspots.sum()
-check(G, "manual: total periodo = 15,732", abs(man_total - 15732) <= TOL, f"{man_total:.2f}")
-check(G, "manual: 36,260 celdas-dia", len(cd) == 36260, str(len(cd)))
-check(G, "manual: 58,779 focos", len(fo) == 58779, str(len(fo)))
+check(G, "manual: total periodo = 15,818", abs(man_total - 15818) <= TOL, f"{man_total:.2f}")
+check(G, "manual: 36,568 celdas-dia", len(cd) == 36568, str(len(cd)))
+check(G, "manual: 59,211 focos", len(fo) == 59211, str(len(fo)))
 por_anio = cd.groupby("anio").eq_hotspots.sum()
 for y in (2005, 2012, 2013, 2020, 2025):
     check(G, f"manual: anio {y} = {esperado[y]:,}", abs(por_anio[y] - esperado[y]) <= TOL,
@@ -258,8 +259,8 @@ if CSV_MAX_5_ANIOS:
 else:
     rows = list(csv.DictReader(io.StringIO(r.content.decode("utf-8-sig")))) if r.status_code == 200 else []
     s_all = math.fsum(float(x["eq_foco"]) for x in rows)
-    check(G, "CSV periodo completo: 58,779 focos y suma = 15,732 (MAESTRO 12)",
-          len(rows) == 58779 and abs(s_all - 15732) <= TOL, f"{r.status_code} {len(rows)} filas, {s_all:.2f}")
+    check(G, "CSV periodo completo: 59,211 focos y suma = 15,818 (MAESTRO 12)",
+          len(rows) == 59211 and abs(s_all - 15818) <= TOL, f"{r.status_code} {len(rows)} filas, {s_all:.2f}")
     hdr = r.headers.get("X-Total-Eq-Foco"), r.headers.get("X-Row-Count")
     check(G, "cabeceras X-Row-Count y X-Total-Eq-Foco = contenido",
           hdr[1] is not None and int(hdr[1]) == len(rows) and abs(float(hdr[0]) - s_all) <= 0.01, str(hdr))

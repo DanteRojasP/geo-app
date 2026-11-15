@@ -25,12 +25,13 @@ COLS_FOCOS = ["fecha_local", "fecha_utc", "hora_utc", "latitude", "longitude", "
               "cell_lon", "alt_m", "sensor", "satelite", "frp", "brillo_k", "confianza",
               "diurno_nocturno", "fuente_serie", "calidad", "en_serie", "eq_foco"]
 
-# Sumas de control de MAESTRO §6 (v1.2). Si cambian, los datos cambiaron: investigar.
+# Sumas de control de MAESTRO §6 (v1.3: NOAA-20 en los días sin S-NPP). Si cambian, los datos
+# cambiaron: investigar.
 CONTROL = {
-    "celda_dia": {"filas": 36260, "suma": 15732.03,
-                  "sha256": "6f33caec736af9718e559da1143b93cf0886093e0c0dfab9b5667baa42a257cc"},
-    "focos": {"filas": 58779, "suma": 15732.01,
-              "sha256": "c8d15200bf17da15807f48972c8a4dca76d274de1b872eff82de59444de7f36b"},
+    "celda_dia": {"filas": 36568, "suma": 15818.39,
+                  "sha256": "d686c8fda6259392730e416e40139b436311042c5081b9273cac747778e639b1"},
+    "focos": {"filas": 59211, "suma": 15818.36,
+              "sha256": "934c28d5f5fa8c4eedd926719292ac08ddaf3bb6a8cfad824bffd25f7f334d26"},
 }
 
 # Región armonizada y validada (MAESTRO §1.6 y §12): solo Cusco.
