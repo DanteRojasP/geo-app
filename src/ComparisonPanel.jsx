@@ -1,24 +1,27 @@
-import { useEffect, useMemo, useState } from 'react'
-import { ArrowLeftRight, ChartNoAxesCombined, Download, MapPin, ShieldCheck, X } from 'lucide-react'
+import { useMemo } from 'react'
+import { ChartNoAxesCombined, Download, MapPin, ShieldCheck, X } from 'lucide-react'
 import { locale, months, tr } from './i18n.js'
 
 const value = (cell, key) => Number(cell?.[key]) || 0
 const format = (number, digits = 0) => Number(number || 0).toLocaleString(locale(), { maximumFractionDigits: digits })
 
-function summarize(cells, year) {
-  const byMonth = Array.from({ length: 12 }, (_, index) => cells.find((cell) => cell.anio === year && cell.mes === index + 1))
-  const series = byMonth.map((cell) => value(cell, 'focos_armonizados'))
+function summarize(cells, period) {
+  const selected = cells.filter((cell) => {
+    const key = `${cell.anio}-${String(cell.mes).padStart(2, '0')}`
+    return key >= period.from && key <= period.to
+  })
+  const series = Array.from({ length: 12 }, (_, index) => selected.filter((cell) => cell.mes === index + 1).reduce((sum, cell) => sum + value(cell, 'focos_armonizados'), 0))
   const total = series.reduce((sum, current) => sum + current, 0)
   const peakIndex = series.indexOf(Math.max(...series))
   return {
-    year,
+    label: `${period.from} – ${period.to}`,
     series,
     total,
-    cellDays: byMonth.reduce((sum, cell) => sum + value(cell, 'celdas_dia'), 0),
-    activeMonths: series.filter((current) => current > 0).length,
+    cellDays: selected.reduce((sum, cell) => sum + value(cell, 'celdas_dia'), 0),
+    activeMonths: selected.filter((cell) => value(cell, 'focos_armonizados') > 0).length,
     peakIndex,
     peak: series[peakIndex] || 0,
-    quality: [...new Set(byMonth.map((cell) => cell?.calidad).filter(Boolean))],
+    quality: [...new Set(selected.map((cell) => cell?.calidad).filter(Boolean))],
   }
 }
 
@@ -62,25 +65,18 @@ function CumulativeLines({ first, second }) {
 
 function downloadComparison(first, second) {
   const labels = months()
-  const rows = [['month', String(first.year), String(second.year), 'difference'], ...labels.map((label, index) => [label, first.series[index], second.series[index], second.series[index] - first.series[index]])]
+  const rows = [['month', first.label, second.label, 'difference'], ...labels.map((label, index) => [label, first.series[index], second.series[index], second.series[index] - first.series[index]])]
   const blob = new Blob([rows.map((row) => row.join(',')).join('\n')], { type: 'text/csv;charset=utf-8' })
   const link = document.createElement('a')
-  link.href = URL.createObjectURL(blob); link.download = `nubel_comparison_${first.year}_${second.year}.csv`; link.click()
+  link.href = URL.createObjectURL(blob); link.download = `nubel_comparison_${first.label.slice(0, 7)}_${second.label.slice(0, 7)}.csv`; link.click()
   URL.revokeObjectURL(link.href)
 }
 
-export default function ComparisonPanel({ calendar, regionName, onClose }) {
-  const cells = useMemo(() => calendar?.celdas || [], [calendar])
-  const years = useMemo(() => [...new Set(cells.map((cell) => cell.anio))].sort((a, b) => a - b), [cells])
-  const [yearA, setYearA] = useState(years.includes(2020) ? 2020 : years.at(-2))
-  const [yearB, setYearB] = useState(years.at(-1))
-  useEffect(() => {
-    if (!years.length) return
-    setYearA((current) => years.includes(current) ? current : (years.includes(2020) ? 2020 : years.at(-2)))
-    setYearB((current) => years.includes(current) ? current : years.at(-1))
-  }, [years])
-  const first = useMemo(() => summarize(cells, yearA), [cells, yearA])
-  const second = useMemo(() => summarize(cells, yearB), [cells, yearB])
+export default function ComparisonPanel({ calendar, calendarA, calendarB, regionName, periodA, periodB, onClose }) {
+  const cellsA = useMemo(() => calendarA?.celdas || calendar?.celdas || [], [calendar, calendarA])
+  const cellsB = useMemo(() => calendarB?.celdas || calendar?.celdas || [], [calendar, calendarB])
+  const first = useMemo(() => summarize(cellsA, periodA), [cellsA, periodA])
+  const second = useMemo(() => summarize(cellsB, periodB), [cellsB, periodB])
   const difference = second.total - first.total
   const percent = first.total ? difference / first.total * 100 : null
   const changes = second.series.map((current, index) => ({ index, value: current - first.series[index] }))
@@ -88,17 +84,13 @@ export default function ComparisonPanel({ calendar, regionName, onClose }) {
   const changeText = percent === null ? tr('compare.notComparable') : Math.abs(percent) < 1
     ? tr('compare.stable')
     : tr(percent > 0 ? 'compare.increased' : 'compare.decreased', { pct: format(Math.abs(percent), 1) })
-  const conclusion = tr('compare.conclusion', { a: yearA, b: yearB, change: changeText, month: months()[largest.index], delta: `${largest.value >= 0 ? '+' : '−'}${format(Math.abs(largest.value), 1)}` })
+  const conclusion = tr('compare.conclusion', { a: first.label, b: second.label, change: changeText, month: months()[largest.index], delta: `${largest.value >= 0 ? '+' : '−'}${format(Math.abs(largest.value), 1)}` })
 
-  if (!years.length) return <aside className="fc-compare-panel"><div className="fc-compare-empty">{tr('summary.loading')}</div></aside>
+  if (!cellsA.length && !cellsB.length) return <aside className="fc-compare-panel"><div className="fc-compare-empty">{tr('summary.loading')}</div></aside>
   return <aside className="fc-compare-panel" aria-label={tr('compare.title')}>
     <header className="fc-compare-head">
       <div><p>{tr('compare.kicker')}</p><h2>{tr('compare.title')}</h2><span><MapPin size={12}/>{regionName} · {tr('compare.validated')}</span></div>
-      <div className="fc-compare-selectors">
-        <label><span>{tr('compare.periodA')}</span><select value={yearA} onChange={(event) => setYearA(Number(event.target.value))}>{years.map((year) => <option key={year}>{year}</option>)}</select></label>
-        <button onClick={() => { setYearA(yearB); setYearB(yearA) }} title={tr('compare.swap')}><ArrowLeftRight size={16}/></button>
-        <label><span>{tr('compare.periodB')}</span><select value={yearB} onChange={(event) => setYearB(Number(event.target.value))}>{years.map((year) => <option key={year}>{year}</option>)}</select></label>
-      </div>
+      <div className="fc-compare-selectors"><label><span>{tr('compare.periodA')}</span><b>{first.label}</b></label><label><span>{tr('compare.periodB')}</span><b>{second.label}</b></label></div>
       <button className="fc-compare-close" onClick={onClose} title={tr('btn.close')}><X size={18}/></button>
     </header>
     <div className="fc-compare-body">
@@ -107,14 +99,14 @@ export default function ComparisonPanel({ calendar, regionName, onClose }) {
         <ShieldCheck size={22}/>
       </section>
       <section className="fc-compare-metrics">
-        <article><span>{tr('metric.hotspots')}</span><div><b>{format(first.total, 1)}</b><i>{yearA}</i></div><div><b>{format(second.total, 1)}</b><i>{yearB}</i></div><strong className={difference >= 0 ? 'is-up' : 'is-down'}>{difference >= 0 ? '+' : '−'}{format(Math.abs(difference), 1)}</strong></article>
-        <article><span>{tr('metric.cellDays')}</span><div><b>{format(first.cellDays)}</b><i>{yearA}</i></div><div><b>{format(second.cellDays)}</b><i>{yearB}</i></div><strong>{second.cellDays - first.cellDays >= 0 ? '+' : '−'}{format(Math.abs(second.cellDays - first.cellDays))}</strong></article>
+        <article><span>{tr('metric.hotspots')}</span><div><b>{format(first.total, 1)}</b><i>A</i></div><div><b>{format(second.total, 1)}</b><i>B</i></div><strong className={difference >= 0 ? 'is-up' : 'is-down'}>{difference >= 0 ? '+' : '−'}{format(Math.abs(difference), 1)}</strong></article>
+        <article><span>{tr('metric.cellDays')}</span><div><b>{format(first.cellDays)}</b><i>A</i></div><div><b>{format(second.cellDays)}</b><i>B</i></div><strong>{second.cellDays - first.cellDays >= 0 ? '+' : '−'}{format(Math.abs(second.cellDays - first.cellDays))}</strong></article>
         <article><span>{tr('compare.peakMonth')}</span><div><b>{months()[first.peakIndex]}</b><i>{format(first.peak, 1)}</i></div><div><b>{months()[second.peakIndex]}</b><i>{format(second.peak, 1)}</i></div><strong>{tr('compare.monthlyPeak')}</strong></article>
-        <article><span>{tr('metric.monthsFire')}</span><div><b>{first.activeMonths}</b><i>{yearA}</i></div><div><b>{second.activeMonths}</b><i>{yearB}</i></div><strong>{tr('compare.ofTwelve')}</strong></article>
+        <article><span>{tr('metric.monthsFire')}</span><div><b>{first.activeMonths}</b><i>A</i></div><div><b>{second.activeMonths}</b><i>B</i></div><strong>{tr('compare.ofPeriod')}</strong></article>
       </section>
       <div className="fc-compare-grid-layout">
-        <section className="fc-compare-chart"><header><div><span>01</span><h3>{tr('compare.monthly')}</h3></div><p>{tr('compare.monthlyHelp')}</p></header><div className="fc-compare-legend"><i className="is-first"/>{yearA}<i className="is-second"/>{yearB}</div><MonthlyBars first={first} second={second}/></section>
-        <section className="fc-compare-chart"><header><div><span>02</span><h3>{tr('compare.cumulative')}</h3></div><p>{tr('compare.cumulativeHelp')}</p></header><div className="fc-compare-legend"><i className="is-first"/>{yearA}<i className="is-second"/>{yearB}</div><CumulativeLines first={first} second={second}/></section>
+        <section className="fc-compare-chart"><header><div><span>01</span><h3>{tr('compare.monthly')}</h3></div><p>{tr('compare.monthlyHelp')}</p></header><div className="fc-compare-legend"><i className="is-first"/>A<i className="is-second"/>B</div><MonthlyBars first={first} second={second}/></section>
+        <section className="fc-compare-chart"><header><div><span>02</span><h3>{tr('compare.cumulative')}</h3></div><p>{tr('compare.cumulativeHelp')}</p></header><div className="fc-compare-legend"><i className="is-first"/>A<i className="is-second"/>B</div><CumulativeLines first={first} second={second}/></section>
       </div>
       <section className="fc-compare-notes"><ChartNoAxesCombined size={18}/><div><b>{tr('compare.interpretation')}</b><p>{tr('compare.note')}</p><small>{tr('compare.quality')}: {first.quality.join(', ') || '—'} / {second.quality.join(', ') || '—'}</small></div></section>
     </div>

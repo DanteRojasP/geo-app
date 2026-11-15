@@ -12,7 +12,7 @@ import {
   ThermometerSun, Trash2, X,
 } from 'lucide-react'
 import SimplePanel from './SimplePanel.jsx'
-import ComparisonPanel from './ComparisonPanel.jsx'
+import ComparisonWorkspace from './ComparisonWorkspace.jsx'
 import { LANGS, getLang, locale, months, setLang, tr } from './i18n.js'
 import { CUSCO, downloadCsv, getCalendar, getDepartments, getFocos, getMonth } from './services/api.js'
 
@@ -712,7 +712,7 @@ function FireMapApp() {
         <div className="fw-selection-actions"><button onClick={toggleSelectionMode}><Scan size={15}/>{tr('sel.redraw')}</button><button onClick={() => selection?.bbox && runDownload(selection.bbox, tr('csv.area'))} disabled={!selection?.calendar}><Download size={15}/>CSV</button></div>
       </aside>}
       {simpleOpen && <SimplePanel key={lang} aoi={selection?.bbox || aoi} etiqueta={selection?.bbox ? 'area' : 'cusco'} onClose={() => setSimpleOpen(false)}/>}
-      {compareOpen && <ComparisonPanel key={lang} calendar={calendar} regionName={selectedRegion.name} onClose={() => setCompareOpen(false)}/>}
+      {compareOpen && <ComparisonWorkspace key={lang} calendar={calendar} region={region} regionName={selectedRegion.name} onClose={() => setCompareOpen(false)}/>}
       {calendarOpen && <CalendarPanel calendar={calendar} mode={calendarMode} setMode={setCalendarMode} selected={selected} onSelect={selectMonth} onClose={() => setCalendarOpen(false)}/>}
       <section className="fw-timeline fc-timeline">
         <button className="fw-play" onClick={() => { setCustomPeriod(null); setPlaying((v) => !v) }} title={playing ? tr('timeline.pause') : tr('timeline.play')}>{playing ? <Pause size={19}/> : <Play size={19}/>}</button>
