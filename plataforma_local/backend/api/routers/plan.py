@@ -281,7 +281,7 @@ def _nrt(request: Request) -> NrtStore:
     if getattr(app.state, "nrt", None) is None:
         store = _store(request)
         key = store.settings.env.firms_map_key
-        app.state.nrt = NrtStore(key.get_secret_value() if key else None, store.region_geom)
+        app.state.nrt = NrtStore(key.get_secret_value().strip() if key else None, store.region_geom)
     return app.state.nrt
 
 

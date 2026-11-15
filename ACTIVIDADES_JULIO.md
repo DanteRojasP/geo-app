@@ -326,7 +326,11 @@ Revisión **`firecal-00009`** (imagen `firecal-cusco:gabriel-dante-v1`).
       clave; ahora se redacta) ni en los errores. 7 pruebas nuevas con FIRMS simulado (110 en verde).
 - [x] Interfaz: botón **En vivo** en la barra lateral, panel con ventana de 24 h, 48 h o 5 días, color por
       antigüedad, detalle al hacer clic y renovación cada 5 min.
-- [ ] Desplegar con la MAP_KEY en Secret Manager (decidido por Julio) cuando esté la clave.
+- [x] Publicado en la revisión **`firecal-00010`** (imagen `firecal-cusco:live-v1`). La MAP_KEY está en Secret
+      Manager (`firms-map-key`) y solo la cuenta de servicio de Cloud Run puede leerla
+      (`roles/secretmanager.secretAccessor` sobre ese secreto). Comprobado en la URL: 11 detecciones en 24 h y 23 en
+      5 días en Cusco, las 4 fuentes responden, y la clave no aparece en las respuestas ni en los logs.
+- Para cambiar la clave: `gcloud secrets versions add firms-map-key --data-file=<archivo>` y volver a desplegar.
 
 ## Pendientes que me afectan
 
