@@ -6,9 +6,11 @@ const value = (cell, key) => Number(cell?.[key]) || 0
 const format = (number, digits = 0) => Number(number || 0).toLocaleString(locale(), { maximumFractionDigits: digits })
 
 function summarize(cells, period) {
+  const fromMonth = period.from.slice(0, 7)
+  const toMonth = period.to.slice(0, 7)
   const selected = cells.filter((cell) => {
     const key = `${cell.anio}-${String(cell.mes).padStart(2, '0')}`
-    return key >= period.from && key <= period.to
+    return key >= fromMonth && key <= toMonth
   })
   const series = Array.from({ length: 12 }, (_, index) => selected.filter((cell) => cell.mes === index + 1).reduce((sum, cell) => sum + value(cell, 'focos_armonizados'), 0))
   const total = series.reduce((sum, current) => sum + current, 0)

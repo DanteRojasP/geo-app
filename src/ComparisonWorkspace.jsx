@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import * as maplibregl from 'maplibre-gl'
-import { ArrowLeftRight, BarChart3, Layers3, Map as MapIcon, MapPin, Mountain, Scan, ThermometerSun, X } from 'lucide-react'
+import { ArrowLeftRight, BarChart3, CalendarDays, Layers3, Map as MapIcon, MapPin, Mountain, Scan, ThermometerSun, X } from 'lucide-react'
 import ComparisonPanel from './ComparisonPanel.jsx'
 import { CUSCO, getCalendar, getFocos } from './services/api.js'
 import { tr } from './i18n.js'
@@ -25,6 +25,29 @@ function bboxParam(bounds) {
   return { bbox: [bounds.west, bounds.south, bounds.east, bounds.north].map((number) => number.toFixed(4)).join(',') }
 }
 
+function filterByDate(body, period) {
+  const features = (body?.features || []).filter((feature) => {
+    const date = feature.properties?.fecha_local
+    return date && date >= period.from && date <= period.to
+  })
+  return { ...body, features, n_focos: features.length }
+}
+
+function calendarWithExactHotspots(calendar, features) {
+  const totals = features.reduce((all, feature) => {
+    const key = feature.properties?.fecha_local?.slice(0, 7)
+    if (key) all[key] = (all[key] || 0) + (Number(feature.properties?.eq_foco) || 0)
+    return all
+  }, {})
+  return {
+    ...calendar,
+    celdas: (calendar?.celdas || []).map((cell) => ({
+      ...cell,
+      focos_armonizados: Number((totals[`${cell.anio}-${String(cell.mes).padStart(2, '0')}`] || 0).toFixed(2)),
+    })),
+  }
+}
+
 function MapPane({ side, region, period, onPeriod, onStats }) {
   const containerRef = useRef(null)
   const mapRef = useRef(null)
@@ -46,13 +69,15 @@ function MapPane({ side, region, period, onPeriod, onStats }) {
     if (period.from > period.to) { onStats({ loading: false, error: tr('filter.invalid'), total: 0, detections: 0, selection }); return undefined }
     onStats((previous) => ({ ...previous, loading: true, error: '' }))
     const aoi = selection ? bboxParam(selection) : { departamento: CUSCO }
-    Promise.all([getFocos(aoi, period.from, period.to), getCalendar(aoi, period.from, period.to)])
+    const apiFrom = period.from.slice(0, 7)
+    const apiTo = period.to.slice(0, 7)
+    Promise.all([getFocos(aoi, apiFrom, apiTo), getCalendar(aoi, apiFrom, apiTo)])
       .then(([focosResponse, calendarResponse]) => {
         if (!active) return
-        const body = focosResponse.body
+        const body = filterByDate(focosResponse.body, period)
         setFocos(body)
         const total = (body.features || []).reduce((sum, feature) => sum + (Number(feature.properties?.eq_foco) || 0), 0)
-        onStats({ loading: false, error: '', total, detections: body.n_focos ?? body.features?.length ?? 0, selection, calendar: calendarResponse.body })
+        onStats({ loading: false, error: '', total, detections: body.n_focos ?? body.features?.length ?? 0, selection, calendar: calendarWithExactHotspots(calendarResponse.body, body.features || []) })
       })
       .catch((error) => active && onStats({ loading: false, error: error.message, total: 0, detections: 0, selection, calendar: null }))
     return () => { active = false }
@@ -129,7 +154,7 @@ function MapPane({ side, region, period, onPeriod, onStats }) {
   return <section className={`fc-split-map is-${side.toLowerCase()}`}>
     <div ref={containerRef} className="fc-split-canvas"/>
     <div className="fc-split-label"><b>{side}</b><span>{tr(`compare.map${side}`)}</span></div>
-    <div className="fc-split-dates"><label><span>{tr('filter.from')}</span><input type="month" min="2000-11" max="2025-12" value={period.from} onChange={(event) => onPeriod({ ...period, from: event.target.value })}/></label><label><span>{tr('filter.to')}</span><input type="month" min="2000-11" max="2025-12" value={period.to} onChange={(event) => onPeriod({ ...period, to: event.target.value })}/></label></div>
+    <div className="fc-split-dates"><div className="fc-split-date-head"><CalendarDays/><span>{tr('compare.dateRange')}</span></div><label><span>{tr('filter.from')}</span><input type="date" min="2000-11-01" max="2025-12-31" value={period.from} onChange={(event) => onPeriod({ ...period, from: event.target.value })}/></label><label><span>{tr('filter.to')}</span><input type="date" min="2000-11-01" max="2025-12-31" value={period.to} onChange={(event) => onPeriod({ ...period, to: event.target.value })}/></label></div>
     <nav className="fc-split-tools" aria-label={tr('rail.label')}>
       <button className={baseMap === 'relief' ? 'is-active' : ''} title={baseMap === 'relief' ? tr('basemap.standard') : tr('basemap.relief')} onClick={() => setBaseMap((current) => current === 'relief' ? 'standard' : 'relief')}>{baseMap === 'relief' ? <Mountain/> : <MapIcon/>}</button>
       <button className={layer === 'surface' ? 'is-active' : ''} title={layer === 'surface' ? tr('layers.points') : tr('layers.density')} onClick={() => setLayer((current) => current === 'surface' ? 'points' : 'surface')}>{layer === 'surface' ? <ThermometerSun/> : <MapPin/>}</button>
@@ -141,8 +166,8 @@ function MapPane({ side, region, period, onPeriod, onStats }) {
 }
 
 export default function ComparisonWorkspace({ calendar, region, regionName, onClose }) {
-  const [periodA, setPeriodA] = useState({ from: '2020-01', to: '2020-12' })
-  const [periodB, setPeriodB] = useState({ from: '2025-01', to: '2025-12' })
+  const [periodA, setPeriodA] = useState({ from: '2020-01-01', to: '2020-12-31' })
+  const [periodB, setPeriodB] = useState({ from: '2025-01-01', to: '2025-12-31' })
   const [statsA, setStatsA] = useState({ loading: true, total: 0 })
   const [statsB, setStatsB] = useState({ loading: true, total: 0 })
   const [compared, setCompared] = useState(false)
