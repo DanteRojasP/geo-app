@@ -43,6 +43,13 @@ prueba se hizo en local, con 1 núcleo, no en producción. Puntos a vigilar:
   1 vCPU y subir `--concurrency` a 60-80 (sin costo extra) y `--cpu-boost` (arranque más rápido, costo mínimo).
   No se aplicó: cambia la configuración del servicio.
 
+### Revisión 20: datos v1.3 y diseño de Dante
+
+- **Datos v1.3 (Antonio, PR #12):** NOAA-20 rellena los días sin VIIRS S-NPP. Cambian los totales de MAESTRO §12:
+  todo el periodo 15.818, 2022 = 850, 2024 = 640, 2025 = 387 (2005 = 1.355 y 2020 = 1.206 no cambian).
+- **Interfaz:** se adopta el diseño de Dante (comparación de periodos, filtro por fechas exactas, lanzadores a la
+  izquierda, menú a la derecha) con el modo En vivo reincorporado.
+
 ## 2. Recomendaciones (no implementadas)
 
 1. **Alerta de presupuesto** de US$10-20 en Facturación → Presupuestos. Es lo más importante antes de compartir la URL.

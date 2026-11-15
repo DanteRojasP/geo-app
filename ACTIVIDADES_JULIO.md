@@ -358,6 +358,20 @@ Revisión **`firecal-00019`**.
 - [x] Prueba automática en la URL (9 pasos en 1440, 1100 y celular): siempre un solo botón activo y ninguna
       superposición.
 
+## Datos v1.3 de Antonio y diseño de Dante (dom 15 nov 2026)
+
+Revisión **`firecal-00020`** (imagen `firecal-cusco:v13-dante`).
+- [x] **PR #12 de Antonio (datos v1.3) revisado e integrado.** Los días sin S-NPP se rellenan con NOAA-20 y su
+      factor `k20` (calibrado con 2018-21 y validado con 2022-25: 0,98-1,05), o con MODIS si tampoco hay NOAA-20.
+      Las sumas de control coinciden con los archivos, `verificar_datos.py` da TODO OK y pasan 112 pruebas. Un
+      detalle menor: la fuente mensual que muestra la app dice "VIIRS*k" aunque parte del mes sea NOAA-20.
+- [x] **Diseño de Dante adoptado** (decisión de Julio), con el modo En vivo reincorporado. Su versión partía de la
+      revisión 9 y no lo tenía. Trae lanzadores a la izquierda (Datos, En simple, Comparar), menú a la derecha,
+      filtro por fechas exactas y la comparación de periodos en dos mapas.
+- [x] Soporte para la copia de Dante en Vercel: `vercel.json` reenvía `/api` a Cloud Run.
+- [ ] Reemplaza decisiones de interfaz anteriores (Info cerrado al inicio, barra izquierda de 5 botones, Layers a la
+      derecha). Revisar con el equipo si alguna se mantiene.
+
 ## Pendientes que me afectan
 
 - [x] Datos reales de FIRMS (Cusco, de Antonio).

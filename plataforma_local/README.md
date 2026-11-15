@@ -22,11 +22,19 @@ Une el trabajo del equipo con `PLAN.md` (en `main`) como eje:
   a MODIS. En la API el campo se llama **`focos_armonizados`** (decisión del equipo). Es la suma de `eq_hotspots`
   (celda-día) o de `eq_foco` (focos): nunca se cuentan filas ni se suma `n_modis + n_viirs`.
 - **Sin FRP** (no está armonizado entre sensores), **sin área quemada** y **sin "eventos"**: los datos son focos.
-- **Interfaz (base de Dante):** mapa MapLibre a pantalla completa con Cusco resaltado y el resto atenuado.
-  - **Capas:** densidad (mapa de calor pesado por `eq_foco`), focos (puntos por sensor), límite y área.
-  - **Panel de resumen:** focos armonizados, mediana, anomalía y focos MODIS/VIIRS por separado.
-  - **Selección de área** con vista satelital (Esri) y su propio total y descarga.
-  - **Barra inferior:** año y sus 12 meses; el botón ▶ recorre los meses.
+- **Interfaz (diseño de Dante, `dante` 3a132de, desde el 15-nov):** mapa MapLibre a pantalla completa con Cusco
+  resaltado, relieve por defecto.
+  - **Izquierda:** tres accesos: **Datos** (panel con filtro por fechas exactas, métricas y descarga CSV), **En
+    simple** (frases y gráficos) y **Comparar** (dos mapas lado a lado, cada uno con su rango de fechas, resumen,
+    gráficos mensual y acumulado y CSV).
+  - **Derecha:** idioma EN/ES y un menú que despliega Hotspots, Calendario, Área y Capas.
+  - **Arriba:** selector **Serie histórica | En vivo**. En vivo muestra solo las detecciones casi en tiempo real
+    de NASA FIRMS (`/api/tiempo-real`, sin armonizar) y oculta todo lo histórico.
+  - **Abajo:** línea de tiempo (año y 12 meses; ▶ recorre los meses) y, a la derecha, fondo y leyenda.
+  - **Selección de área** con vista satelital (Esri), su propio total y descarga.
+- **Datos v1.3 (Antonio, PR #12):** los días sin VIIRS S-NPP se rellenan con VIIRS NOAA-20 (`VIIRS-N20*k`,
+  `k20` 0,324 / 0,235) o, si tampoco hay, con MODIS (`MODIS-hueco`). Julio de 2022 pasa de 54 a 85 y julio de 2024,
+  de 46 a 74.
 - **Calendario mes × año** (eje del PLAN):
   - Rampa YlOrRd con cortes en los cuantiles 50/75/90/99 de los meses con fuego.
   - El cero va en gris; "sin dato", rayado.
