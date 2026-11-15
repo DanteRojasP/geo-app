@@ -156,7 +156,7 @@ def test_qa_erik_poco_fuego_no_inventa_temporada(api):
         return
     body = res.json()
     if max(m["mediana"] for m in body["meses"]) < 0.5:
-        assert "muy poco fuego" in body["en_simple"]
+        assert "muy pocos focos de calor" in body["en_simple"]
         assert "con unos 0" not in body["en_simple"]
 
 

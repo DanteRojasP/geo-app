@@ -4,10 +4,10 @@ Cinco cálculos de sumas y percentiles, pensados para un gestor que no es especi
 resultado trae ``en_simple`` (una frase que se entiende sin gráfico) y ``como_leerlo`` (cómo
 interpretar los números), además de los datos para dibujar.
 
-- ``estacionalidad``: en qué meses se concentra el fuego.
-- ``ranking``: qué años tuvieron más y menos fuego.
+- ``estacionalidad``: en qué meses se concentran los focos de calor.
+- ``ranking``: qué años tuvieron más y menos focos de calor.
 - ``acumulado``: cómo fue avanzando un año frente a lo normal.
-- ``altitud``: a qué altitud ocurre el fuego.
+- ``altitud``: a qué altitud ocurren los focos de calor.
 - ``recurrencia``: qué lugares arden año tras año.
 
 Límites (MAESTRO.md): se describen focos armonizados, no incendios ni área quemada; nada de
@@ -32,7 +32,7 @@ from firecal.plan.query import (
     unidad,
 )
 
-# Parte del total anual que define la "temporada de fuego".
+# Parte del total anual que define la "temporada de focos de calor".
 PARTE_TEMPORADA = 0.80
 # La recurrencia se mide solo con VIIRS (desde 2013): MODIS localiza peor y marca menos celdas.
 RECURRENCIA_DESDE = 2013
@@ -159,27 +159,29 @@ def estacionalidad(store: PlanStore, aoi: AOI) -> dict:
     parte = _pct(parte_temporada)
     if float(tabla["mediana"].max()) < 0.5:
         # QA de Erik (5): con todas las medianas en 0 el "mes pico" salía enero. En un año
-        # típico no hay fuego: se dice eso y el mes con más fuego acumulado.
+        # típico no hay focos de calor: se dice eso y el mes con más focos acumulados.
         pico = int(tabla["parte"].idxmax())
         en_simple = t(
-            es=f"En esta área hay muy poco fuego para hablar de una temporada: en un año típico "
+            es=f"En esta área hay muy pocos focos de calor para hablar de una temporada: en un año "
+               f"típico "
                f"ningún mes tiene focos. Cuando hubo, fue sobre todo en {month_name(pico)} "
                f"({_pct(tabla.loc[pico, 'parte'])} del total).",
-            en=f"This area has too little fire to describe a season: in a typical year no month "
+            en=f"This area has too few hotspots to describe a season: in a typical year no month "
                f"has hotspots. When there were some, it was mostly in {month_name(pico)} "
                f"({_pct(tabla.loc[pico, 'parte'])} of the total).")
     else:
         esos = (t(es="esos meses reúnen", en="those months hold") if len(temporada) > 1
                 else t(es="ese mes reúne", en="that month holds"))
         en_simple = t(
-            es=f"La temporada de fuego {cuando}: {esos} el {parte} del fuego del año. "
+            es=f"La temporada de focos de calor {cuando}: {esos} el {parte} de los focos de calor "
+               f"del año. "
                f"El mes más activo es {month_name(pico)}, con unos "
                f"{_focos(tabla.loc[pico, 'mediana'])} en un año típico.",
-            en=f"The fire season {cuando}: {esos} {parte} of the year's fire. "
+            en=f"The hotspot season {cuando}: {esos} {parte} of the year's hotspots. "
                f"The most active month is {month_name(pico)}, with about "
                f"{_focos(tabla.loc[pico, 'mediana'])} in a typical year.")
     return _envoltura(
-        aoi, t(es="¿Cuándo hay más fuego?", en="When is there more fire?"), en_simple,
+        aoi, t(es="¿Cuándo hay más focos de calor?", en="When are there more hotspots?"), en_simple,
         t(es="Cada barra es un mes. La altura es lo habitual (mediana) y el rango marca entre qué "
              "valores cae la mitad de los años.",
           en="Each bar is a month. The height is the usual value (median) and the range shows "
@@ -217,10 +219,10 @@ def ranking(store: PlanStore, aoi: AOI) -> dict:
     mayor, menor = firmes[0], firmes[-1]
     veces = _veces(mayor["total"], tipico)
     en_simple = t(
-        es=f"El año con más fuego fue {mayor['anio']}, con {_focos(mayor['total'])}: "
+        es=f"El año con más focos de calor fue {mayor['anio']}, con {_focos(mayor['total'])}: "
            f"{veces} un año típico ({_n(tipico)}). El más tranquilo fue "
            f"{menor['anio']}, con {_n(menor['total'])}.",
-        en=f"The year with the most fire was {mayor['anio']}, with {_focos(mayor['total'])}: "
+        en=f"The year with the most hotspots was {mayor['anio']}, with {_focos(mayor['total'])}: "
            f"{veces} a typical year ({_n(tipico)}). The quietest was "
            f"{menor['anio']}, with {_n(menor['total'])}.")
     notes = []
@@ -234,12 +236,14 @@ def ranking(store: PlanStore, aoi: AOI) -> dict:
     if any(f["anio"] == 2025 for f in filas):
         notes.append(note_2025())
     return _envoltura(
-        aoi, t(es="¿Qué años tuvieron más fuego?", en="Which years had the most fire?"), en_simple,
+        aoi, t(es="¿Qué años tuvieron más focos de calor?",
+               en="Which years had the most hotspots?"),
+        en_simple,
         t(es="Cada barra es un año. La línea punteada marca un año típico: las barras que la "
-             "superan tuvieron más fuego de lo habitual. Las barras claras incluyen focos "
-             "extrapolados.",
+             "superan tuvieron más focos de calor de lo habitual. Las barras claras incluyen "
+             "focos extrapolados.",
           en="Each bar is a year. The dashed line marks a typical year: bars above it had more "
-             "fire than usual. Light bars include extrapolated hotspots."),
+             "hotspots than usual. Light bars include extrapolated hotspots."),
         {"anio_tipico": round(tipico, 1), "anios_referencia": [ref[0], ref[-1]], "anios": filas},
         notes)
 
@@ -346,10 +350,10 @@ def altitud(store: PlanStore, aoi: AOI) -> dict:
     mayor = max(bandas, key=lambda b: b["parte"])
     alto = sum(b["parte"] for b in bandas if (b["desde_m"] or 0) >= 2500)
     en_simple = t(
-        es=f"La franja con más fuego es la de {mayor['banda']}: reúne el "
+        es=f"La franja con más focos de calor es la de {mayor['banda']}: reúne el "
            f"{_pct(mayor['parte'])} de los focos armonizados. En total, el {_pct(alto)} ocurre "
            f"sobre los 2,500 m y el {_pct(1 - alto)} por debajo.",
-        en=f"The band with the most fire is {mayor['banda']}: it holds "
+        en=f"The band with the most hotspots is {mayor['banda']}: it holds "
            f"{_pct(mayor['parte'])} of the harmonized hotspots. Overall, {_pct(alto)} occurs "
            f"above 2,500 m and {_pct(1 - alto)} below.")
     notes = []
@@ -359,10 +363,12 @@ def altitud(store: PlanStore, aoi: AOI) -> dict:
                        en=f"{_n(por['n'][-1])} harmonized hotspots have no altitude and are not "
                           "in any band."))
     return _envoltura(
-        aoi, t(es="¿A qué altitud ocurre el fuego?", en="At what altitude does fire occur?"),
+        aoi, t(es="¿A qué altitud ocurren los focos de calor?",
+               en="At what altitude do hotspots occur?"),
         en_simple,
-        t(es="Cada franja muestra qué parte de todo el fuego del periodo ocurrió a esa altitud.",
-          en="Each band shows what share of all the fire in the period occurred at that "
+        t(es="Cada franja muestra qué parte de los focos de calor del periodo ocurrió a esa "
+             "altitud.",
+          en="Each band shows what share of all the hotspots in the period occurred at that "
              "altitude."),
         {"bandas": bandas}, notes)
 
@@ -388,21 +394,25 @@ def recurrencia(store: PlanStore, aoi: AOI, limite: int = 5000) -> dict:
     frecuentes = int((df["anios"] >= umbral).sum())
     tope = int(df["anios"].max())
     df = df.sort_values(["anios", "n"], ascending=False)
-    ardieron = t(es="ardió", en="burned") if frecuentes == 1 else t(es="ardieron", en="burned")
+    ardieron = (t(es="tuvo focos", en="had hotspots") if frecuentes == 1
+                else t(es="tuvieron focos", en="had hotspots"))
     en_simple = t(
-        es=f"Desde {RECURRENCIA_DESDE} se detectó fuego en {_lugares(total)} de ~1 km. "
-           f"En el {_pct(una_vez / total)} ardió un solo año; {_lugares(frecuentes)} {ardieron} "
-           f"en {umbral} o más de los {posibles} años, y el más repetido lo hizo en "
+        es=f"Desde {RECURRENCIA_DESDE} se detectaron focos de calor en {_lugares(total)} de "
+           f"~1 km. En el {_pct(una_vez / total)} hubo focos un solo año; "
+           f"{_lugares(frecuentes)} {ardieron} "
+           f"en {umbral} o más de los {posibles} años, y el más repetido los tuvo en "
            f"{_anios(tope)}.",
-        en=f"Since {RECURRENCIA_DESDE}, fire was detected in {_lugares(total)} of ~1 km. "
-           f"{_pct(una_vez / total)} burned in a single year; {_lugares(frecuentes)} {ardieron} "
-           f"in {umbral} or more of the {posibles} years, and the most repeated one did so in "
+        en=f"Since {RECURRENCIA_DESDE}, hotspots were detected in {_lugares(total)} of ~1 km. "
+           f"{_pct(una_vez / total)} had hotspots in a single year; {_lugares(frecuentes)} "
+           f"{ardieron} "
+           f"in {umbral} or more of the {posibles} years, and the most repeated one had them in "
            f"{_anios(tope)}.")
     return _envoltura(
-        aoi, t(es="¿Dónde vuelve a arder?", en="Where does it burn again?"), en_simple,
+        aoi, t(es="¿Dónde se repiten los focos de calor?", en="Where do hotspots recur?"),
+        en_simple,
         t(es="Cada punto es una celda de ~1 km. El número es en cuántos años distintos tuvo "
-             "fuego: cuanto más alto, más se repite en ese lugar.",
-          en="Each point is a ~1 km cell. The number is how many different years it had fire: "
+             "focos de calor: cuanto más alto, más se repiten en ese lugar.",
+          en="Each point is a ~1 km cell. The number is how many different years it had hotspots: "
              "the higher, the more often it repeats in that place."),
         {"desde": RECURRENCIA_DESDE, "anios_posibles": posibles, "lugares": total,
          "umbral_recurrente": umbral, "lugares_recurrentes": frecuentes,
@@ -432,8 +442,8 @@ def resumen(store: PlanStore, aoi: AOI, graficos: bool = False) -> dict:
     if partes[2]["anio"] == 2025:               # la frase de la curva habla de 2025
         notes.append(note_2025())
     return {"aoi": aoi.info(),
-            "titulo": t(es=f"El fuego en {aoi.label}, en simple",
-                        en=f"Fire in {aoi.label}, in plain words"),
+            "titulo": t(es=f"Los focos de calor en {aoi.label}, en simple",
+                        en=f"Hotspots in {aoi.label}, in plain words"),
             "unidad": unidad(),
             "frases": [{"pregunta": p["titulo"], "respuesta": p["en_simple"]} for p in partes],
             **({"graficos": dict(zip(["estacionalidad", "ranking", "acumulado", "altitud"],

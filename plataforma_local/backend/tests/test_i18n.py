@@ -68,12 +68,12 @@ def test_analytics_in_english(api_en):
     assert "By August 24 it had already reached" in b["en_simple"]
     assert b["veredicto"] == "muy por encima de lo normal"          # código del contrato
     est = api_en.get("/api/analitica/estacionalidad", params={"departamento": "PE-CUS"}).json()
-    assert est["en_simple"].startswith("The fire season runs from July to October")
+    assert est["en_simple"].startswith("The hotspot season runs from July to October")
     assert est["meses"][7]["nombre"] == "August"
     alt = api_en.get("/api/analitica/altitud", params={"departamento": "PE-CUS"}).json()
     assert alt["bandas"][0]["banda"] == "below 1,500 m"
     res = api_en.get("/api/resumen", params={"departamento": "PE-CUS"}).json()
-    assert res["titulo"] == "Fire in Cusco, in plain words" and len(res["frases"]) == 5
+    assert res["titulo"] == "Hotspots in Cusco, in plain words" and len(res["frases"]) == 5
 
 
 def test_errors_and_limits_in_english(plan_home):

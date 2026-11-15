@@ -19,7 +19,7 @@ from pydantic import BaseModel
 
 from api.cache import ResponseCacheMiddleware, ResponseCacheStore
 from api.limits import HeavyGate, RateLimiter
-from api.routers import plan
+from api.routers import ambitos, plan
 from firecal import __version__
 from firecal.i18n import reset_lang, set_lang, t
 from firecal.plan.query import PlanNotReady, PlanStore
@@ -106,7 +106,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         description=(
             "Calendario armonizado de focos de calor MODIS + VIIRS para **Cusco** (2000-11 a "
             "2025-12), con datos reales de NASA FIRMS. Unidad: **focos armonizados** (celdas de "
-            "~1 km con fuego por día, en escala MODIS). Detalles en `GET /api/metadatos`."
+            "~1 km con focos de calor por día, en escala MODIS). Detalles en `GET /api/metadatos`."
         ),
     )
     app.state.settings = settings
@@ -177,6 +177,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return {**app.state.limiter.stats(), **app.state.gate.stats(), **app.state.cache.stats()}
 
     app.include_router(plan.router)
+    app.include_router(ambitos.router)
 
     frontend = Path(os.environ.get("FIRECAL_FRONTEND_DIR", DEFAULT_FRONTEND))
     if os.environ.get("FIRECAL_FRONTEND_DIR") != "" and (frontend / "index.html").is_file():
