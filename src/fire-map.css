@@ -215,3 +215,9 @@
 
 @media(max-width:950px){.fw-display-dock{right:12px;bottom:126px;width:196px}}
 @media(max-width:650px){.fw-display-dock{right:8px;bottom:118px;width:176px}.fw-display-modes{height:31px}.fw-display-modes button{font-size:8px}.fw-heat-legend{padding:6px 8px 5px}}
+
+/* Align the display dock with the desktop timeline */
+.fw-display-dock{bottom:12px}
+@media(max-width:1200px){.fw-display-dock{bottom:104px}}
+@media(max-width:950px){.fw-display-dock{bottom:126px}}
+@media(max-width:650px){.fw-display-dock{bottom:118px}}
