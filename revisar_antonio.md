@@ -2,6 +2,11 @@
 
 *Domingo 15-nov-2026 · Julio · detalle en `REVISION_FACTIBILIDAD_REGIONES.md` §2.1*
 
+> **También para ti: `PROTOCOLO_PREVENTIVO.md`**, el protocolo de evaluación preventiva con múltiples fuentes:
+> diseño, hipótesis, validación, fuentes con su estado verificado y lo que falta (credenciales, APIs y créditos).
+> Las partes que tocan tus datos son el §6 (calidad y continuidad de la serie) y el §14 (decisión D8). Los scripts
+> y resultados están en `exploratorio/preventivo/`.
+
 ## Qué pasa
 
 VIIRS S-NPP no tiene **ninguna** detección en todo Perú en estos tramos de la temporada de fuego:
