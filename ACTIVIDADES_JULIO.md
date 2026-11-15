@@ -222,8 +222,8 @@ Reglas de pantalla:
 | --- | --- | --- |
 | **422** | Consulta mal formada: AOI vacío, dos AOI a la vez, fecha mal escrita, rango invertido, área > 50 000 km², > 50 000 focos para el mapa, CSV > 200 000 filas | Muestra `detail` (texto en español) |
 | **404** | **Sin datos:** otra región, área fuera de Cusco o fechas fuera de la serie | Muestra `detail`; nunca ceros |
-| **429** | La misma IP superó **120 solicitudes/min** (ráfaga de 40) o **10 pesadas/min** (ráfaga de 5) | Esperar `Retry-After` segundos |
-| **503** | Ya hay **2 consultas pesadas** en curso en el servidor y no se liberó turno en 2 s; o los datos no están cargados | Reintentar tras `Retry-After` |
+| **429** | La misma IP superó **600 consultas nuevas/min** (ráfaga de 120) o **60 pesadas/min** (ráfaga de 20). Las respuestas repetidas de Cusco entero salen de la caché (`X-Cache: HIT`) y no gastan cupo | Esperar `Retry-After` segundos |
+| **503** | Ya hay **4 consultas pesadas** en curso en el servidor y no se liberó turno en 8 s (o hay más de 16 esperando); o los datos no están cargados | Reintentar tras `Retry-After` |
 
 - **Pesadas:** `/api/hotspots.csv` y cualquier llamada con `bbox` o `lat/lon`. Las de `departamento=PE-CUS` son
   livianas y se guardan en caché (~7 ms al repetirlas).

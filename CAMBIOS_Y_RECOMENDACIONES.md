@@ -52,7 +52,8 @@ Corregidos los 14 errores de `QA_ERIK.md` (detalle al final de ese archivo) y la
 - **Sin secretos** en el repositorio ni en la imagen. El contenedor corre sin privilegios (uid 10001). Solo acepta
   `GET` y `OPTIONS`. El SQL usa parámetros.
 - `npm audit` y `pip-audit` sin vulnerabilidades conocidas.
-- Abuso: 120 solicitudes/min por IP y 10 consultas pesadas/min. Hay 2 pesadas a la vez como máximo: si hay más,
+- Abuso: 600 consultas nuevas/min por IP y 60 consultas pesadas/min (las respuestas repetidas salen de la caché y no
+  gastan cupo: una sala entera comparte IP). Hay 4 pesadas a la vez como máximo: si hay más,
   responde 503 en vez de saturarse. El CSV tiene un tope de 200 000 filas. La IP se toma del último salto de Cloud Run,
   así que no se puede falsificar.
 - **Riesgo restante:** una red de bots con muchas IP puede generar tráfico de salida (egress), que es lo único sin

@@ -88,17 +88,27 @@ api:
   # Protocolo de solicitudes (api/limits.py). Por cliente (IP): cubeta de fichas general y otra para
   # las pesadas (CSV, AOI dibujados). En todo el proceso: como mucho max_concurrent_heavy pesadas a la
   # vez; las demás esperan su turno hasta queue_timeout_s y luego reciben 503 con Retry-After.
+  # Los cupos son por IP y una sala entera (wifi, oficina) sale por la misma IP pública: están
+  # dimensionados para ~60 personas detrás de una IP (prueba de carga del 14-nov, AUDITORIA.md §10).
+  # Las respuestas servidas desde la caché (response_cache) no gastan cupo.
   rate_limit:
     enabled: true
-    requests_per_minute: 120
-    burst: 40
-    heavy_per_minute: 10
-    heavy_burst: 5
-    max_concurrent_heavy: 2
-    queue_timeout_s: 2.0
+    requests_per_minute: 600           # antes 120: con 60 personas en la misma IP, 86 % de 429
+    burst: 120                         # antes 40
+    heavy_per_minute: 60               # antes 10
+    heavy_burst: 20                    # antes 5
+    max_concurrent_heavy: 4            # antes 2: con los datos en memoria un área cuesta ~0,1 s
+    queue_timeout_s: 8.0               # antes 2: esperar el turno es mejor que un 503
+    max_queue: 16                      # pesadas en espera; con más, 503 inmediato (no agota los hilos)
     trust_proxy_headers: false         # true SOLO detrás de Azure/Cloud Run (FIRECAL_TRUST_PROXY=1)
     proxy_hops: 1                      # IP real = la proxy_hops-ésima desde la derecha (Cloud Run: 2, con FIRECAL_PROXY_HOPS)
     max_clients: 10000
+  # Caché de respuestas completas de Cusco entero (api/cache.py). Los datos son históricos: la misma
+  # consulta devuelve siempre lo mismo, así que se calcula una vez y se repite a los demás visitantes.
+  response_cache:
+    enabled: true
+    max_items: 3000                    # hay ~1.300 respuestas distintas por idioma
+    max_mb: 64                         # memoria máxima; se guardan ya comprimidas (~5 KB cada una)
 
 synthetic:
   seed: 42

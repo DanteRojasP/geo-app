@@ -175,32 +175,29 @@ def hotspots_csv(request: Request, fecha_inicio: Annotated[str, Query(descriptio
     La cabecera ``X-Total-Eq-Foco`` trae Σ eq_foco de las filas: es el total que muestra la web."""
     store = _store(request)
     aoi = _call(store.resolve_aoi, departamento, bbox, lat, lon, radio_km)
-    # El turno se toma aquí y se libera cuando termina de enviarse el CSV (o si el cliente corta).
-    gate = request.app.state.gate
-    gate.acquire()
-    try:
+    # El turno cubre solo la consulta y el armado del CSV (en memoria: como mucho max_csv_rows
+    # filas, ~7 MB para toda la serie). Se libera ANTES de enviar: una descarga lenta (celular,
+    # mala señal) ya no retiene uno de los turnos de consultas pesadas mientras baja.
+    chunk = store.settings.params.api.csv_chunk_rows
+    with request.app.state.gate.turn():
         sql, params, n_rows, total = _call(store.hotspots_query, aoi, fecha_inicio, fecha_fin)
-        chunk = store.settings.params.api.csv_chunk_rows
-        cur = store.cursor()
-        cur.execute(sql, params)
-    except BaseException:
-        gate.release()
-        raise
-
-    def rows() -> Iterator[bytes]:
         buf = io.StringIO()
         w = csv.writer(buf, lineterminator="\n")
         w.writerow(COLS_FOCOS)
-        yield ("﻿" + buf.getvalue()).encode("utf-8")
+        parts: list[bytes] = [("﻿" + buf.getvalue()).encode("utf-8")]
+        cur = store.cursor()
         try:
+            cur.execute(sql, params)
             while batch := cur.fetchmany(chunk):
                 buf.seek(0)
                 buf.truncate()
                 w.writerows(["" if v is None else v for v in row] for row in batch)
-                yield buf.getvalue().encode("utf-8")
+                parts.append(buf.getvalue().encode("utf-8"))
         finally:
             cur.close()
-            gate.release()
+
+    def rows() -> Iterator[bytes]:
+        yield from parts
 
     tag = "cusco" if aoi.whole_region else aoi.kind
     name = f"focos_{tag}_{fecha_inicio}_{fecha_fin}.csv"

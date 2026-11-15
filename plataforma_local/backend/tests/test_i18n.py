@@ -80,6 +80,7 @@ def test_errors_and_limits_in_english(plan_home):
     s = _settings(plan_home.settings, default_lang="en")
     raw = s.params.model_dump()
     raw["api"]["rate_limit"].update({"enabled": True, "burst": 1, "requests_per_minute": 1})
+    raw["api"]["response_cache"]["enabled"] = False   # sin caché: la consulta repetida gasta cupo
     s = Settings(env=s.env, params=ScientificParams.model_validate(raw), paths=s.paths)
     api = TestClient(create_app(s))
     assert api.get("/api/departamentos").status_code == 200

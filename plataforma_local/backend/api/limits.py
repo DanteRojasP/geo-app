@@ -91,26 +91,48 @@ class TokenBuckets:
 class HeavyGate:
     """Semáforo de consultas pesadas con espera limitada y contadores para /health."""
 
-    def __init__(self, max_concurrent: int, timeout_s: float) -> None:
+    def __init__(self, max_concurrent: int, timeout_s: float, max_queue: int | None = None) -> None:
         self.max_concurrent = max_concurrent
         self.timeout_s = timeout_s
+        # Cada pesada en espera ocupa un hilo del pool (~40). Con la fila llena se rechaza de
+        # inmediato para que las consultas livianas siempre tengan hilos libres.
+        self.max_queue = max_queue
         self._sem = threading.BoundedSemaphore(max_concurrent)
         self._lock = threading.Lock()
         self.active = 0
+        self.waiting = 0
         self.rejected = 0
 
+    def _busy(self) -> HTTPException:
+        with self._lock:
+            self.rejected += 1
+        return HTTPException(
+            status_code=503,
+            detail=t(es="Servidor ocupado con otras descargas o consultas pesadas. "
+                        "Intenta de nuevo en unos segundos.",
+                     en="Server busy with other downloads or heavy queries. Try again in "
+                        "a few seconds."),
+            headers={"Retry-After": "5"})
+
     def acquire(self) -> None:
-        """Pide un turno; 503 si no hay uno libre dentro de ``timeout_s``."""
-        if not self._sem.acquire(timeout=self.timeout_s):
+        """Pide un turno; 503 si la fila está llena o no hay uno libre dentro de ``timeout_s``."""
+        if self._sem.acquire(blocking=False):            # turno libre: sin esperar
             with self._lock:
-                self.rejected += 1
-            raise HTTPException(
-                status_code=503,
-                detail=t(es="Servidor ocupado con otras descargas o consultas pesadas. "
-                            "Intenta de nuevo en unos segundos.",
-                         en="Server busy with other downloads or heavy queries. Try again in "
-                            "a few seconds."),
-                headers={"Retry-After": "5"})
+                self.active += 1
+            return
+        with self._lock:
+            full = self.max_queue is not None and self.waiting >= self.max_queue
+            if not full:
+                self.waiting += 1
+        if full:
+            raise self._busy()
+        try:
+            got = self._sem.acquire(timeout=self.timeout_s)
+        finally:
+            with self._lock:
+                self.waiting -= 1
+        if not got:
+            raise self._busy()
         with self._lock:
             self.active += 1
 
@@ -129,8 +151,8 @@ class HeavyGate:
 
     def stats(self) -> dict:
         with self._lock:
-            return {"pesadas_activas": self.active, "max_pesadas": self.max_concurrent,
-                    "rechazadas_503": self.rejected}
+            return {"pesadas_activas": self.active, "pesadas_en_espera": self.waiting,
+                    "max_pesadas": self.max_concurrent, "rechazadas_503": self.rejected}
 
 
 # ---------------------------------------------------------------------------------- middleware

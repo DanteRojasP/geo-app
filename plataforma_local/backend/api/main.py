@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import time
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
@@ -14,12 +17,15 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from api.cache import ResponseCacheMiddleware, ResponseCacheStore
 from api.limits import HeavyGate, RateLimiter
 from api.routers import plan
 from firecal import __version__
 from firecal.i18n import reset_lang, set_lang, t
-from firecal.plan.query import PlanStore
+from firecal.plan.query import PlanNotReady, PlanStore
 from firecal.settings import PROJECT_ROOT, Settings, get_settings
+
+log = logging.getLogger(__name__)
 
 
 class HealthResponse(BaseModel):
@@ -78,7 +84,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     """Crea la app. Recibe ``settings`` explícitos en tests; si no, usa los globales."""
     settings = settings or get_settings()
 
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        """Carga los datos al arrancar (no con el primer visitante): ~1,6 s y ~20 MB."""
+        def preload() -> None:
+            store: PlanStore = app.state.plan
+            try:
+                store.monthly(store.resolve_aoi("PE-CUS"))   # tablas en memoria + serie de Cusco
+            except PlanNotReady:
+                log.warning("Datos de Cusco sin cargar: corre 'firecal plan-events'.")
+        await run_in_threadpool(preload)
+        yield
+
     app = FastAPI(
+        lifespan=lifespan,
         default_response_class=UTF8JSONResponse,
         title="FireCal Cusco API",
         version=__version__,
@@ -92,7 +111,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.plan = PlanStore(settings)
     rl = settings.params.api.rate_limit
     app.state.limiter = RateLimiter(rl)
-    app.state.gate = HeavyGate(rl.max_concurrent_heavy, rl.queue_timeout_s)
+    app.state.gate = HeavyGate(rl.max_concurrent_heavy, rl.queue_timeout_s, rl.max_queue)
+    rc = settings.params.api.response_cache
+    app.state.cache = ResponseCacheStore(rc.enabled, rc.max_items, int(rc.max_mb * 1024 * 1024),
+                                         version=app.state.plan.data_version)
 
     @app.middleware("http")
     async def _timing_and_limits(request: Request, call_next):
@@ -117,6 +139,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # Compresión: focos.geojson de un año pasa de ~1,6 MB a ~0,2 MB (auditoría de Gabriel).
     app.add_middleware(GZipMiddleware, minimum_size=1024)
 
+    # Caché de respuestas de Cusco entero (api/cache.py). Va por fuera de la compresión y de los
+    # límites (guarda la respuesta ya comprimida y una repetida no gasta cupo) y por dentro de
+    # CORS (esas cabeceras dependen de quién pregunta).
+    app.add_middleware(ResponseCacheMiddleware, store=app.state.cache)
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[*settings.params.api.cors_origins,
@@ -124,7 +151,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_methods=["GET", "OPTIONS"],
         allow_headers=["*"],
         expose_headers=["Content-Disposition", "X-Data-Mode", "X-Row-Count",
-                        "X-Process-Time-ms", "X-RateLimit-Remaining", "Retry-After"],
+                        "X-Process-Time-ms", "X-RateLimit-Remaining", "Retry-After", "X-Cache"],
     )
 
     @app.exception_handler(RequestValidationError)
@@ -144,8 +171,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/health/limits", tags=["meta"])
     def health_limits() -> dict:
-        """Estado del protocolo de solicitudes: clientes, rechazos 429/503 y pesadas en curso."""
-        return {**app.state.limiter.stats(), **app.state.gate.stats()}
+        """Estado del protocolo de solicitudes: clientes, rechazos 429/503, pesadas y caché."""
+        return {**app.state.limiter.stats(), **app.state.gate.stats(), **app.state.cache.stats()}
 
     app.include_router(plan.router)
 
