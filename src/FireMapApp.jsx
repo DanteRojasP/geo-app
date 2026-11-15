@@ -7,7 +7,7 @@ import * as maplibregl from 'maplibre-gl'
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import {
   CalendarDays, ChevronLeft, ChevronRight, Database, Download, Flame, Gauge,
-  Layers3, Map as MapIcon, MapPin, Mountain, Pause, Play, Satellite, Scan, ShieldAlert,
+  Layers3, Map as MapIcon, MapPin, MessageCircleQuestion, Mountain, Pause, Play, Satellite, Scan, ShieldAlert,
   SlidersHorizontal,
   ThermometerSun, Trash2, X,
 } from 'lucide-react'
@@ -603,7 +603,8 @@ function FireMapApp() {
     <div className="fw-app">
       <div ref={mapContainerRef} className="fw-map" aria-label={tr('map.aria')} />
       <div className="fw-nubel-brand" aria-label="Nubel Team · FireCal Cusco"><img src="./nubel-team-logo.png" alt="Nubel Team"/></div>
-      <button className={`fc-data-launcher ${detailsOpen ? 'is-active' : ''}`} aria-label={tr('data.open')} aria-expanded={detailsOpen} onClick={() => setDetailsOpen((v) => !v)}><Database size={19}/><span>{tr('data.label')}</span></button>
+      <button className={`fc-data-launcher ${detailsOpen ? 'is-active' : ''}`} aria-label={tr('data.open')} aria-expanded={detailsOpen} onClick={() => { setSimpleOpen(false); setDetailsOpen((v) => !v) }}><Database size={19}/><span>{tr('data.label')}</span></button>
+      <button className={`fc-data-launcher fc-simple-launcher ${simpleOpen ? 'is-active' : ''}`} aria-label={tr('rail.simpleTitle')} aria-expanded={simpleOpen} onClick={() => { setDetailsOpen(false); setSimpleOpen((v) => !v) }}><MessageCircleQuestion size={19}/><span>{tr('rail.simple')}</span></button>
       <div className="fc-map-menu">
         <div className="fc-lang" role="group" aria-label={tr('lang.title')}>{LANGS.map((l) => <button key={l} className={l === lang ? 'is-active' : ''} aria-pressed={l === lang} onClick={() => changeLang(l)}>{l.toUpperCase()}</button>)}</div>
         <button className={`fc-menu-toggle ${toolsOpen ? 'is-open' : ''}`} aria-label={tr('rail.label')} aria-expanded={toolsOpen} onClick={() => setToolsOpen((v) => !v)}><Layers3 size={21}/></button>

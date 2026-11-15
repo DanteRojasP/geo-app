@@ -151,6 +151,7 @@ button:focus-visible,select:focus-visible{outline:2px solid #197bb5;outline-offs
 /* Left data access and regional model information. */
 .fc-data-launcher{position:absolute;z-index:730;top:78px;left:14px;width:58px;height:54px;padding:0;border:1px solid rgba(177,204,220,.28);border-radius:5px;background:rgba(12,36,56,.94);color:#a9c0ce;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;box-shadow:0 7px 20px rgba(5,27,42,.24);backdrop-filter:blur(12px);cursor:pointer}
 .fc-data-launcher span{font:600 7px 'IBM Plex Sans',sans-serif;letter-spacing:.04em}.fc-data-launcher:hover,.fc-data-launcher.is-active{background:#17698f;color:#fff}.fc-data-launcher.is-active{box-shadow:inset 3px 0 #56b9e8,0 7px 20px rgba(5,27,42,.24)}
+.fc-simple-launcher{top:140px}
 .fc-region-picker{padding:12px 18px;border-bottom:1px solid #dbe6ed;background:#f7fafc;color:#18384f}
 .fc-region-picker label{margin-bottom:7px;display:flex;align-items:center;gap:7px;color:#557184;font-size:8px;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 .fc-region-picker select{width:100%;height:36px;padding:0 34px 0 10px;border:1px solid #bdceda;border-radius:4px;background:#fff;color:#102c42;font:600 11px 'IBM Plex Sans',sans-serif;cursor:pointer}
@@ -158,7 +159,7 @@ button:focus-visible,select:focus-visible{outline:2px solid #197bb5;outline-offs
 .fc-model-card{margin:0 14px 12px;border:1px solid #d5e2e9;border-radius:5px;background:#f7fafc;color:#18384f;overflow:hidden}
 .fc-model-card header{padding:9px 10px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #dce7ed}.fc-model-card header>svg{color:#197bb5}.fc-model-card header div{display:flex;flex-direction:column}.fc-model-card header b{font-size:9px}.fc-model-card header span{margin-top:2px;color:#718896;font-size:7px}
 .fc-model-card dl{margin:0;display:grid;grid-template-columns:1fr 1fr}.fc-model-card dl div{padding:8px 10px;border-right:1px solid #e1e9ee;border-bottom:1px solid #e1e9ee}.fc-model-card dl div:nth-child(2n){border-right:0}.fc-model-card dl div:nth-last-child(-n+2){border-bottom:0}.fc-model-card dt{color:#718896;font-size:7px;text-transform:uppercase;letter-spacing:.06em}.fc-model-card dd{margin:3px 0 0;color:#18384f;font:600 9px 'IBM Plex Mono',monospace}.fc-model-card dd.is-ok{color:#14805e}
-@media(max-width:650px){.fc-data-launcher{top:62px;left:9px;width:48px;height:46px}.fw-summary{left:64px;right:9px;width:auto}}
+@media(max-width:650px){.fc-data-launcher{top:62px;left:9px;width:48px;height:46px}.fc-simple-launcher{top:114px}.fw-summary{left:64px;right:9px;width:auto}}
 
 /* Selected-area analysis as a centered workspace, clear of both tool rails. */
 .fw-selection-card{z-index:780;left:50%;right:auto;top:calc(50% - 34px);bottom:auto;width:min(520px,calc(100vw - 190px));max-height:calc(100dvh - 190px);transform:translate(-50%,-50%);border-radius:8px;box-shadow:0 22px 65px rgba(4,25,39,.32)}
