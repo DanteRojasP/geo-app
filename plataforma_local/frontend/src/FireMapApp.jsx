@@ -6,12 +6,13 @@ import { createElement, useCallback, useEffect, useMemo, useRef, useState } from
 import * as maplibregl from 'maplibre-gl'
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import {
-  CalendarDays, ChevronLeft, ChevronRight, CircleHelp, Download, Flame, Gauge, Info,
+  ArrowLeftRight, CalendarDays, ChevronLeft, ChevronRight, CircleHelp, Download, Flame, Gauge, Info, SlidersHorizontal,
   Hexagon, Layers3, Map as MapIcon, MapPin, MessageCircleQuestion, Mountain, Pause, Play, Radio, Satellite, Scan, ShieldAlert,
 
   ThermometerSun, Trash2, X,
 } from 'lucide-react'
 import SimplePanel from './SimplePanel.jsx'
+import ComparisonWorkspace from './ComparisonWorkspace.jsx'
 import { LANGS, getLang, locale, months, setLang, tr } from './i18n.js'
 import { CUSCO, downloadCsv, getCalendar, getFocos, getMetadata, getMonth, getRegion, getTiempoReal } from './services/api.js'
 
@@ -31,6 +32,14 @@ const SATELLITE_STYLE = {
   layers: [{ id: 'satellite-imagery', type: 'raster', source: 'imagery', paint: { 'raster-saturation': 0.08, 'raster-contrast': 0.08 } }],
 }
 const EMPTY = { type: 'FeatureCollection', features: [] }
+// Filtro por fechas exactas (Dante, 3a132de): la API trabaja por meses; los focos se recortan al día.
+const monthStart = (y, m) => `${y}-${String(m).padStart(2, '0')}-01`
+const monthEnd = (y, m) => `${y}-${String(m).padStart(2, '0')}-${String(new Date(y, m, 0).getDate()).padStart(2, '0')}`
+const filterFocosByDate = (body, from, to) => {
+  if (!from || !to) return body
+  const features = (body?.features || []).filter((f) => { const d = f.properties?.fecha_local; return d && d >= from && d <= to })
+  return { ...body, features, n_focos: features.length }
+}
 const FIRST_YEAR = 2000
 const LAST_YEAR = 2025
 const YEARS = Array.from({ length: LAST_YEAR - FIRST_YEAR + 1 }, (_, i) => FIRST_YEAR + i)
@@ -296,6 +305,9 @@ function FireMapApp() {
   const [live, setLive] = useState(null)              // { body } | { error } | null
   const liveRef = useRef(EMPTY)
   const yearsRef = useRef(null)
+  const compareOpen = panel === 'compare'
+  const [customPeriod, setCustomPeriod] = useState(null)        // { from, to } en AAAA-MM-DD
+  const [filterDraft, setFilterDraft] = useState({ from: monthStart(LAST_YEAR, 1), to: monthEnd(LAST_YEAR, 12) })
   const simpleOpen = panel === 'simple'
   const detailsOpen = panel === 'info'
   const setDetailsOpen = panelSetter('info')
@@ -307,12 +319,21 @@ function FireMapApp() {
   const changeLang = (l) => { setLang(l); setLangState(l) }
   const MESES = months()
 
-  const periodo = useMemo(() => (selected.month
-    ? { inicio: ym(selected.year, selected.month), fin: ym(selected.year, selected.month), label: `${months()[selected.month - 1]} ${selected.year}` }
-    : { inicio: ym(selected.year, selected.year === FIRST_YEAR ? 11 : 1), fin: ym(selected.year, 12), label: tr('period.year', { y: selected.year }) }), [selected, lang]) // eslint-disable-line react-hooks/exhaustive-deps
+  const periodo = useMemo(() => {
+    if (customPeriod) return { inicio: customPeriod.from.slice(0, 7), fin: customPeriod.to.slice(0, 7), label: `${customPeriod.from} – ${customPeriod.to}` }
+    return selected.month
+      ? { inicio: ym(selected.year, selected.month), fin: ym(selected.year, selected.month), label: `${months()[selected.month - 1]} ${selected.year}` }
+      : { inicio: ym(selected.year, selected.year === FIRST_YEAR ? 11 : 1), fin: ym(selected.year, 12), label: tr('period.year', { y: selected.year }) }
+  }, [selected, lang, customPeriod]) // eslint-disable-line react-hooks/exhaustive-deps
   const aoi = { departamento: CUSCO }
   const yearCells = useMemo(() => (calendar?.celdas || []).filter((c) => c.anio === selected.year), [calendar, selected.year])
   const yearTotal = useMemo(() => yearCells.reduce((s, c) => s + (c.focos_armonizados || 0), 0), [yearCells])
+  // Celdas del calendario del periodo filtrado (por mes) para las métricas del panel Info.
+  const periodCells = useMemo(() => {
+    if (!customPeriod) return yearCells
+    const a = customPeriod.from.slice(0, 7); const b = customPeriod.to.slice(0, 7)
+    return (calendar?.celdas || []).filter((c) => { const k = ym(c.anio, c.mes); return k >= a && k <= b })
+  }, [calendar, customPeriod, yearCells])
   const yearMax = useMemo(() => Math.max(1, ...yearCells.map((c) => c.focos_armonizados || 0)), [yearCells])
   playableRef.current = new Set(yearCells.filter((c) => !c.sin_dato).map((c) => c.mes))
   selectionModeRef.current = selectionMode
@@ -338,16 +359,16 @@ function FireMapApp() {
     setMonth(null)                 // vaciar el detalle: no mostrar números de otro mes mientras carga
     setError('')
     const tasks = [getFocos({ departamento: CUSCO }, periodo.inicio, periodo.fin)]
-    if (selected.month) tasks.push(getMonth({ departamento: CUSCO }, periodo.inicio))
+    if (!customPeriod && selected.month) tasks.push(getMonth({ departamento: CUSCO }, periodo.inicio))
     Promise.all(tasks)
       .then(([f, mo]) => {
         if (!active) return
-        setFocos(f.body); setLatency(f.ms); setMonth(mo ? mo.body : null); setError('')
+        setFocos(customPeriod ? filterFocosByDate(f.body, customPeriod.from, customPeriod.to) : f.body); setLatency(f.ms); setMonth(mo ? mo.body : null); setError('')
       })
       .catch((e) => active && setError(e.message))
       .finally(() => active && setLoading(false))
     return () => { active = false }
-  }, [periodo, selected.month])
+  }, [periodo, selected.month, customPeriod])
 
   // Área dibujada: calendario del área en el periodo y sus focos.
   useEffect(() => {
@@ -359,10 +380,10 @@ function FireMapApp() {
     let active = true
     setSelection({ loading: true, bbox })
     Promise.all([getCalendar(bbox, periodo.inicio, periodo.fin), getFocos(bbox, periodo.inicio, periodo.fin)])
-      .then(([c, f]) => active && setSelection({ bbox, calendar: c.body, focos: f.body }))
+      .then(([c, f]) => active && setSelection({ bbox, calendar: c.body, focos: customPeriod ? filterFocosByDate(f.body, customPeriod.from, customPeriod.to) : f.body }))
       .catch((e) => active && setSelection({ bbox, error: e.message }))
     return () => { active = false }
-  }, [selectionBounds, periodo, playing])
+  }, [selectionBounds, periodo, playing, customPeriod])
 
   // Tiempo real: pide al abrir y cada 5 min (el servidor renueva desde FIRMS cada 15 min).
   useEffect(() => {
@@ -629,8 +650,20 @@ function FireMapApp() {
     map.setPaintProperty('study-area-border', 'line-width', showBoundary ? 3 : 1.8)
   }, [showBoundary])
 
-  const selectMonth = (year, m) => { setPlaying(false); setSelected({ year, month: m }) }
-  const shiftYear = (delta) => setSelected((s) => ({ year: Math.min(LAST_YEAR, Math.max(FIRST_YEAR, s.year + delta)), month: null }))
+  const selectMonth = (year, m) => { setPlaying(false); setCustomPeriod(null); setSelected({ year, month: m }) }
+  const shiftYear = (delta) => { setCustomPeriod(null); setSelected((s) => ({ year: Math.min(LAST_YEAR, Math.max(FIRST_YEAR, s.year + delta)), month: null })) }
+  const applyFilters = (event) => {
+    event.preventDefault()
+    if (filterDraft.from > filterDraft.to) { setError(tr('filter.invalid')); return }
+    setPlaying(false); setError('')
+    setSelected({ year: Number(filterDraft.to.slice(0, 4)), month: null })
+    setCustomPeriod({ from: filterDraft.from, to: filterDraft.to })
+  }
+  const clearFilters = () => {
+    setPlaying(false); setError(''); setCustomPeriod(null)
+    setFilterDraft({ from: monthStart(LAST_YEAR, 1), to: monthEnd(LAST_YEAR, 12) })
+    setSelected({ year: LAST_YEAR, month: null })
+  }
   const toggleSelectionMode = () => {
     setPlaying(false)
     setSelectionMode((active) => { if (!active) setSelectionBounds(null); return !active })
@@ -660,7 +693,10 @@ function FireMapApp() {
     return Math.abs(selectionBounds.east - selectionBounds.west) * 111.32 * Math.cos(mid) * Math.abs(selectionBounds.north - selectionBounds.south) * 110.57
   }, [selectionBounds])
 
-  const summaryValue = selected.month ? month?.focos_armonizados : yearTotal
+  const summaryValue = customPeriod
+    ? (focos.features || []).reduce((s, f) => s + (Number(f.properties?.eq_foco) || 0), 0)
+    : selected.month ? month?.focos_armonizados : yearTotal
+  const byMonth = !customPeriod && selected.month
   const unidad = metadata?.unidad
   const notes = [...new Set([...(selected.month ? month?.notes || [] : []), ...(calendar?.notes || [])])]
 
@@ -683,6 +719,7 @@ function FireMapApp() {
         <button className={railActive === 'calendar' ? 'is-active' : ''} aria-pressed={railActive === 'calendar'} title={tr('rail.calendar')} onClick={() => { goHistoric(); setSelectionMode(false); setPanel((p) => (p === 'calendar' && !liveOn ? null : 'calendar')) }}><CalendarDays size={20}/><span>{tr('rail.calendar')}</span></button>
         <button className={railActive === 'area' ? 'is-active select' : ''} aria-pressed={railActive === 'area'} title={tr('rail.areaTitle')} onClick={() => { goHistoric(); if (!selectionMode) { setPanel(null); focusCusco({ bottom: 40 }) } toggleSelectionMode() }}><Scan size={20}/><span>{tr('rail.area')}</span></button>
         <button className={railActive === 'simple' ? 'is-active' : ''} aria-pressed={railActive === 'simple'} title={tr('rail.simpleTitle')} onClick={() => { goHistoric(); setSelectionMode(false); setPanel('simple') }}><MessageCircleQuestion size={20}/><span>{tr('rail.simple')}</span></button>
+        <button className={railActive === 'compare' ? 'is-active' : ''} aria-pressed={railActive === 'compare'} title={tr('rail.compareTitle')} onClick={() => { goHistoric(); setSelectionMode(false); setPlaying(false); setPanel('compare') }}><ArrowLeftRight size={20}/><span>{tr('rail.compare')}</span></button>
         <button className={railActive === 'info' ? 'is-active' : ''} aria-pressed={railActive === 'info'} title={tr('rail.infoTitle')} onClick={() => { goHistoric(); setSelectionMode(false); setPanel((p) => (p === 'info' && !liveOn ? null : 'info')) }}><Info size={20}/><span>{tr('rail.info')}</span></button>
       </nav>
       {liveOn && <aside className="fc-live-panel" aria-label={tr('rail.liveTitle')}>
@@ -706,16 +743,27 @@ function FireMapApp() {
         })()}
       </aside>}
       {detailsOpen && !liveOn && <aside className="fw-summary">
-        <div className="fw-summary-head"><div><p>{tr('summary.kicker')}</p><h1>{unidad?.nombre || tr('unit.name')}</h1><span>{periodo.label}{month?.calidad ? ` · ${calidadLabel(month.calidad)}` : ''}</span></div><button onClick={() => setDetailsOpen(false)} title={tr('btn.close')} aria-label={tr('btn.close')}><X size={17}/></button></div>
-        <div className="fw-summary-status">{selected.month ? <CategoryBadge categoria={month?.categoria}/> : <span className="fw-risk fw-risk--bajo"><i/>{tr('summary.yearTotal')}</span>}<span>{loading ? tr('summary.loading') : tr('summary.onMap', { n: fmt(focos.n_focos || 0) })}</span></div>
+        <div className="fw-summary-head"><div><p>{tr('summary.kicker')}</p><h1>{unidad?.nombre || tr('unit.name')}</h1><span>{periodo.label}{byMonth && month?.calidad ? ` · ${calidadLabel(month.calidad)}` : ''}</span></div><button onClick={() => setDetailsOpen(false)} title={tr('btn.close')} aria-label={tr('btn.close')}><X size={17}/></button></div>
+        <form className="fc-filter-panel" onSubmit={applyFilters}>
+          <p>{tr('filter.hint')}</p>
+          <label htmlFor="fc-region"><span>{tr('filter.department')}</span><select id="fc-region" value={CUSCO} disabled><option value={CUSCO}>{tr('filter.departmentFixed')}</option></select></label>
+          <div className="fc-filter-period"><strong><CalendarDays/>{tr('compare.dateRange')}</strong><div>
+            <label htmlFor="fc-from"><span>{tr('filter.from')}</span><input id="fc-from" type="date" min="2000-11-01" max="2025-12-31" value={filterDraft.from} onChange={(e) => setFilterDraft((f) => ({ ...f, from: e.target.value }))}/></label>
+            <label htmlFor="fc-to"><span>{tr('filter.to')}</span><input id="fc-to" type="date" min="2000-11-01" max="2025-12-31" value={filterDraft.to} onChange={(e) => setFilterDraft((f) => ({ ...f, to: e.target.value }))}/></label>
+          </div></div>
+          <button className="fc-filter-apply" type="submit"><SlidersHorizontal size={14}/>{tr('filter.apply')}</button>
+          <button className="fc-filter-clear" type="button" onClick={clearFilters}>{tr('filter.clear')}</button>
+          <small><i/>{tr('filter.validatedOnly')}</small>
+        </form>
+        <div className="fw-summary-status">{byMonth ? <CategoryBadge categoria={month?.categoria}/> : <span className="fw-risk fw-risk--bajo"><i/>{customPeriod ? tr('filter.active') : tr('summary.yearTotal')}</span>}<span>{loading ? tr('summary.loading') : tr('summary.onMap', { n: fmt(focos.n_focos || 0) })}</span></div>
         {error && <div className="fw-error"><ShieldAlert size={16}/>{error}</div>}
         <div className="fw-metrics">
           <Metric icon={Flame} label={tr('metric.hotspots')} value={fmtFocos(summaryValue)} tone="red"/>
-          <Metric icon={Gauge} label={selected.month ? tr('metric.monthMedian') : tr('metric.monthsFire')} value={selected.month ? fmt(month?.mediana_hist, 1) : yearCells.filter((c) => c.focos_armonizados > 0).length} tone="orange"/>
-          <Metric icon={CalendarDays} label={selected.month ? tr('metric.anomaly') : tr('metric.cellDays')} value={selected.month ? (month?.anomalia ?? '–') : fmt(yearCells.reduce((s, c) => s + (c.celdas_dia || 0), 0))} tone="green"/>
-          <Metric icon={Satellite} label={tr('metric.modisViirs')} value={selected.month ? `${fmt(month?.focos_modis)} / ${fmt(month?.focos_viirs)}` : `${fmt(yearCells.reduce((s, c) => s + (c.focos_modis || 0), 0))} / ${fmt(yearCells.reduce((s, c) => s + (c.focos_viirs || 0), 0))}`} tone="blue"/>
+          <Metric icon={Gauge} label={byMonth ? tr('metric.monthMedian') : tr('metric.monthsFire')} value={byMonth ? fmt(month?.mediana_hist, 1) : periodCells.filter((c) => c.focos_armonizados > 0).length} tone="orange"/>
+          <Metric icon={CalendarDays} label={byMonth ? tr('metric.anomaly') : tr('metric.cellDays')} value={byMonth ? (month?.anomalia ?? '–') : fmt(periodCells.reduce((s, c) => s + (c.celdas_dia || 0), 0))} tone="green"/>
+          <Metric icon={Satellite} label={tr('metric.modisViirs')} value={byMonth ? `${fmt(month?.focos_modis)} / ${fmt(month?.focos_viirs)}` : `${fmt(periodCells.reduce((s, c) => s + (c.focos_modis || 0), 0))} / ${fmt(periodCells.reduce((s, c) => s + (c.focos_viirs || 0), 0))}`} tone="blue"/>
         </div>
-        {selected.month && month?.incertidumbre > 0 && <p className="fc-margin">{tr('summary.margin', { a: fmt(month.rango[0], 1), b: fmt(month.rango[1], 1) })}</p>}
+        {byMonth && month?.incertidumbre > 0 && <p className="fc-margin">{tr('summary.margin', { a: fmt(month.rango[0], 1), b: fmt(month.rango[1], 1) })}</p>}
         <div className="fw-sensor-row"><span><i className="modis"/>MODIS · 1 km</span><span><i className="viirs"/>VIIRS · 375 m</span></div>
         <div className="fw-summary-actions"><button onClick={() => setCalendarOpen(true)}><CalendarDays size={16}/>{tr('rail.calendar')}</button><button onClick={() => runDownload(aoi, tr('csv.cusco'))}><Download size={16}/>CSV</button></div>
         {notice && <p className="fc-notice">{notice}</p>}
@@ -758,10 +806,11 @@ function FireMapApp() {
         </div>}
         <div className="fw-selection-actions"><button onClick={toggleSelectionMode}><Scan size={15}/>{tr('sel.redraw')}</button><button onClick={() => selection?.bbox && runDownload(selection.bbox, tr('csv.area'))} disabled={!selection?.calendar}><Download size={15}/>CSV</button></div>
       </aside>}
+      {compareOpen && !liveOn && <ComparisonWorkspace key={lang} calendar={calendar} region={region} regionName="Cusco" onClose={() => setPanel(null)}/>}
       {simpleOpen && !liveOn && <SimplePanel key={lang} aoi={selection?.bbox || aoi} etiqueta={selection?.bbox ? 'area' : 'cusco'}/>}
       {calendarOpen && !liveOn && <CalendarPanel calendar={calendar} mode={calendarMode} setMode={setCalendarMode} selected={selected} onSelect={selectMonth} onClose={() => setCalendarOpen(false)}/>}
       {!liveOn && !selectionMode && <section className="fw-timeline fc-timeline">
-        <button className="fw-play" onClick={() => setPlaying((v) => !v)} title={playing ? tr('timeline.pause') : tr('timeline.play')}>{playing ? <Pause size={19}/> : <Play size={19}/>}</button>
+        <button className="fw-play" onClick={() => { setCustomPeriod(null); setPlaying((v) => !v) }} title={playing ? tr('timeline.pause') : tr('timeline.play')}>{playing ? <Pause size={19}/> : <Play size={19}/>}</button>
         <div className="fw-timeline-panel" style={{ '--progress': `${selected.month ? ((selected.month - 1) / 11) * 100 : 100}%` }}>
           <div className={`fw-time-callout ${selected.month === 1 ? 'is-start' : !selected.month || selected.month === 12 ? 'is-end' : ''}`}><b>{periodo.label}</b><span>{tr('timeline.yearSum', { n: fmtFocos(selected.month ? (month?.focos_armonizados ?? 0) : yearTotal) })}</span></div>
           <div className="fw-days">
@@ -772,11 +821,11 @@ function FireMapApp() {
             })}
           </div>
           <div className="fw-timeline-options">
-            <button className={selected.month === null ? 'is-active' : ''} title={tr('timeline.allYear')} aria-label={tr('timeline.allYear')} onClick={() => { setSelected((s) => ({ year: s.year, month: null })); setPlaying(false) }}><Layers3 size={13}/><span>{tr('timeline.allYear')}</span></button>
+            <button className={selected.month === null && !customPeriod ? 'is-active' : ''} title={tr('timeline.allYear')} aria-label={tr('timeline.allYear')} onClick={() => { setCustomPeriod(null); setSelected((s) => ({ year: s.year, month: null })); setPlaying(false) }}><Layers3 size={13}/><span>{tr('timeline.allYear')}</span></button>
             <div className="fw-year-scale" aria-label={tr('timeline.years')}>
               <button className="fc-year" onClick={() => shiftYear(-1)} title={tr('timeline.prevYear')} disabled={selected.year <= FIRST_YEAR}><ChevronLeft size={13}/></button>
               <div className="fc-years" ref={yearsRef}>
-                {YEARS.map((y) => <button key={y} aria-label={String(y)} title={String(y)} className={selected.year === y ? 'is-active' : ''} onClick={() => { setPlaying(false); setSelected({ year: y, month: null }) }}>{String(y).slice(2)}</button>)}
+                {YEARS.map((y) => <button key={y} aria-label={String(y)} title={String(y)} className={selected.year === y && !customPeriod ? 'is-active' : ''} onClick={() => { setPlaying(false); setCustomPeriod(null); setSelected({ year: y, month: null }) }}>{String(y).slice(2)}</button>)}
               </div>
               <button className="fc-year" onClick={() => shiftYear(1)} title={tr('timeline.nextYear')} disabled={selected.year >= LAST_YEAR}><ChevronRight size={13}/></button>
             </div>
