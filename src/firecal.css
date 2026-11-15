@@ -163,8 +163,9 @@ button:focus-visible,select:focus-visible{outline:2px solid #197bb5;outline-offs
 .fc-filter-panel select,.fc-filter-panel input{width:100%;height:35px;padding:0 9px;border:1px solid #b9cbd6;border-radius:4px;background:#fff;color:#15364d;font:600 10px 'IBM Plex Sans',sans-serif;outline:none}
 .fc-filter-panel select:focus,.fc-filter-panel input:focus{border-color:#2388bf;box-shadow:0 0 0 2px rgba(35,136,191,.12)}
 .fc-filter-period{margin-top:13px;padding-top:12px;border-top:1px solid #dbe5eb}
-.fc-filter-period>strong{display:block;margin-bottom:8px;color:#526f81;font-size:7px;letter-spacing:.08em;text-transform:uppercase}
+.fc-filter-period>strong{display:flex;align-items:center;gap:6px;margin-bottom:9px;color:#526f81;font-size:7px;letter-spacing:.08em;text-transform:uppercase}.fc-filter-period>strong svg{width:13px;height:13px;color:#2388bf}
 .fc-filter-period>div{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.fc-filter-period input[type=date]{padding:0 7px;cursor:pointer;color-scheme:light}
 .fc-filter-panel>button{width:100%;height:34px;border-radius:4px;display:flex;align-items:center;justify-content:center;gap:7px;font:700 9px 'IBM Plex Sans',sans-serif;cursor:pointer}
 .fc-filter-apply{margin-top:12px;border:1px solid #197bb5;background:#197bb5;color:#fff}.fc-filter-apply:hover{background:#126a9f}
 .fc-filter-clear{margin-top:7px;border:1px solid #c6d4dc;background:#fff;color:#536f7f}.fc-filter-clear:hover{background:#edf4f7;color:#173b51}

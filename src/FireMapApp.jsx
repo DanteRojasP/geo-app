@@ -48,6 +48,16 @@ const fmt = (v, d = 0) => (v === null || v === undefined || Number.isNaN(v)) ? '
   : Number(v).toLocaleString(locale(), { minimumFractionDigits: d, maximumFractionDigits: d })
 const fmtFocos = (v) => (v > 0 && v < 1 ? fmt(v, 1) : fmt(v))
 const ym = (y, m) => `${y}-${String(m).padStart(2, '0')}`
+const monthStart = (y, m) => `${ym(y, m)}-01`
+const monthEnd = (y, m) => `${ym(y, m)}-${String(new Date(y, m, 0).getDate()).padStart(2, '0')}`
+const filterFocosByDate = (body, from, to) => {
+  if (!from || !to) return body
+  const features = (body?.features || []).filter((feature) => {
+    const date = feature.properties?.fecha_local
+    return date && date >= from && date <= to
+  })
+  return { ...body, features, n_focos: features.length }
+}
 
 function classColor(value, breaks) {
   if (!value) return ZERO
@@ -266,7 +276,7 @@ function FireMapApp() {
   const [selectedRegionCode, setSelectedRegionCode] = useState(CUSCO)
   const [calendar, setCalendar] = useState(null)
   const [selected, setSelected] = useState({ year: LAST_YEAR, month: null })
-  const [filterDraft, setFilterDraft] = useState({ region: CUSCO, from: ym(LAST_YEAR, 1), to: ym(LAST_YEAR, 12) })
+  const [filterDraft, setFilterDraft] = useState({ region: CUSCO, from: monthStart(LAST_YEAR, 1), to: monthEnd(LAST_YEAR, 12) })
   const [customPeriod, setCustomPeriod] = useState(null)
   const [month, setMonth] = useState(null)
   const [focos, setFocos] = useState(EMPTY)
@@ -299,7 +309,7 @@ function FireMapApp() {
   const selectedRegion = departments.find((d) => d.code === selectedRegionCode) || { code: CUSCO, name: 'Cusco', datos: 'armonizados' }
 
   const periodo = useMemo(() => {
-    if (customPeriod) return { inicio: customPeriod.from, fin: customPeriod.to, label: `${customPeriod.from} – ${customPeriod.to}` }
+    if (customPeriod) return { inicio: customPeriod.from.slice(0, 7), fin: customPeriod.to.slice(0, 7), exactFrom: customPeriod.from, exactTo: customPeriod.to, label: `${customPeriod.from} – ${customPeriod.to}` }
     return selected.month
       ? { inicio: ym(selected.year, selected.month), fin: ym(selected.year, selected.month), label: `${months()[selected.month - 1]} ${selected.year}` }
       : { inicio: ym(selected.year, selected.year === FIRST_YEAR ? 11 : 1), fin: ym(selected.year, 12), label: tr('period.year', { y: selected.year }) }
@@ -310,9 +320,11 @@ function FireMapApp() {
   const yearMax = useMemo(() => Math.max(1, ...yearCells.map((c) => c.focos_armonizados || 0)), [yearCells])
   const periodCells = useMemo(() => {
     if (!customPeriod) return yearCells
+    const fromMonth = customPeriod.from.slice(0, 7)
+    const toMonth = customPeriod.to.slice(0, 7)
     return (calendar?.celdas || []).filter((c) => {
       const key = ym(c.anio, c.mes)
-      return key >= customPeriod.from && key <= customPeriod.to
+      return key >= fromMonth && key <= toMonth
     })
   }, [calendar, customPeriod, yearCells])
   playableRef.current = new Set(yearCells.filter((c) => !c.sin_dato).map((c) => c.mes))
@@ -346,7 +358,7 @@ function FireMapApp() {
     Promise.all(tasks)
       .then(([f, mo]) => {
         if (!active) return
-        setFocos(f.body); setLatency(f.ms); setMonth(mo ? mo.body : null); setError('')
+        setFocos(customPeriod ? filterFocosByDate(f.body, customPeriod.from, customPeriod.to) : f.body); setLatency(f.ms); setMonth(mo ? mo.body : null); setError('')
       })
       .catch((e) => active && setError(e.message))
       .finally(() => active && setLoading(false))
@@ -363,10 +375,10 @@ function FireMapApp() {
     let active = true
     setSelection({ loading: true, bbox })
     Promise.all([getCalendar(bbox, periodo.inicio, periodo.fin), getFocos(bbox, periodo.inicio, periodo.fin)])
-      .then(([c, f]) => active && setSelection({ bbox, calendar: c.body, focos: f.body }))
+      .then(([c, f]) => active && setSelection({ bbox, calendar: c.body, focos: customPeriod ? filterFocosByDate(f.body, customPeriod.from, customPeriod.to) : f.body }))
       .catch((e) => active && setSelection({ bbox, error: e.message }))
     return () => { active = false }
-  }, [selectionBounds, periodo, playing])
+  }, [selectionBounds, periodo, playing, customPeriod])
 
   // Mantener visible el año elegido en la escala de años (se desplaza si no cabe).
   useEffect(() => {
@@ -386,8 +398,8 @@ function FireMapApp() {
     setFilterDraft((current) => ({
       ...current,
       region: selectedRegionCode,
-      from: selected.month ? ym(selected.year, selected.month) : ym(selected.year, selected.year === FIRST_YEAR ? 11 : 1),
-      to: selected.month ? ym(selected.year, selected.month) : ym(selected.year, 12),
+      from: selected.month ? monthStart(selected.year, selected.month) : monthStart(selected.year, selected.year === FIRST_YEAR ? 11 : 1),
+      to: selected.month ? monthEnd(selected.year, selected.month) : monthEnd(selected.year, 12),
     }))
   }, [customPeriod, selected, selectedRegionCode])
 
@@ -613,7 +625,7 @@ function FireMapApp() {
     setCustomPeriod({ from: filterDraft.from, to: filterDraft.to })
   }
   const clearFilters = () => {
-    const initial = { region: CUSCO, from: ym(LAST_YEAR, 1), to: ym(LAST_YEAR, 12) }
+    const initial = { region: CUSCO, from: monthStart(LAST_YEAR, 1), to: monthEnd(LAST_YEAR, 12) }
     setPlaying(false); setError(''); setSelectionBounds(null)
     setFilterDraft(initial); setSelectedRegionCode(CUSCO); setSelected({ year: LAST_YEAR, month: null }); setCustomPeriod(null)
   }
@@ -634,7 +646,7 @@ function FireMapApp() {
   }, [selectionBounds])
 
   const summaryValue = customPeriod
-    ? periodCells.reduce((s, c) => s + (c.focos_armonizados || 0), 0)
+    ? (focos.features || []).reduce((sum, feature) => sum + (Number(feature.properties?.eq_foco) || 0), 0)
     : selected.month ? month?.focos_armonizados : yearTotal
   return (
     <div className="fw-app">
@@ -658,9 +670,9 @@ function FireMapApp() {
         <form className="fc-filter-panel" onSubmit={applyFilters}>
           <p>{tr('filter.hint')}</p>
           <label htmlFor="fc-region"><span>{tr('filter.department')}</span><select id="fc-region" value={filterDraft.region} onChange={(e) => setFilterDraft((f) => ({ ...f, region: e.target.value }))}>{departments.map((d) => <option key={d.code} value={d.code}>{d.name}</option>)}</select></label>
-          <div className="fc-filter-period"><strong>{tr('filter.period')}</strong><div>
-            <label htmlFor="fc-from"><span>{tr('filter.from')}</span><input id="fc-from" type="month" min="2000-11" max="2025-12" value={filterDraft.from} onChange={(e) => setFilterDraft((f) => ({ ...f, from: e.target.value }))}/></label>
-            <label htmlFor="fc-to"><span>{tr('filter.to')}</span><input id="fc-to" type="month" min="2000-11" max="2025-12" value={filterDraft.to} onChange={(e) => setFilterDraft((f) => ({ ...f, to: e.target.value }))}/></label>
+          <div className="fc-filter-period"><strong><CalendarDays/>{tr('compare.dateRange')}</strong><div>
+            <label htmlFor="fc-from"><span>{tr('filter.from')}</span><input id="fc-from" type="date" min="2000-11-01" max="2025-12-31" value={filterDraft.from} onChange={(e) => setFilterDraft((f) => ({ ...f, from: e.target.value }))}/></label>
+            <label htmlFor="fc-to"><span>{tr('filter.to')}</span><input id="fc-to" type="date" min="2000-11-01" max="2025-12-31" value={filterDraft.to} onChange={(e) => setFilterDraft((f) => ({ ...f, to: e.target.value }))}/></label>
           </div></div>
           <button className="fc-filter-apply" type="submit"><SlidersHorizontal size={14}/>{tr('filter.apply')}</button>
           <button className="fc-filter-clear" type="button" onClick={clearFilters}>{tr('filter.clear')}</button>
