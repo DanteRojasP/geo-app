@@ -9,6 +9,7 @@ from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -32,6 +33,20 @@ class UTF8JSONResponse(JSONResponse):
     """JSON con charset explícito (PowerShell 5.1 asume Latin-1 si no se declara)."""
 
     media_type = "application/json; charset=utf-8"
+
+
+def cache_control(request: Request, status: int) -> str:
+    """Caché del navegador y de proxies. Los datos son históricos (no cambian entre despliegues de
+    datos), así que las respuestas 200 de /api se pueden reutilizar 1 hora; errores, límites y
+    /health, nunca. Los archivos de la interfaz con hash en el nombre (/assets/) duran 1 año."""
+    path = request.url.path
+    if request.method != "GET" or status != 200 or path.startswith("/health"):
+        return "no-store"
+    if path.startswith("/api/"):
+        return "public, max-age=3600"
+    if path.startswith("/assets/"):
+        return "public, max-age=31536000, immutable"
+    return "no-cache"                                   # index.html: siempre revalidar
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -69,7 +84,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         remaining = getattr(request.state, "rate_remaining", None)
         if remaining is not None:
             response.headers["X-RateLimit-Remaining"] = str(remaining)
+        response.headers.setdefault("Cache-Control", cache_control(request, response.status_code))
+        # Encabezados de seguridad básicos para una URL pública.
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
         return response
+
+    # Compresión: focos.geojson de un año pasa de ~1,6 MB a ~0,2 MB (auditoría de Gabriel).
+    app.add_middleware(GZipMiddleware, minimum_size=1024)
 
     app.add_middleware(
         CORSMiddleware,

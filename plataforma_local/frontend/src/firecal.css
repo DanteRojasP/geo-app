@@ -8,23 +8,23 @@
 .fc-toggle button.is-active{background:#223f35;border-color:rgba(184,243,107,.35);color:#fff}
 .fc-calendar-grid{overflow:auto;padding:0 14px}
 .fc-calendar table{border-collapse:separate;border-spacing:2px;font-size:9.5px;font-variant-numeric:tabular-nums;width:100%}
-.fc-calendar th{color:#8fa098;font:8px var(--mono);font-weight:400;padding:0 3px;position:sticky;top:0;background:rgba(8,22,18,.96)}
-.fc-calendar tbody th{text-align:right;padding-right:6px;position:static;background:none}
+.fc-calendar th{color:#d0d5dd;font:8px var(--mono);font-weight:400;padding:0 3px;position:sticky;top:0;background:rgba(8,22,18,.96)}
+.fc-calendar tbody th{text-align:right;padding-right:6px;position:static;background:none;color:#344054;font-weight:600}
 .fc-calendar td{height:19px;min-width:34px;text-align:center;border-radius:3px;cursor:pointer}
 .fc-calendar td.is-empty{background:transparent;cursor:default}
 .fc-calendar td.is-nodata,.fc-legend .sw.is-nodata{background:#3b4a44 repeating-linear-gradient(-45deg,rgba(255,255,255,.18) 0 2px,transparent 2px 6px);cursor:default}
-.fc-calendar td.is-extrap,.fc-legend .sw.is-extrap{opacity:.55;background-image:repeating-linear-gradient(45deg,rgba(255,255,255,.45) 0 3px,transparent 3px 7px)}
+.fc-calendar td.is-extrap,.fc-legend .sw.is-extrap{opacity:.72;background-image:repeating-linear-gradient(45deg,rgba(255,255,255,.45) 0 3px,transparent 3px 7px)}
 .fc-calendar td.is-uncertain,.fc-legend .sw.is-uncertain{outline:1.5px dashed #b8f36b;outline-offset:-2px}
 .fc-calendar td.is-selected{outline:2px solid #fff;outline-offset:-1px}
 .fc-calendar td.is-viirs{box-shadow:inset 3px 0 0 #b8f36b}
 .fc-calendar td:hover:not(.is-empty):not(.is-nodata){outline:2px solid #5ee7d7;outline-offset:-1px}
-.fc-legend{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;padding:8px 14px 12px;font-size:9px;color:#9fb0a8}
+.fc-legend{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;padding:8px 14px 12px;font-size:10.5px;color:#344054}
 .fc-legend .sw{display:inline-block;width:16px;height:10px;border-radius:2px;margin-right:4px;vertical-align:middle;border:1px solid rgba(255,255,255,.12)}
 .fc-cls{display:inline-flex;align-items:center}
-.fc-margin{margin:0 14px 8px;font-size:10px;color:#ffbc5d}
-.fc-notice{margin:0 14px 8px;font-size:10px;color:#b8f36b}
-.fc-notes{margin:0 14px 10px;padding-left:16px;font-size:9px;color:#9fb0a8;line-height:1.45}
-.fc-credits{margin:0 14px 12px;font:8px var(--mono);color:#83938b}
+.fc-margin{margin:0 14px 8px;font-size:11px;color:#b54708}
+.fc-notice{margin:0 14px 8px;font-size:11px;color:#067647}
+.fc-notes{margin:0 14px 10px;padding-left:16px;font-size:10.5px;color:#475467;line-height:1.45}
+.fc-credits{margin:0 14px 12px;font:9.5px var(--mono);color:#475467}
 .fw-time-info .fc-year{border:1px solid var(--line);background:rgba(255,255,255,.04);color:#dce7e1;border-radius:7px;width:24px;height:24px;display:grid;place-items:center;cursor:pointer}
 .fw-time-info .fc-year:disabled{opacity:.35;cursor:default}
 .fw-days button:disabled{opacity:.35;cursor:default}

@@ -34,7 +34,7 @@ const FIRST_YEAR = 2000
 const LAST_YEAR = 2025
 // YlOrRd (ColorBrewer, apta para daltonismo) para los tramos con fuego; el 0 va en gris neutro.
 const YLORRD = ['#ffffb2', '#fecc5c', '#fd8d3c', '#f03b20', '#bd0026']
-const ZERO = '#2a3a34'
+const ZERO = '#e4e7ec'               // 0 focos: gris claro (no debe resaltar)
 const calidadLabel = (q) => tr(`calidad.${q}`)
 const catLabel = (c) => (c ? tr(`cat.${c}`) : tr('noData'))
 const CATEGORIA = {
@@ -51,6 +51,22 @@ function classColor(value, breaks) {
   let i = 0
   while (i < breaks.length && value > breaks[i]) i++
   return YLORRD[Math.min(i, YLORRD.length - 1)]
+}
+
+// Anomalía: azul (por debajo) - blanco - rojo (por encima), de -2 a +2 (apta para daltonismo).
+const DIVERGING = [[-2, '#2166ac'], [-1, '#67a9cf'], [0, '#f7f7f7'], [1, '#ef8a62'], [2, '#b2182b']]
+function mixHex(a, b, t) {
+  const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16)
+  const ch = (s) => Math.round(((pa >> s) & 255) + (((pb >> s) & 255) - ((pa >> s) & 255)) * t)
+  return `#${[16, 8, 0].map((s) => ch(s).toString(16).padStart(2, '0')).join('')}`
+}
+function divergingColor(v) {
+  if (v <= DIVERGING[0][0]) return DIVERGING[0][1]
+  for (let i = 1; i < DIVERGING.length; i++) {
+    const [x1, c1] = DIVERGING[i], [x0, c0] = DIVERGING[i - 1]
+    if (v <= x1) return mixHex(c0, c1, (v - x0) / (x1 - x0))
+  }
+  return DIVERGING[DIVERGING.length - 1][1]
 }
 
 // Texto oscuro sobre colores claros (amarillos) y claro sobre oscuros.
@@ -200,8 +216,7 @@ function CalendarPanel({ calendar, mode, setMode, selected, onSelect, onClose })
                   const c = byKey.get(`${y}-${m}`)
                   if (!c) return <td key={m} className="is-empty"/>
                   if (c.sin_dato) return <td key={m} className="is-nodata" title={tr('cal.nodataTip', { m: MESES[idx], y })}/>
-                  const anomColor = c.anomalia === null ? '#3b4a44' : c.anomalia > 0
-                    ? `rgba(240,59,32,${Math.min(1, 0.25 + c.anomalia / 2.5)})` : `rgba(103,169,207,${Math.min(1, 0.25 - c.anomalia / 2.5)})`
+                  const anomColor = c.anomalia === null ? '#d0d5dd' : divergingColor(c.anomalia)
                   const bg = mode === 'anomalia' ? anomColor : classColor(c.focos_armonizados, breaks)
                   const extrap = c.calidad === 'extrapolado' || c.calidad === 'mixto'
                   const isSel = selected.year === y && selected.month === m
@@ -253,6 +268,7 @@ function FireMapApp() {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [activeLayer, setActiveLayer] = useState('surface')
+  const [showBoundary, setShowBoundary] = useState(false)
   const [calendarMode, setCalendarMode] = useState('valor')
   // ?calendario=0 abre la página sin el calendario (p. ej. para incrustarla en una presentación).
   const [calendarOpen, setCalendarOpen] = useState(window.innerWidth >= 650
@@ -295,6 +311,8 @@ function FireMapApp() {
   useEffect(() => {
     let active = true
     setLoading(true)
+    setMonth(null)                 // vaciar el detalle: no mostrar números de otro mes mientras carga
+    setError('')
     const tasks = [getFocos({ departamento: CUSCO }, periodo.inicio, periodo.fin)]
     if (selected.month) tasks.push(getMonth({ departamento: CUSCO }, periodo.inicio))
     Promise.all(tasks)
@@ -310,15 +328,17 @@ function FireMapApp() {
   // Área dibujada: calendario del área en el periodo y sus focos.
   useEffect(() => {
     if (!selectionBounds) { setSelection(null); return undefined }
-    let active = true
     const b = selectionBounds
     const bbox = { bbox: [b.west, b.south, b.east, b.north].map((v) => v.toFixed(4)).join(',') }
+    // Las consultas de un área son "pesadas" (cupo de 5 seguidas): durante la reproducción se pausan.
+    if (playing) { setSelection({ bbox, paused: true }); return undefined }
+    let active = true
     setSelection({ loading: true, bbox })
     Promise.all([getCalendar(bbox, periodo.inicio, periodo.fin), getFocos(bbox, periodo.inicio, periodo.fin)])
       .then(([c, f]) => active && setSelection({ bbox, calendar: c.body, focos: f.body }))
       .catch((e) => active && setSelection({ bbox, error: e.message }))
     return () => { active = false }
-  }, [selectionBounds, periodo])
+  }, [selectionBounds, periodo, playing])
 
   // Reproducir: recorre los meses del año seleccionado.
   useEffect(() => {
@@ -496,8 +516,15 @@ function FireMapApp() {
     if (!mapReadyRef.current || !map) return
     map.setLayoutProperty('fire-heat', 'visibility', activeLayer === 'surface' ? 'visible' : 'none')
     map.setLayoutProperty('fire-points', 'visibility', activeLayer === 'points' ? 'visible' : 'none')
-    map.setPaintProperty('study-area-fill', 'fill-opacity', activeLayer === 'aoi' ? 0.22 : 0.035)
   }, [activeLayer])
+
+  // "Límite" resalta Cusco sin apagar la densidad ni los puntos.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!mapReadyRef.current || !map) return
+    map.setPaintProperty('study-area-fill', 'fill-opacity', showBoundary ? 0.22 : 0.035)
+    map.setPaintProperty('study-area-border', 'line-width', showBoundary ? 3 : 1.8)
+  }, [showBoundary])
 
   const selectMonth = (year, m) => { setPlaying(false); setSelected({ year, month: m }) }
   const shiftYear = (delta) => setSelected((s) => ({ year: Math.min(LAST_YEAR, Math.max(FIRST_YEAR, s.year + delta)), month: null }))
@@ -564,7 +591,7 @@ function FireMapApp() {
         <div className="fw-layers-title"><span>{tr('layers.title')}</span><SlidersHorizontal size={15}/></div>
         <LayerButton active={activeLayer === 'surface'} icon={ThermometerSun} label={tr('layers.density')} tone="heat" onClick={() => setActiveLayer('surface')}/>
         <LayerButton active={activeLayer === 'points'} icon={MapPin} label={tr('layers.points')} tone="points" onClick={() => setActiveLayer('points')}/>
-        <LayerButton active={activeLayer === 'aoi'} icon={Layers3} label={tr('layers.boundary')} tone="boundary" onClick={() => setActiveLayer('aoi')}/>
+        <LayerButton active={showBoundary} icon={Layers3} label={tr('layers.boundary')} tone="boundary" onClick={() => setShowBoundary((v) => !v)}/>
         <LayerButton active={selectionMode} icon={Scan} label={tr('layers.area')} tone="select" onClick={toggleSelectionMode}/>
         <div className="fw-scale"><span>{activeLayer === 'points' ? 'MODIS · VIIRS' : tr('layers.scaleDensity')}</span><div/><section><small>{tr('scale.low')}</small><small>{tr('scale.mid')}</small><small>{tr('scale.high')}</small></section></div>
       </aside>}
@@ -574,6 +601,7 @@ function FireMapApp() {
         <div className="fw-selection-head"><div><p>{tr('sel.kicker')}</p><h2>{tr('sel.title')}</h2><span>{periodo.label} · {tr('sel.within')}</span></div><button onClick={clearSelection} title={tr('sel.clear')}><Trash2 size={17}/></button></div>
         <SatelliteSelectionMap bounds={selectionBounds} focos={selection?.focos || EMPTY}/>
         <div className="fw-selection-source"><span>{tr('sel.source')}</span><b>Esri World Imagery · NASA FIRMS</b></div>
+        {selection?.paused && <p className="fc-notice">{tr('sel.paused')}</p>}
         {selection?.error ? <div className="fw-error"><ShieldAlert size={16}/>{selection.error}</div> : <div className="fw-selection-grid">
           <article><span>{tr('metric.hotspots')}</span><b>{selection?.calendar ? fmtFocos(selection.calendar.total_focos_armonizados) : '…'}</b></article>
           <article><span>{tr('metric.cellDays')}</span><b>{selection?.calendar ? fmt(selection.calendar.celdas.reduce((s, c) => s + (c.celdas_dia || 0), 0)) : '…'}</b></article>

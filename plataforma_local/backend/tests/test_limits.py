@@ -198,3 +198,16 @@ def test_proxy_hops_from_env_cloud_run(plan_home, monkeypatch):
     assert api.get("/api/departamentos", headers=a).status_code == 200
     assert api.get("/api/departamentos", headers=b).status_code == 200   # otro visitante: su cupo
     assert api.get("/api/departamentos", headers=spoof).status_code == 429  # inventar no sirve
+
+
+def test_gzip_and_cache_headers(plan_home):
+    """Mejora 4 de la auditoría: compresión y caché (datos históricos)."""
+    api = TestClient(create_app(plan_home.settings))
+    r = api.get("/api/focos.geojson", params={"departamento": "PE-CUS", "fecha_inicio": "2020-01",
+                                              "fecha_fin": "2020-12"},
+                headers={"Accept-Encoding": "gzip"})
+    assert r.status_code == 200 and r.headers["content-encoding"] == "gzip"
+    assert r.headers["cache-control"] == "public, max-age=3600"
+    assert api.get("/health").headers["cache-control"] == "no-store"
+    err = api.get("/api/calendario", params={"departamento": "PE-PUN"})
+    assert err.status_code == 404 and err.headers["cache-control"] == "no-store"

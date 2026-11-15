@@ -16,8 +16,16 @@ function buildUrl(path, params = {}) {
   return url
 }
 
-async function request(path, params) {
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
+async function request(path, params, retry = true) {
   const response = await fetch(buildUrl(path, params))
+  // 429 (cupo por IP) o 503 (servidor ocupado): esperar lo que pide Retry-After y reintentar una vez.
+  if (retry && (response.status === 429 || response.status === 503)) {
+    const wait = Math.min(6, Number(response.headers.get('Retry-After')) || 2)
+    await sleep(wait * 1000)
+    return request(path, params, false)
+  }
   let body = null
   try { body = await response.json() } catch { /* respuesta sin JSON */ }
   if (!response.ok) {
