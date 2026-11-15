@@ -7,6 +7,7 @@ import './nikal-paleta.css'
 import './nikal.css'
 import './panel-historia.css'
 import './ambitos-dias.css'
+import './paneles.css'
 import App from './FireMapApp.jsx'
 import { getLang, setLang } from './i18n.js'
 

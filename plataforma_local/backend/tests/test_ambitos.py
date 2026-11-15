@@ -207,3 +207,18 @@ def test_dias_parametros(api):
     for params in ({"ventana": 5}, {"desde": 1999}, {"desde": 2024, "hasta": 2020}):
         assert api.get("/api/ambitos/provincia/dias", params=params).status_code == 422
     assert api.get("/api/ambitos/no_existe/dias").status_code == 404
+
+
+def test_celdas_del_dia_cuadran_con_la_curva(api):
+    crudo = _get(api, "/api/ambitos/provincia/dias", ventana=1).json()["dias"]
+    uno = _get(api, "/api/ambitos/provincia/dias/244", ventana=1).json()
+    siete = _get(api, "/api/ambitos/provincia/dias/1", ventana=7).json()
+    assert uno["total"] == pytest.approx(crudo[243]["total"], abs=0.01)
+    assert sum(f["properties"]["n"] for f in uno["geojson"]["features"]) == pytest.approx(
+        uno["total"], abs=0.05
+    )
+    # ventana circular: el 1 de enero junta del 29 de diciembre al 4 de enero
+    ventana = [crudo[i]["total"] for i in (362, 363, 364, 0, 1, 2, 3)]
+    assert siete["total"] == pytest.approx(sum(ventana), abs=0.01)
+    for dia in (0, 366):
+        assert api.get(f"/api/ambitos/provincia/dias/{dia}").status_code == 422

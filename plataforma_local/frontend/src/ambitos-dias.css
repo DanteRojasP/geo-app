@@ -22,3 +22,10 @@
 /* Con esta sección el panel Ámbitos se desplaza completo y la lista conserva su propia altura. */
 .fa-panel{overflow-y:auto;scrollbar-width:thin}
 .fa-panel .fa-list{flex:none;min-height:200px;max-height:48vh}
+.fa-dias-chart svg{cursor:crosshair}
+.fa-dias-ventana{fill:rgba(20,18,16,.08)}
+.fa-dias-fijo{stroke:#141210;stroke-width:1.6}
+.fa-dias-mapa{display:flex;align-items:center;gap:4px;margin-top:6px;padding:6px;border-radius:8px;background:rgba(20,18,16,.05)}
+.fa-dias-mapa>button{flex:none;width:28px;height:28px;display:grid;place-items:center;border:1px solid rgba(20,18,16,.25);border-radius:6px;background:transparent;color:inherit;cursor:pointer}
+.fa-dias-mapa>div{flex:1;min-width:0;display:flex;flex-direction:column;padding:0 4px;font-size:11.5px;line-height:1.3}
+.fa-dias-mapa>div span{opacity:.75}

@@ -5,6 +5,7 @@
 - ``GET /api/ambitos/{nivel}.geojson``: las mismas unidades con geometría y color, para el mapa.
 - ``GET /api/ambitos/{nivel}.csv``: tabla para los tomadores de decisión (UTF-8 con BOM).
 - ``GET /api/ambitos/{nivel}/dias``: focos por día del año según el nivel de peligro (dinámico).
+- ``GET /api/ambitos/{nivel}/dias/{dia}``: las celdas de ese día (para el mapa).
 - ``GET /api/ambitos/{nivel}/{codigo}``: una unidad, con frases "en simple" y serie anual.
 - ``GET /api/ambitos/{nivel}/{codigo}/informe``: informe imprimible (HTML; Imprimir -> PDF).
 
@@ -89,6 +90,20 @@ def dias(
     store = _store(request)
     body = _call(ambitos.distribucion_diaria, store, nivel, desde, hasta, ventana)
     return _envelope(store, {**body, "notes": body["metodo"]["notas"]})
+
+
+@router.get("/{nivel}/dias/{dia}")
+def dia_mapa(
+    request: Request,
+    nivel: str,
+    dia: int,
+    desde: int = ambitos.REF[0],
+    hasta: int = ambitos.REF[1],
+    ventana: int = 7,
+) -> dict:
+    """Celdas con focos en ese día del año (± media ventana) y el nivel de peligro de su unidad."""
+    store = _store(request)
+    return _envelope(store, _call(ambitos.celdas_dia, store, nivel, dia, desde, hasta, ventana))
 
 
 @router.get("/{nivel}/{codigo}")

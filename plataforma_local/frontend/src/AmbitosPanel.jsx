@@ -125,7 +125,7 @@ function AmbitosPanel({ map, onClose }) {
           ))}
         </div>
         <p className="fa-note">{tr('amb.coverage', { p: Math.round((datos.cobertura || 0) * 1000) / 10 })}</p>
-        <AmbitosDias nivel={nivel}/>
+        <AmbitosDias nivel={nivel} map={map}/>
         <ol className="fa-list" ref={listRef}>
           {filas.map((u) => (
             <li key={u.codigo} data-codigo={u.codigo} className={u.codigo === elegido ? 'is-picked' : ''}>

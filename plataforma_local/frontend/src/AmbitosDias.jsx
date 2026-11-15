@@ -1,32 +1,101 @@
 // Focos de calor por día del año según el nivel de peligro (CENEPRED) de la unidad donde ocurren.
-// Datos: GET /api/ambitos/{nivel}/dias, que se calcula al pedirlo con los años y la ventana de suavizado.
-// Áreas apiladas por nivel (colores de datos de CENEPRED, los mismos del mapa y la lista); modo "focos por
-// año" o "parte del día" (100 %); al pasar el cursor se ve el día con el valor de cada nivel.
-import { useEffect, useMemo, useState } from 'react'
-import { getAmbitoDias } from './services/api.js'
+// Datos: GET /api/ambitos/{nivel}/dias (curva) y /api/ambitos/{nivel}/dias/{dia} (celdas del día para el
+// mapa); ambos se calculan al pedirlos con los años y la ventana de suavizado elegidos.
+// Áreas apiladas por nivel (colores de datos de CENEPRED, los mismos del mapa y la lista). El día elegido
+// (clic, ◀ ▶ o ▶ reproducir) se refleja en el mapa: se ven solo los focos de esos días.
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { ChevronLeft, ChevronRight, Pause, Play, X } from 'lucide-react'
+import { getAmbitoDia, getAmbitoDias } from './services/api.js'
 import { locale, monthLetters, tr } from './i18n.js'
 
 const ANIOS = Array.from({ length: 2025 - 2003 + 1 }, (_, i) => 2003 + i)
 const W = 380, H = 170, M = { l: 30, r: 8, t: 8, b: 20 }
 const INICIO_MES = [1, 32, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335]
 const n1 = (v) => (v >= 10 ? Math.round(v) : Math.round(v * 10) / 10).toLocaleString(locale())
+const fechaCorta = (dia) => new Date(2001, 0, dia).toLocaleDateString(locale(), { day: 'numeric', month: 'long' })
+const OCULTAR = ['fire-heat', 'fire-points']   // capas del periodo general mientras se ve un día
 
-function AmbitosDias({ nivel }) {
+// ---------- capa del día en el mapa ----------
+function pintarDia(map, geojson) {
+  if (!map) return
+  if (!map.isStyleLoaded()) { map.once('idle', () => pintarDia(map, geojson)); return }
+  const max = Math.max(0.05, ...geojson.features.map((f) => f.properties.n))
+  const peso = ['min', 1, ['/', ['get', 'n'], max]]
+  if (!map.getSource('ambito-dia')) {
+    map.addSource('ambito-dia', { type: 'geojson', data: geojson })
+    map.addLayer({ id: 'ambito-dia-heat', type: 'heatmap', source: 'ambito-dia', maxzoom: 11, paint: {
+      'heatmap-weight': peso, 'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 5, 0.9, 9, 1.6],
+      'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 5, 9, 8, 18, 11, 30], 'heatmap-opacity': 0.9,
+      'heatmap-color': ['interpolate', ['linear'], ['heatmap-density'], 0, 'rgba(252,165,10,0)', 0.2, 'rgba(252,165,10,.35)',
+        0.45, '#fca50a', 0.7, '#dd513a', 0.9, '#b5367a', 1, '#5c1a52'] } })
+    map.addLayer({ id: 'ambito-dia-pts', type: 'circle', source: 'ambito-dia', minzoom: 8, paint: {
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 8, 2.5, 12, 6], 'circle-color': '#fcffa4',
+      'circle-stroke-color': '#141210', 'circle-stroke-width': 1, 'circle-opacity': 0.9 } })
+  } else {
+    map.getSource('ambito-dia').setData(geojson)
+    map.setPaintProperty('ambito-dia-heat', 'heatmap-weight', peso)
+  }
+  ;['ambito-dia-heat', 'ambito-dia-pts'].forEach((id) => map.setLayoutProperty(id, 'visibility', 'visible'))
+}
+
+function AmbitosDias({ nivel, map }) {
   const [desde, setDesde] = useState(2003)
   const [hasta, setHasta] = useState(2025)
   const [ventana, setVentana] = useState(7)
   const [modo, setModo] = useState('focos')
   const [estado, setEstado] = useState({ cargando: true })
-  const [dia, setDia] = useState(null)
+  const [dia, setDia] = useState(null)            // cursor (solo el gráfico)
+  const [fijo, setFijo] = useState(null)          // día elegido: se refleja en el mapa
+  const [delDia, setDelDia] = useState(null)
+  const [jugando, setJugando] = useState(false)
+  const previo = useRef(null)
 
   useEffect(() => {
     let activo = true
     setEstado((s) => ({ ...s, cargando: true, error: '' }))
     getAmbitoDias(nivel, { desde, hasta, ventana })
-      .then(({ body }) => activo && setEstado({ d: body }))
+      .then(({ body }) => {
+        if (!activo) return
+        setEstado({ d: body })
+        // primera vez: el día pico del nivel con más focos, para que el mapa ya cuente algo
+        setFijo((f) => f ?? (body.niveles.filter((n) => n.dia_pico).sort((a, b) => b.parte - a.parte)[0]?.dia_pico || null))
+      })
       .catch((e) => activo && setEstado({ error: e.message }))
     return () => { activo = false }
   }, [nivel, desde, hasta, ventana])
+
+  // El día elegido (o los años, la ventana o el ámbito) cambia el mapa.
+  useEffect(() => {
+    if (!map || !fijo) return undefined
+    let activo = true
+    const id = setTimeout(() => {
+      getAmbitoDia(nivel, fijo, { desde, hasta, ventana })
+        .then(({ body }) => {
+          if (!activo) return
+          setDelDia(body)
+          if (!previo.current) previo.current = OCULTAR.filter((l) => map.getLayer(l)).map((l) => [l, map.getLayoutProperty(l, 'visibility') || 'visible'])
+          OCULTAR.forEach((l) => map.getLayer(l) && map.setLayoutProperty(l, 'visibility', 'none'))
+          pintarDia(map, body.geojson)
+        })
+        .catch(() => activo && setDelDia(null))
+    }, 180)
+    return () => { activo = false; clearTimeout(id) }
+  }, [map, nivel, fijo, desde, hasta, ventana])
+
+  // Sin día elegido (o al cerrar el panel): se quita la capa y vuelven los focos del periodo.
+  useEffect(() => {
+    if (fijo || !map) return undefined
+    restaurar(map, previo)
+    return undefined
+  }, [fijo, map])
+  useEffect(() => () => restaurar(map, previo), [map])
+
+  // ▶ recorre el año avanzando de a una ventana.
+  useEffect(() => {
+    if (!jugando) return undefined
+    const id = setInterval(() => setFijo((f) => ((f || 1) - 1 + Math.max(1, ventana)) % 365 + 1), 900)
+    return () => clearInterval(id)
+  }, [jugando, ventana])
 
   const { d, error, cargando } = estado
   const niveles = useMemo(() => (d?.niveles || []).filter((n) => n.focos_por_anio > 0), [d])
@@ -46,13 +115,15 @@ function AmbitosDias({ nivel }) {
     }) }
   }, [d, niveles, modo])
 
-  const mover = (e) => {
+  const diaDe = (e) => {
     const r = e.currentTarget.getBoundingClientRect()
     const fx = ((e.clientX - r.left) / r.width) * W
-    setDia(Math.min(365, Math.max(1, Math.round(((fx - M.l) / (W - M.l - M.r)) * 364) + 1)))
+    return Math.min(365, Math.max(1, Math.round(((fx - M.l) / (W - M.l - M.r)) * 364) + 1))
   }
+  const mover = (delta) => { setJugando(false); setFijo((f) => (((f || 1) - 1 + delta) % 365 + 365) % 365 + 1) }
   const fila = d && dia ? d.dias[dia - 1] : null
   const letras = monthLetters()
+  const paso = Math.max(1, ventana)
 
   return (
     <section className="fa-dias" aria-label={tr('amb.days.title')}>
@@ -69,18 +140,32 @@ function AmbitosDias({ nivel }) {
       {d && <>
         <p className="fa-dias-lead">{d.en_simple}</p>
         <div className={`fa-dias-chart ${cargando ? 'is-loading' : ''}`}>
-          <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`${d.titulo}. ${d.en_simple}`} onMouseMove={mover} onMouseLeave={() => setDia(null)}>
+          <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`${d.titulo}. ${d.en_simple}`}
+            onMouseMove={(e) => setDia(diaDe(e))} onMouseLeave={() => setDia(null)} onClick={(e) => { setJugando(false); setFijo(diaDe(e)) }}>
             {[0.5, 1].map((f) => <g key={f}><line x1={M.l} x2={W - M.r} y1={capas.y(capas.max * f)} y2={capas.y(capas.max * f)} className="fa-dias-grid"/>
               <text x={M.l - 4} y={capas.y(capas.max * f) + 3} textAnchor="end" className="fa-dias-eje">{modo === 'parte' ? `${Math.round(100 * f)} %` : n1(capas.max * f)}</text></g>)}
+            {fijo && ventana > 1 && <rect x={capas.x(Math.max(0, fijo - 1 - Math.floor(ventana / 2)))} width={capas.x(Math.min(364, fijo - 1 + Math.floor(ventana / 2))) - capas.x(Math.max(0, fijo - 1 - Math.floor(ventana / 2)))} y={M.t} height={capas.y(0) - M.t} className="fa-dias-ventana"/>}
             {capas.areas.map(({ n, path }) => <path key={n.nivel_peligro} d={path} fill={n.color} fillOpacity=".88"><title>{n.etiqueta}</title></path>)}
             <line x1={M.l} x2={W - M.r} y1={capas.y(0)} y2={capas.y(0)} className="fa-dias-grid"/>
             {INICIO_MES.map((dd, i) => <text key={i} x={capas.x(dd - 1 + 15)} y={H - 6} textAnchor="middle" className="fa-dias-eje">{letras[i]}</text>)}
+            {fijo && <line x1={capas.x(fijo - 1)} x2={capas.x(fijo - 1)} y1={M.t} y2={capas.y(0)} className="fa-dias-fijo"/>}
             {fila && <line x1={capas.x(dia - 1)} x2={capas.x(dia - 1)} y1={M.t} y2={capas.y(0)} className="fa-dias-cursor"/>}
           </svg>
           {fila && <div className="fa-dias-tip" style={{ left: `${(100 * capas.x(dia - 1)) / W}%` }}>
-            <b>{new Date(2001, 0, dia).toLocaleDateString(locale(), { day: 'numeric', month: 'long' })}</b>
+            <b>{fechaCorta(dia)}</b>
             {niveles.map((n) => <span key={n.nivel_peligro}><i style={{ background: n.color }}/>{n.etiqueta}: {modo === 'parte' ? `${Math.round(100 * (fila.total ? fila[n.nivel_peligro] / fila.total : 0))} %` : n1(fila[n.nivel_peligro])}</span>)}
           </div>}
+        </div>
+        <div className="fa-dias-mapa" aria-live="polite">
+          <button onClick={() => mover(-paso)} aria-label={tr('amb.days.prev')}><ChevronLeft size={15}/></button>
+          <button onClick={() => { if (!fijo) setFijo(1); setJugando((v) => !v) }} aria-label={jugando ? tr('timeline.pause') : tr('amb.days.play')}>{jugando ? <Pause size={14}/> : <Play size={14}/>}</button>
+          <button onClick={() => mover(paso)} aria-label={tr('amb.days.next')}><ChevronRight size={15}/></button>
+          <div>
+            {fijo ? <><b>{tr('amb.days.onMap')} {delDia?.dias || fechaCorta(fijo)}</b>
+              {delDia && <span>{tr('amb.days.mapTotal', { n: n1(delDia.total), u: delDia.unidad })}</span>}</>
+              : <span>{tr('amb.days.pick')}</span>}
+          </div>
+          {fijo && <button onClick={() => { setJugando(false); setFijo(null); setDelDia(null) }} aria-label={tr('amb.days.clear')} title={tr('amb.days.clear')}><X size={14}/></button>}
         </div>
         <ul className="fa-dias-niveles">
           {niveles.map((n) => <li key={n.nivel_peligro}>
@@ -94,6 +179,13 @@ function AmbitosDias({ nivel }) {
       </>}
     </section>
   )
+}
+
+function restaurar(map, previo) {
+  if (!map) return
+  ;['ambito-dia-heat', 'ambito-dia-pts'].forEach((id) => map.getLayer?.(id) && map.setLayoutProperty(id, 'visibility', 'none'))
+  ;(previo.current || []).forEach(([l, v]) => map.getLayer?.(l) && map.setLayoutProperty(l, 'visibility', v))
+  previo.current = null
 }
 
 export default AmbitosDias

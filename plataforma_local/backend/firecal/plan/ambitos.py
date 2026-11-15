@@ -459,22 +459,7 @@ def distribucion_diaria(
     día del año (calendario sin bisiestos) en los años elegidos y se divide por el número de años
     (focos armonizados por año en ese día); 4) se suaviza con un promedio móvil circular.
     """
-    if not (REF[0] <= desde <= hasta <= REF[1]):
-        raise PlanError(
-            t(
-                es=f"Años no válidos: elige 'desde' y 'hasta' entre {REF[0]} y {REF[1]}, "
-                "con desde ≤ hasta.",
-                en=f"Invalid years: choose 'desde' and 'hasta' between {REF[0]} and {REF[1]}, "
-                "with desde ≤ hasta.",
-            )
-        )
-    if ventana not in VENTANAS:
-        raise PlanError(
-            t(
-                es=f"Ventana no válida: usa {', '.join(map(str, VENTANAS))} días.",
-                en=f"Invalid window: use {', '.join(map(str, VENTANAS))} days.",
-            )
-        )
+    _validar_dias(desde, hasta, ventana)
     tipos = tipificar(store, nivel)
     cur = store.cursor()
     df = cur.execute(
@@ -587,6 +572,102 @@ def distribucion_diaria(
         "niveles": niveles,
         "dias": filas,
         "metodo": metodo(),
+    }
+
+
+def _validar_dias(desde: int, hasta: int, ventana: int) -> None:
+    if not (REF[0] <= desde <= hasta <= REF[1]):
+        raise PlanError(
+            t(
+                es=f"Años no válidos: elige 'desde' y 'hasta' entre {REF[0]} y {REF[1]}, "
+                "con desde ≤ hasta.",
+                en=f"Invalid years: choose 'desde' and 'hasta' between {REF[0]} and {REF[1]}, "
+                "with desde ≤ hasta.",
+            )
+        )
+    if ventana not in VENTANAS:
+        raise PlanError(
+            t(
+                es=f"Ventana no válida: usa {', '.join(map(str, VENTANAS))} días.",
+                en=f"Invalid window: use {', '.join(map(str, VENTANAS))} days.",
+            )
+        )
+
+
+# Día del año en SQL (DuckDB), con el mismo calendario sin bisiestos que dia_del_anio().
+_DIA_SQL = (
+    "dayofyear(CAST(c.fecha_local AS DATE)) - CASE WHEN (c.anio % 4 = 0 AND (c.anio % 100 <> 0 "
+    "OR c.anio % 400 = 0)) AND (month(CAST(c.fecha_local AS DATE)) > 2 OR (month(CAST("
+    "c.fecha_local AS DATE)) = 2 AND day(CAST(c.fecha_local AS DATE)) = 29)) THEN 1 ELSE 0 END"
+)
+
+
+def celdas_dia(
+    store: PlanStore,
+    nivel: str,
+    dia: int,
+    desde: int = REF[0],
+    hasta: int = REF[1],
+    ventana: int = 7,
+) -> dict:
+    """Celdas con focos en un día del año (± media ventana, circular), sumando los años elegidos.
+
+    Es lo que el mapa muestra al elegir un día en el gráfico de ``distribucion_diaria``: cada celda
+    lleva su unidad y el nivel de peligro de esa unidad; su valor son los focos armonizados por año
+    en esos días (suma de los años / número de años).
+    """
+    _validar_dias(desde, hasta, ventana)
+    if not 1 <= dia <= 365:
+        raise PlanError(t(es="Día no válido: usa un número entre 1 y 365.",
+                          en="Invalid day: use a number between 1 and 365."))
+    tipos = tipificar(store, nivel)
+    h = ventana // 2
+    dias = sorted({(dia - 1 + k) % 365 + 1 for k in range(-h, h + 1)})
+    cur = store.cursor()
+    df = cur.execute(
+        f"WITH x AS (SELECT c.cell_lat, c.cell_lon, c.eq_hotspots, a.codigo, {_DIA_SQL} AS dia "
+        "FROM cd c JOIN ambito_celdas a ON a.alat = c.cell_lat AND a.alon = c.cell_lon "
+        "WHERE a.nivel = ? AND c.anio BETWEEN ? AND ?) "
+        "SELECT cell_lat, cell_lon, codigo, sum(eq_hotspots) AS n FROM x "
+        "WHERE list_contains(?, dia) GROUP BY 1, 2, 3",
+        [nivel, desde, hasta, dias],
+    ).df()
+    cur.close()
+    n_anios = hasta - desde + 1
+    df["n"] = df["n"] / n_anios
+    df["peligro"] = df["codigo"].map(tipos["nivel_peligro"]).fillna("sin_clasificar")
+    por_nivel = df.groupby("peligro")["n"].sum()
+    ini, fin = dias[0] if h == 0 else (dia - 1 - h) % 365 + 1, (dia - 1 + h) % 365 + 1
+    return {
+        "nivel": nivel,
+        "dia": dia,
+        "fecha": _fecha_dia(dia),
+        "desde": desde,
+        "hasta": hasta,
+        "ventana": ventana,
+        "dias": t(es=f"del {_fecha_dia(ini)} al {_fecha_dia(fin)}",
+                  en=f"{_fecha_dia(ini)} to {_fecha_dia(fin)}") if h else _fecha_dia(dia),
+        "total": round(float(df["n"].sum()), 3),
+        "por_nivel": [
+            {"nivel_peligro": p, "etiqueta": etiqueta(p), "color": COLOR[p],
+             "focos": round(float(por_nivel.get(p, 0.0)), 3)}
+            for p in ORDEN_PELIGRO if p in por_nivel.index or (tipos["nivel_peligro"] == p).any()
+        ],
+        "geojson": {
+            "type": "FeatureCollection",
+            "features": [
+                {
+                    "type": "Feature",
+                    "geometry": {"type": "Point",
+                                 "coordinates": [round(r.cell_lon, 3), round(r.cell_lat, 3)]},
+                    "properties": {"n": round(float(r.n), 3), "codigo": r.codigo,
+                                   "nivel_peligro": r.peligro, "color": COLOR[r.peligro]},
+                }
+                for r in df.itertuples()
+            ],
+        },
+        "unidad": t(es="focos armonizados por año en esos días",
+                    en="harmonized hotspots per year on those days"),
     }
 
 
