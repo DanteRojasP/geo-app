@@ -77,18 +77,6 @@
 .fc-timeline .fw-days button i{position:absolute;bottom:0;left:0;height:2px;background:#31a2dc}
 .fc-timeline .fw-days button:disabled{opacity:.35;cursor:default}
 .fc-timeline .fw-year-scale .fc-year{min-width:26px;padding:0;display:grid;place-items:center;color:#d8e7ef}
-.fc-timeline .fw-play:disabled{opacity:.48;cursor:default}
-.fc-timeline .fw-days.fc-years-detail,.fc-timeline .fw-days.fc-days-detail{grid-template-columns:repeat(var(--items),minmax(52px,1fr));overflow-x:auto;overflow-y:hidden;scrollbar-width:none}
-.fc-timeline .fw-days.fc-years-detail::-webkit-scrollbar,.fc-timeline .fw-days.fc-days-detail::-webkit-scrollbar{display:none}
-.fc-timeline .fw-days.fc-days-detail button{min-width:46px}
-.fc-timeline .fw-days.fc-years-detail button{min-width:58px}
-.fc-timeline .fw-days.fc-days-detail button span,.fc-timeline .fw-days.fc-years-detail button span{font-family:'IBM Plex Mono',monospace;font-size:8px}
-.fc-range-control{height:27px;display:flex;align-items:center;gap:4px;padding-right:8px;margin-right:7px;border-right:1px solid rgba(177,211,229,.2);white-space:nowrap}
-.fc-range-control>span{color:#9bb5c5;font:600 7px 'IBM Plex Sans',sans-serif;text-transform:uppercase;letter-spacing:.05em}
-.fc-range-control select{height:23px;min-width:57px;padding:0 3px;border:1px solid #46687d;border-radius:3px;background:#142f42;color:#e4eef4;font:600 8px 'IBM Plex Mono',monospace;cursor:pointer}
-.fc-range-control>i{color:#7894a5;font-style:normal;font-size:8px}
-.fc-range-control>button{height:23px;padding:0 7px;border:1px solid #46687d;border-radius:3px;background:transparent;color:#c6d8e3;font:600 7px 'IBM Plex Sans',sans-serif;cursor:pointer}
-.fc-range-control>button:hover,.fc-range-control>button.is-active{border-color:#45aee0;background:#1d79ad;color:#fff}
 .fc-points-legend{margin-top:6px;padding:8px 4px 2px;border-top:1px solid #e2e8f0;font-size:11px;color:#334155}
 .fc-points-legend>span{display:block;font:500 8px var(--mono);letter-spacing:.09em;color:#475569;margin-bottom:4px}
 .fc-points-legend p{margin:3px 0;display:flex;align-items:center;gap:7px}
@@ -129,8 +117,6 @@ button:focus-visible,select:focus-visible{outline:2px solid #197bb5;outline-offs
 .fc-timeline .fc-years button{min-width:30px;padding:0 3px}
 @media(max-width:1500px){.fc-timeline .fw-timeline-source span{display:none}}
 @media(max-width:650px){.fc-timeline .fc-years button{min-width:28px}}
-@media(max-width:1100px){.fc-range-control>span{display:none}.fc-range-control{margin-right:4px;padding-right:4px}.fc-range-control>button{width:25px;padding:0;font-size:0}.fc-range-control>button:after{content:'↔';font-size:12px}}
-@media(max-width:650px){.fc-range-control{gap:2px}.fc-range-control select{min-width:48px;width:48px;font-size:7px}.fc-timeline .fw-days.fc-days-detail button{min-width:40px}.fc-timeline .fw-days.fc-years-detail button{min-width:50px}}
 
 /* Panel de fondo y leyenda (Dante, 2dad4eb), adaptado: sin FRP, colores reales de la capa de
    densidad y leyenda de puntos MODIS/VIIRS. En pantallas anchas la línea de tiempo deja libre la
