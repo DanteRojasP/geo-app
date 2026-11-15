@@ -81,3 +81,10 @@ con números, y el primer gráfico lo confirma sin leyenda.
    Inter instalada y no agrego dependencias).
 5. **Fase A** = drawer, titular, 3 capítulos, contexto, ES/EN y tokens. **Fase B** = mes ↔ mapa, cifras del titular
    que llevan al gráfico y "Ver en el mapa" con las celdas recurrentes (la API ya las devuelve: `/api/analitica/recurrencia`).
+
+## Estado (solo la parte de diseño del pedido)
+Implementado en `PanelHistoria.jsx` + `panel-historia.css` (tokens): drawer oscuro / hoja inferior, titular con cifras
+resaltadas, 3 capítulos con título-hallazgo y subtítulo, tira de contexto, etiquetas directas, ⓘ con la nota de lectura,
+una sola descarga (PNG/CSV) por gráfico, ES/EN, año en `#FCA50A` y lo habitual en gris punteado (también en la cinta).
+Sin botón de cerrar: se sale eligiendo otro capítulo (indicación previa de Julio). Queda fuera lo funcional: mapa ↔
+gráficos, cifras del titular que llevan al gráfico y "Ver en el mapa" con las celdas recurrentes.

@@ -7,7 +7,8 @@
 //   Brasa    #dd513a / #b83a24  el fuego: lo que pasó y la acción principal.
 //   Ichu     #fca50a  el territorio y el tiempo: Cusco, el área dibujada, lo elegido.
 //   Chispa   #fcffa4  la punta de la llama: la cifra y el elemento activo.
-//   Puna     #7fb7b2 / #3f6f74  lo habitual: medianas y referencias (frío, para contrastar con la brasa
+//   Habitual #bdb7ad  lo habitual (medianas): gris claro punteado en toda la app; el año siempre en ichu.
+//   Puna     #7fb7b2 / #3f6f74  referencia fría en los gráficos del diseño anterior (frío, para contrastar con la brasa
 //            también con daltonismo).
 // Los colores de datos (escala de calor, anomalía, niveles CENEPRED, sensores, En vivo) no cambian.
 export const NK = typeof window === 'undefined' || new URLSearchParams(window.location.search).get('diseno') !== 'dante'

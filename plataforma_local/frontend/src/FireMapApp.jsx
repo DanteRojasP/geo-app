@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import AmbitosPanel from './AmbitosPanel.jsx'
 import SimplePanel from './SimplePanel.jsx'
+import PanelHistoria from './PanelHistoria.jsx'
 import { ChapterRail, SeasonRibbon } from './Narrativa.jsx'
 import { MAPA, NK } from './diseno.js'
 import { IcoAjustes, IcoArea, IcoCalendario, IcoCapas, IcoFocos, IcoHabitual, IcoHistorico, IcoPlano, IcoRelieve, IcoSatelite, IcoVivo } from './NkIcons.jsx'
@@ -830,7 +831,9 @@ function FireMapApp() {
         </div>}
         <div className="fw-selection-actions"><button onClick={toggleSelectionMode}><Scan size={15}/>{tr('sel.redraw')}</button><button onClick={() => selection?.bbox && runDownload(selection.bbox, tr('csv.area'))} disabled={!selection?.calendar}><Download size={15}/>CSV</button><button onClick={() => selection?.bbox && openReport(informeUrl(selection.bbox, reportExtra))} disabled={!selection?.calendar} title={tr('report.tip')}><FileText size={15}/>{tr('report.short')}</button></div>
       </aside>}
-      {simpleOpen && <SimplePanel key={lang} aoi={selection?.bbox || aoi} etiqueta={selection?.bbox ? 'area' : 'cusco'} onClose={() => setSimpleOpen(false)}/>}
+      {simpleOpen && (NK
+        ? <PanelHistoria key={lang} aoi={selection?.bbox || aoi} etiqueta={selection?.bbox ? 'area' : 'cusco'}/>
+        : <SimplePanel key={lang} aoi={selection?.bbox || aoi} etiqueta={selection?.bbox ? 'area' : 'cusco'} onClose={() => setSimpleOpen(false)}/>)}
       {ambitosOpen && !liveOn && <AmbitosPanel key={lang} map={mapRef.current} onClose={() => setAmbitosOpen(false)}/>}
       {compareOpen && <ComparisonWorkspace key={lang} calendar={calendar} region={region} regionName={selectedRegion.name} onClose={() => setCompareOpen(false)}/>}
       {calendarOpen && <CalendarPanel calendar={calendar} mode={calendarMode} setMode={setCalendarMode} selected={selected} onSelect={selectMonth} onClose={() => setCalendarOpen(false)} reportUrl={informeUrl(aoi, reportExtra)}/>}

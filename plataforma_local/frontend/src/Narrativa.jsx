@@ -122,7 +122,7 @@ export function SeasonRibbon({ calendar, selected, onMonth, onYear, onAllYear, o
           <div className="nk-plot">
           <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-hidden="true">
             <defs>
-              <linearGradient id="nk-ember" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#dd513a" stopOpacity=".7"/><stop offset=".55" stopColor="#b5367a" stopOpacity=".25"/><stop offset="1" stopColor="#b5367a" stopOpacity="0"/></linearGradient>
+              <linearGradient id="nk-ember" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#fca50a" stopOpacity=".5"/><stop offset=".55" stopColor="#b5367a" stopOpacity=".25"/><stop offset="1" stopColor="#b5367a" stopOpacity="0"/></linearGradient>
             </defs>
             <path d={area} fill="url(#nk-ember)"/>
             <path d={median} className="nk-median" fill="none"/>
