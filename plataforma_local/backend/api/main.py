@@ -1,4 +1,4 @@
-"""Aplicación FastAPI de FireCal: CORS, salud, routers v1 y manejo de errores."""
+"""Aplicación FastAPI de FireCal Cusco: idioma, límites, caché, rutas /api y la interfaz."""
 
 from __future__ import annotations
 
@@ -9,19 +9,23 @@ from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
-from api.db import Repository
 from api.limits import HeavyGate, RateLimiter
-from api.routers import anomaly, calendar, forecast, hotspots, map, meta, plan, regions
-from api.schemas import HealthResponse
-from api.services.common import AOIError
+from api.routers import plan
 from firecal import __version__
+from firecal.i18n import reset_lang, set_lang, t
 from firecal.plan.query import PlanStore
 from firecal.settings import PROJECT_ROOT, Settings, get_settings
 
-API_PREFIX = "/api/v1"
+
+class HealthResponse(BaseModel):
+    status: str
+    data_mode: str
+    data_ready: bool
 # Frontend (React + MapLibre, base de Dante) ya compilado con `npm run build` en frontend/dist.
 # FIRECAL_FRONTEND_DIR lo cambia (p. ej. en Docker); vacío = no servir.
 DEFAULT_FRONTEND = PROJECT_ROOT.parent / "frontend" / "dist"
@@ -33,13 +37,50 @@ class UTF8JSONResponse(JSONResponse):
     media_type = "application/json; charset=utf-8"
 
 
+def cache_control(request: Request, status: int) -> str:
+    """Caché del navegador y de proxies. Los datos son históricos (no cambian entre despliegues de
+    datos), así que las respuestas 200 de /api se pueden reutilizar 1 hora; errores, límites y
+    /health, nunca. Los archivos de la interfaz con hash en el nombre (/assets/) duran 1 año."""
+    path = request.url.path
+    if request.method != "GET" or status != 200 or path.startswith("/health"):
+        return "no-store"
+    if path.startswith("/api/"):
+        return "public, max-age=3600"
+    if path.startswith("/assets/"):
+        return "public, max-age=31536000, immutable"
+    return "no-cache"                                   # index.html: siempre revalidar
+
+
+def _validation_msg(e: dict) -> str:
+    """Mensaje de validación de FastAPI en el idioma de la persona (QA de Erik, 11)."""
+    kind, ctx = e.get("type", ""), e.get("ctx") or {}
+    if kind == "missing":
+        return t(es="falta este parámetro", en="this parameter is required")
+    if kind in ("float_parsing", "float_type", "finite_number"):
+        return t(es="debe ser un número", en="must be a number")
+    if kind in ("int_parsing", "int_type", "int_from_float"):
+        return t(es="debe ser un número entero", en="must be a whole number")
+    if kind in ("bool_parsing", "bool_type"):
+        return t(es="debe ser true o false", en="must be true or false")
+    for key, es, en in (("ge", "mayor o igual que", "greater than or equal to"),
+                        ("gt", "mayor que", "greater than"),
+                        ("le", "menor o igual que", "less than or equal to"),
+                        ("lt", "menor que", "less than")):
+        if key in ctx:
+            return t(es=f"debe ser {es} {ctx[key]}", en=f"must be {en} {ctx[key]}")
+    if "max_length" in ctx:
+        return t(es=f"admite como máximo {ctx['max_length']} caracteres",
+                 en=f"at most {ctx['max_length']} characters")
+    return t(es="valor no válido", en="invalid value")
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     """Crea la app. Recibe ``settings`` explícitos en tests; si no, usa los globales."""
     settings = settings or get_settings()
 
     app = FastAPI(
         default_response_class=UTF8JSONResponse,
-        title="FireCal Perú API",
+        title="FireCal Cusco API",
         version=__version__,
         description=(
             "Calendario armonizado de focos de calor MODIS + VIIRS para **Cusco** (2000-11 a "
@@ -48,7 +89,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         ),
     )
     app.state.settings = settings
-    app.state.repo = Repository(settings)
     app.state.plan = PlanStore(settings)
     rl = settings.params.api.rate_limit
     app.state.limiter = RateLimiter(rl)
@@ -56,49 +96,49 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.middleware("http")
     async def _timing_and_limits(request: Request, call_next):
-        """Protocolo de solicitudes (429 por cliente) y latencia en X-Process-Time-ms."""
+        """Idioma (?lang=en|es), protocolo de solicitudes (429) y latencia en X-Process-Time-ms."""
         t0 = time.perf_counter()
-        rejected = app.state.limiter.check(request)
-        response = rejected or await call_next(request)
+        token = set_lang(request.query_params.get("lang"), settings.params.api.default_lang)
+        try:
+            rejected = app.state.limiter.check(request)
+            response = rejected or await call_next(request)
+        finally:
+            reset_lang(token)
         response.headers["X-Process-Time-ms"] = f"{(time.perf_counter() - t0) * 1000:.1f}"
         remaining = getattr(request.state, "rate_remaining", None)
         if remaining is not None:
             response.headers["X-RateLimit-Remaining"] = str(remaining)
+        response.headers.setdefault("Cache-Control", cache_control(request, response.status_code))
+        # Encabezados de seguridad básicos para una URL pública.
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
         return response
+
+    # Compresión: focos.geojson de un año pasa de ~1,6 MB a ~0,2 MB (auditoría de Gabriel).
+    app.add_middleware(GZipMiddleware, minimum_size=1024)
 
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[*settings.params.api.cors_origins,
                        *(o.strip() for o in settings.env.cors_origins.split(",") if o.strip())],
-        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_methods=["GET", "OPTIONS"],
         allow_headers=["*"],
         expose_headers=["Content-Disposition", "X-Data-Mode", "X-Row-Count",
                         "X-Process-Time-ms", "X-RateLimit-Remaining", "Retry-After"],
     )
 
-    @app.exception_handler(AOIError)
-    def _aoi_error(_: Request, exc: AOIError) -> JSONResponse:
-        return UTF8JSONResponse(status_code=422, content={"detail": str(exc)})
-
     @app.exception_handler(RequestValidationError)
     def _validation_error(_: Request, exc: RequestValidationError) -> JSONResponse:
         errors = [{"campo": ".".join(str(x) for x in e.get("loc", [])[1:]),
-                   "error": e.get("msg", "")} for e in exc.errors()]
+                   "error": _validation_msg(e)} for e in exc.errors()]
         return UTF8JSONResponse(status_code=422, content={
-            "detail": "Solicitud inválida: revisa los campos indicados en 'errors'.",
+            "detail": t(es="Solicitud inválida: revisa los campos indicados en 'errors'.",
+                        en="Invalid request: check the fields listed in 'errors'."),
             "errors": errors})
-
-    legacy = settings.params.api.legacy_v1
 
     @app.get("/health", response_model=HealthResponse, tags=["meta"])
     def health() -> HealthResponse:
-        """Estado del servicio: si los datos de Cusco están cargados (o la base sintética, en
-        modo legacy_v1)."""
-        if legacy:
-            repo: Repository = app.state.repo
-            ready = repo.ready
-            mode = repo.data_mode if ready else settings.data_mode
-            return HealthResponse(status="ok", data_mode=mode, data_ready=ready)
+        """Estado del servicio: si los datos de Cusco están cargados."""
         plan_store: PlanStore = app.state.plan
         return HealthResponse(status="ok", data_mode="real", data_ready=plan_store.ready)
 
@@ -107,11 +147,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         """Estado del protocolo de solicitudes: clientes, rechazos 429/503 y pesadas en curso."""
         return {**app.state.limiter.stats(), **app.state.gate.stats()}
 
-    # Backend anterior (alternativa B, datos SINTÉTICOS de 5 departamentos): apagado por defecto
-    # porque el prototipo usa solo los datos reales de Cusco (MAESTRO §12).
-    if legacy:
-        for module in (regions, calendar, anomaly, hotspots, map, forecast, meta):
-            app.include_router(module.router, prefix=API_PREFIX)
     app.include_router(plan.router)
 
     frontend = Path(os.environ.get("FIRECAL_FRONTEND_DIR", DEFAULT_FRONTEND))

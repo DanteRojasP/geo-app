@@ -54,7 +54,7 @@ y agrega lo que pide el [PLAN.md](PLAN.md).
   - A: grilla común de 1 km; misma celda y mismo día = un evento (se conserva el de mayor FRP).
   - C: anomalía normalizada `(n − mediana) / IQR` del mismo mes dentro de su era de sensores (MODIS hasta
     ene-2012; MODIS + VIIRS desde feb-2012).
-  - B (calibración por solapamiento) sigue disponible en `/api/v1` (backend anterior).
+  - B (calibración por solapamiento) quedó en la rama `archivo/backend-sintetico` (retirada el 14-nov).
 - [x] **Parquet particionado por año y mes**, consultado con DuckDB.
 - [x] **Los 4 endpoints** (`/api/calendario`, `/api/anomalias`, `/api/hotspots.csv`, `/api/metadatos`) +
       `/api/departamentos`. Documentación OpenAPI en `/docs`.
@@ -109,7 +109,7 @@ Antonio ([MAESTRO.md](MAESTRO.md), `data/harmonized/`).
     **"sin datos"** (nunca 0). Es una serie histórica: no incluye 2026.
   - Unidad **"focos armonizados"** (Σ `eq_hotspots` / Σ `eq_foco`). Ya no se usa "evento": los datos son focos.
   - **Sin FRP** en la API ni en la web. El CSV de descarga mantiene las 18 columnas del contrato de Antonio.
-  - El backend sintético anterior (`/api/v1`, 5 departamentos) quedó apagado.
+  - El backend sintético anterior (`/api/v1`, 5 departamentos) quedó apagado y luego se retiró (rama `archivo/backend-sintetico`).
 - [x] **Frontend según MAESTRO P2/P3:** rampa YlOrRd con cortes por cuantiles, cero gris, "sin dato" rayado,
       2000-2002 extrapolado atenuado, nota de 2025, detalle diario por mes y total igual a la descarga.
 - [x] **Casos de prueba de MAESTRO §12 en pytest, todos en verde:** total 15 732 (36 260 celdas-día, 58 779 focos),
@@ -154,8 +154,8 @@ se llama `focos_armonizados`, sin FRP y Dockerfile según el de Antonio.
 - [x] **API con `focos_armonizados`** (`total_focos_armonizados`, `matriz_focos_armonizados`, `unidad` con nombre y
       definición) y nuevo `GET /api/focos.geojson` para el mapa (peso `eq_foco`, sin FRP).
 - [x] **Dockerfile basado en el de Antonio:** contexto en la raíz del repo, etapa Node para la interfaz y
-      validación MAESTRO §6. Probado desde el repo y desde la copia local (1,33 GB, ~130 MB de RAM).
-- [x] 142 pruebas del backend en verde y ESLint sin errores en la interfaz.
+      validación MAESTRO §6. Probado desde el repo y desde la copia local (1,33 GB entonces; 917 MB desde el 14-nov; ~130 MB de RAM).
+- [x] 142 pruebas del backend en verde (83 desde que se retiró el backend sintético) y ESLint sin errores en la interfaz.
 - [x] Desplegado en la plataforma local (http://localhost:8000).
 - [ ] Siguiente: desplegar en Cloud Run (`docs/DESPLIEGUE_Y_FALENCIAS.md`, opción B) cuando el equipo lo decida.
 
@@ -184,6 +184,9 @@ Ninguna llamada sale a FIRMS ni a Google: los datos son los CSV de Antonio, carg
 conexiones externas del navegador son el mapa base (OpenFreeMap), la vista satelital (Esri) y las fuentes tipográficas.
 
 ### 2. Parámetros comunes
+
+- **Idioma:** `lang=en|es` en cualquier ruta (por defecto `en`). La interfaz lo envía siempre según el selector
+  EN | ES. Solo cambian los textos (`detail`, `notes`, `unidad`, frases); los campos y códigos no.
 
 - **AOI (uno solo):** `departamento=PE-CUS` · `bbox=oeste,sur,este,norte` (grados WGS84, máx. 50 000 km²) ·
   `lat`, `lon` y `radio_km` (máx. 100 km). Debe tocar Cusco.
@@ -252,11 +255,50 @@ Correcciones aplicadas en la revisión:
 - **URL pública:** https://firecal-316891526626.southamerica-east1.run.app (API en `/api/*`, documentación en `/docs`).
 - Proyecto `sonic-mile-514718-r5`, región São Paulo, 1 GB, 1 instancia mínima y 2 como máximo, imagen
   `firecal-cusco:8fc1f2b` en Artifact Registry. Casos de MAESTRO §12 comprobados contra la URL pública.
-- Variables: `FIRECAL_TRUST_PROXY=1` y `FIRECAL_PROXY_HOPS=2`. Con 1 salto, todos los visitantes compartían el cupo
-  de 120/min, porque Cloud Run agrega la IP de su proxy al final de `X-Forwarded-For`. Corregido en 8fc1f2b.
+- Variables: `FIRECAL_TRUST_PROXY=1` y `FIRECAL_PROXY_HOPS=1`. Comprobado en producción: Cloud Run agrega al final de
+  `X-Forwarded-For` solo la IP real del visitante. Las revisiones 2 y 3 quedaron mal configuradas (2 saltos y, luego, una
+  variable mal guardada por la coma en PowerShell); la revisión 5 lo corrige.
 - PR #8 unido a `main` (b5768dd).
 - [ ] Probar el límite con dos personas en redes distintas.
 - [ ] Al terminar la evaluación: `--min-instances 0` o borrar el servicio.
+
+## Auditoría de Gabriel (resto) + nueva interfaz de Dante (sáb 14 nov 2026, noche)
+
+Publicado como revisión **`firecal-00006`** (imagen `firecal-cusco:dante-v1`). Comprobado en la URL pública: casos de
+MAESTRO (2005 = 1355, 2020 = 1206), PE-PUN → 404, gzip, caché de 1 h, `nosniff` y una sola IP contada aunque se
+falsifique `X-Forwarded-For`. Detalle, recomendaciones, seguridad y costos: `CAMBIOS_Y_RECOMENDACIONES.md`.
+
+**Backend**
+- [x] Retirado el backend sintético (66 % del código: simulador, H3, `/api/v1`, LightGBM). Archivado en la rama
+      `archivo/backend-sintetico`. Imagen: 1,33 GB → 917 MB; dependencias: 60 → 47.
+- [x] `firecal` solo tiene `plan-events` y `serve`.
+
+**Cambios en el protocolo de llamadas**
+- [x] `GET /api/resumen?graficos=true`: frases y datos de los 4 gráficos en **una** llamada. Antes eran 5.
+- [x] Parámetro desconocido (p. ej. `departmento`) → **422** con la lista de válidos. Antes respondía "área vacía".
+- [x] Fechas solo `AAAA-MM`: `2020-8` o `2020-01-15` → 422.
+- [x] Consultas pesadas, si hay área dibujada (`bbox`/`lat`): calendario, anomalías, focos.geojson, resumen y
+      `analitica/*`; además `hotspots.csv` siempre.
+- [x] Área dibujada: título legible ("the selected area") y coordenadas en `aoi.bbox`.
+
+**Interfaz (rama de Dante, b4dbf8c, adaptada)**
+- [x] Mapa base con relieve, logo del equipo, barra superior derecha (EN/ES y ayuda) y nueva línea de tiempo.
+- [x] El botón "Hotspots" del riel centra Cusco y abre el detalle; leyenda de la capa de puntos.
+- [x] Calendario: años recientes primero, uso con teclado (Tab, Enter) y cerrado por defecto en pantallas < 1600 px.
+- [x] La tarjeta de selección ya no tapa el panel "En simple"; riel horizontal en el celular.
+- [x] Se rotulan los dos conteos: armonizados frente a "detecciones en el mapa (sin ponderar)".
+
+## QA de Erik (rama `erik/qa`) aplicado (sáb 14 nov 2026, noche)
+
+Revisión **`firecal-00008`** (imagen `firecal-cusco:qa-erik-v2`). La rama de Erik (`QA_ERIK.md` y `qa/`) quedó unida.
+El estado de cada uno de los 14 errores está al final de `QA_ERIK.md`.
+- [x] API: fechas recortadas a 2000-2025, mensajes de validación en el idioma de la persona, radio 0, "mes
+      inválida" y área sin fuego con un mensaje claro.
+- [x] "En simple": áreas con poco fuego, año más tranquilo nunca extrapolado y plurales.
+- [x] Interfaz: el ▶ salta los meses sin dato, sin jerga técnica, botones con nombre y escala de años con flechas
+      fijas (se cortaba en 2021).
+- [x] 90 pruebas en verde (7 nuevas `test_qa_erik_*`).
+- [ ] Probar en un teléfono real y dibujar un área con el dedo.
 
 ## Pendientes que me afectan
 

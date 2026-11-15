@@ -14,6 +14,14 @@
   API, en `ACTIVIDADES_JULIO.md`.
 - **La versión de Vercel no es la oficial:** la URL de arriba es la que entregamos (incluye la interfaz y la API).
 
+## Actualización (14-nov, noche): nueva interfaz
+
+- Ya está la interfaz nueva de Dante: relieve, logo, línea de tiempo y calendario con años recientes primero.
+- La app abre en **inglés**. El botón **EN/ES** (arriba a la derecha) la pasa a español.
+- Para la evaluación con usuarios, anoten qué no se entiende, qué tarda y qué falla en el celular.
+  Recomendado: un formulario de comentarios (Google Forms) con el enlace en el grupo.
+- Cambios y recomendaciones: `CAMBIOS_Y_RECOMENDACIONES.md`.
+
 ## Qué le toca a cada uno
 
 - **Erik y Gabriel (QA):** prueben la URL, también desde el celular, y reporten errores con captura. Los registros

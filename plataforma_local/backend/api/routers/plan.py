@@ -23,24 +23,40 @@ from collections.abc import Iterator
 from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 
+from firecal.i18n import t
 from firecal.plan.events import PLAN_VERSION
 from firecal.plan.query import (
     CATEGORY_EDGES,
     MIN_YEARS,
-    NOTE_2025,
-    NOTE_EXTRAPOLADO,
-    UNIDAD,
     PlanError,
     PlanNoData,
     PlanNotReady,
     PlanStore,
+    note_2025,
+    note_extrapolado,
+    unidad,
 )
 from firecal.plan.sources import COLS_FOCOS
 
-router = APIRouter(prefix="/api", tags=["plan (MVP)"])
+KNOWN_PARAMS = {"departamento", "bbox", "lat", "lon", "radio_km", "fecha_inicio", "fecha_fin",
+                "mes", "anio", "limite", "graficos", "lang"}
+
+
+def _known_params(request: Request) -> None:
+    """422 con un mensaje claro si llega un parámetro que no existe (p. ej. 'departmento')."""
+    unknown = sorted(set(request.query_params) - KNOWN_PARAMS)
+    if unknown:
+        raise HTTPException(status_code=422, detail=t(
+            es=f"Parámetro(s) desconocido(s): {', '.join(unknown)}. Válidos: "
+               f"{', '.join(sorted(KNOWN_PARAMS))}.",
+            en=f"Unknown parameter(s): {', '.join(unknown)}. Valid: "
+               f"{', '.join(sorted(KNOWN_PARAMS))}."))
+
+
+router = APIRouter(prefix="/api", tags=["plan (MVP)"], dependencies=[Depends(_known_params)])
 
 FIRMS_CREDIT = ("We acknowledge the use of data and/or imagery from NASA's FIRMS "
                 "(https://earthdata.nasa.gov/firms).")
@@ -92,8 +108,10 @@ def departamentos(request: Request) -> dict:
     return _envelope(store, {
         "departamentos": [{"code": reg["code"], "name": reg["name"], "datos": "armonizados"}],
         "geojson": store.region_geojson,
-        "notes": ["Prototipo centrado en Cusco: es la única región con factores de armonización "
-                  "validados. Otras regiones responden 'sin datos'."]})
+        "notes": [t(es="Prototipo centrado en Cusco: es la única región con factores de "
+                          "armonización validados. Otras regiones responden 'sin datos'.",
+                       en="Prototype focused on Cusco: it is the only region with validated "
+                          "harmonization factors. Other regions return 'no data'.")]})
 
 
 @router.get("/departamentos.geojson")
@@ -208,9 +226,12 @@ def _analitica(request: Request, nombre: str, departamento, bbox, lat, lon, radi
 
 @router.get("/resumen")
 def resumen(request: Request, departamento: Dep = None, bbox: BBox = None, lat: Lat = None,
-            lon: Lon = None, radio_km: Radio = None) -> dict:
-    """Cinco frases en lenguaje sencillo sobre el fuego del AOI."""
-    return _analitica(request, "resumen", departamento, bbox, lat, lon, radio_km)
+            lon: Lon = None, radio_km: Radio = None,
+            graficos: Annotated[bool, Query(description="Incluir los datos de los 4 gráficos "
+                                            "(una sola llamada para el panel)")] = False) -> dict:
+    """Cinco frases en lenguaje sencillo sobre el fuego del AOI (y, si se pide, los gráficos)."""
+    return _analitica(request, "resumen", departamento, bbox, lat, lon, radio_km,
+                      graficos=graficos)
 
 
 @router.get("/analitica/estacionalidad")
@@ -263,43 +284,70 @@ def metadatos(request: Request) -> dict:
     m = store.meta
     f = m["factores"]
     return _envelope(store, {
-        "unidad": {**UNIDAD,
-                   "campos": "focos_armonizados en la API = suma de eq_hotspots (celda-día) o "
-                             "eq_foco (foco); nunca contar filas ni sumar n_modis + n_viirs"},
+        "unidad": {**unidad(),
+                   "campos": t(es="focos_armonizados en la API = suma de eq_hotspots (celda-día) "
+                                  "o eq_foco (foco); nunca contar filas ni sumar n_modis + n_viirs",
+                               en="focos_armonizados in the API = sum of eq_hotspots (cell-day) "
+                                  "or eq_foco (hotspot); never count rows or add n_modis + "
+                                  "n_viirs")},
         "armonizacion": {
             "version_datos": PLAN_VERSION,
-            "grilla": "celda de 0.01° (~1.1 km) × día local (UTC−5); presencia de fuego",
+            "grilla": t(es="celda de 0.01° (~1.1 km) × día local (UTC−5); presencia de fuego",
+                        en="0.01° cell (~1.1 km) × local day (UTC−5); fire presence"),
             "serie": [
-                {"periodo": "2000-11-04 a 2002-07-03", "fuente_serie": "Terra*kT",
+                {"periodo": t(es="2000-11-04 a 2002-07-03", en="2000-11-04 to 2002-07-03"),
+                 "fuente_serie": "Terra*kT",
                  "calidad": "extrapolado", "kT": {"alto": f.get("Terra*kT|alto"),
                                                   "bajo": f.get("Terra*kT|bajo")}},
-                {"periodo": "2002-07-04 a 2012-12-31", "fuente_serie": "MODIS",
+                {"periodo": t(es="2002-07-04 a 2012-12-31", en="2002-07-04 to 2012-12-31"),
+                 "fuente_serie": "MODIS",
                  "calidad": "referencia", "peso": 1.0},
-                {"periodo": "desde 2013-01-01", "fuente_serie": "VIIRS*k", "calidad": "calibrado",
+                {"periodo": t(es="desde 2013-01-01", en="since 2013-01-01"),
+                 "fuente_serie": "VIIRS*k", "calidad": "calibrado",
                  "k": {"alto": f.get("VIIRS*k|alto"), "bajo": f.get("VIIRS*k|bajo")}},
             ],
-            "estratos": "alto ≥ 2500 m, bajo < 2500 m (altitud SRTM)",
-            "validacion": "k calibrado en 2013-2019; en 2020-2024 VIIRS×k / MODIS real = "
-                          "0.90-1.09 por año",
-            "filtros": "type = 0 (vegetación); MODIS confidence ≥ 30; VIIRS n o h; solo S-NPP",
-            "anomalia": "(valor − mediana del mismo mes) / max(IQR, 1), con los meses completos "
-                        "de calidad referencia o calibrado",
+            "estratos": t(es="alto ≥ 2500 m, bajo < 2500 m (altitud SRTM)",
+                          en="high ≥ 2500 m, low < 2500 m (SRTM altitude)"),
+            "validacion": t(es="k calibrado en 2013-2019; en 2020-2024 VIIRS×k / MODIS real = "
+                               "0.90-1.09 por año",
+                            en="k calibrated on 2013-2019; in 2020-2024 VIIRS×k / actual MODIS = "
+                               "0.90-1.09 per year"),
+            "filtros": t(es="type = 0 (vegetación); MODIS confidence ≥ 30; VIIRS n o h; solo "
+                            "S-NPP",
+                         en="type = 0 (vegetation); MODIS confidence ≥ 30; VIIRS n or h; S-NPP "
+                            "only"),
+            "anomalia": t(es="(valor − mediana del mismo mes) / max(IQR, 1), con los meses "
+                             "completos de calidad referencia o calibrado",
+                          en="(value − median of the same month) / max(IQR, 1), using complete "
+                             "months of quality referencia or calibrado"),
             "min_anios_para_anomalia": MIN_YEARS,
             "categorias": [{"hasta": e if e != float("inf") else None, "nombre": n}
                            for e, n in CATEGORY_EDGES],
         },
         "cobertura": {"region": m["region"], "desde": m["cobertura_desde"],
                       "hasta": m["cobertura_hasta"], "ultimo_dia_con_focos": m["ultimo_dia"],
-                      "nota": "Serie histórica: no incluye 2026."},
+                      "nota": t(es="Serie histórica: no incluye 2026.",
+                                en="Historical series: 2026 is not included.")},
         "controles_maestro": {k: {"filas": v["filas"], "suma": v["suma"],
                                   "coincide": v["coincide_maestro"]}
                               for k, v in m["controles"].items()},
-        "creditos": [FIRMS_CREDIT, "Límite de Cusco: FAO GAUL 2015 (nivel 1, simplificado).",
-                     "Altitud: SRTM.", "Mapa base: © OpenStreetMap."],
-        "notes": ["Un foco es un píxel con anomalía térmica, no un incendio ni un área quemada.",
-                  "No se calcula área quemada y el FRP no se usa (no está armonizado entre "
-                  "sensores).",
-                  NOTE_EXTRAPOLADO, NOTE_2025,
-                  "Cobertura validada: solo Cusco. Los factores k y kT no se reutilizan en otras "
-                  "regiones."],
+        "creditos": [FIRMS_CREDIT,
+                     t(es="Límite de Cusco: FAO GAUL 2015 (nivel 1, simplificado).",
+                       en="Cusco boundary: FAO GAUL 2015 (level 1, simplified)."),
+                     t(es="Altitud: SRTM.", en="Altitude: SRTM."),
+                     t(es="Mapa base: OpenFreeMap (datos © OpenStreetMap); imagen satelital: Esri.",
+                       en="Basemap: OpenFreeMap (data © OpenStreetMap); satellite imagery: Esri.")],
+        "notes": [t(es="Un foco es un píxel con anomalía térmica, no un incendio ni un área "
+                       "quemada.",
+                    en="A hotspot is a pixel with a thermal anomaly, not a wildfire or a burned "
+                       "area."),
+                  t(es="No se calcula área quemada y el FRP no se usa (no está armonizado entre "
+                       "sensores).",
+                    en="Burned area is not computed and FRP is not used (it is not harmonized "
+                       "across sensors)."),
+                  note_extrapolado(), note_2025(),
+                  t(es="Cobertura validada: solo Cusco. Los factores k y kT no se reutilizan en "
+                       "otras regiones.",
+                    en="Validated coverage: Cusco only. The k and kT factors are not reused in "
+                       "other regions.")],
     })

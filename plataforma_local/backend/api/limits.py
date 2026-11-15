@@ -30,11 +30,13 @@ from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from firecal.concurrency import SingleFlight  # noqa: F401 - reexportado
+from firecal.i18n import t
 from firecal.settings import RateLimitParams
 
 # Rutas pesadas siempre; /calendario y /anomalias solo si el AOI es dibujado (bbox o punto).
-HEAVY_PATHS = {"/api/hotspots.csv", "/api/v1/hotspots", "/api/v1/map/cells"}
-HEAVY_IF_CUSTOM_AOI = {"/api/calendario", "/api/anomalias"}
+HEAVY_PATHS = {"/api/hotspots.csv"}
+HEAVY_IF_CUSTOM_AOI = {"/api/calendario", "/api/anomalias", "/api/focos.geojson", "/api/resumen"}
+HEAVY_PREFIX_IF_CUSTOM_AOI = "/api/analitica/"
 IDLE_FORGET_S = 600.0
 
 
@@ -104,8 +106,10 @@ class HeavyGate:
                 self.rejected += 1
             raise HTTPException(
                 status_code=503,
-                detail="Servidor ocupado con otras descargas o consultas pesadas. Intenta de "
-                       "nuevo en unos segundos.",
+                detail=t(es="Servidor ocupado con otras descargas o consultas pesadas. "
+                            "Intenta de nuevo en unos segundos.",
+                         en="Server busy with other downloads or heavy queries. Try again in "
+                            "a few seconds."),
                 headers={"Retry-After": "5"})
         with self._lock:
             self.active += 1
@@ -151,7 +155,8 @@ def is_heavy(request: Request) -> bool:
     if path in HEAVY_PATHS:
         return True
     q = request.query_params
-    return path in HEAVY_IF_CUSTOM_AOI and ("bbox" in q or "lat" in q)
+    custom = "bbox" in q or "lat" in q
+    return custom and (path in HEAVY_IF_CUSTOM_AOI or path.startswith(HEAVY_PREFIX_IF_CUSTOM_AOI))
 
 
 class RateLimiter:
@@ -162,9 +167,9 @@ class RateLimiter:
         self.enabled = params.enabled
         env_trust = os.environ.get("FIRECAL_TRUST_PROXY") == "1"
         self.trust_proxy = params.trust_proxy_headers or env_trust
-        # Cuántos proxies agregan IP al final de X-Forwarded-For. En Cloud Run son 2 (el visitante
-        # queda penúltimo): con 1, todos los visitantes compartían el cupo del proxy de Google
-        # (comprobado en producción el 14-nov). FIRECAL_PROXY_HOPS lo fija sin reconstruir.
+        # Cuántos proxies agregan IP al final de X-Forwarded-For. En Cloud Run es 1: llega
+        # "<lo que mandó el cliente>, <IP real>" (comprobado en producción el 14-nov: con 2, las IP
+        # inventadas creaban clientes nuevos). FIRECAL_PROXY_HOPS lo cambia sin reconstruir.
         self.proxy_hops = int(os.environ.get("FIRECAL_PROXY_HOPS") or params.proxy_hops)
         self.general = TokenBuckets(params.requests_per_minute, params.burst, params.max_clients)
         self.heavy = TokenBuckets(params.heavy_per_minute, params.heavy_burst, params.max_clients)
@@ -189,8 +194,10 @@ class RateLimiter:
         retry = max(1, math.ceil(wait))
         return JSONResponse(
             status_code=429,
-            content={"detail": f"Demasiadas solicitudes desde tu conexión. Espera {retry} s y "
-                               "vuelve a intentar."},
+            content={"detail": t(es=f"Demasiadas solicitudes desde tu conexión. Espera "
+                                    f"{retry} s y vuelve a intentar.",
+                                 en=f"Too many requests from your connection. Wait {retry} s "
+                                    "and try again.")},
             headers={"Retry-After": str(retry), "X-RateLimit-Limit": str(limit),
                      "X-RateLimit-Remaining": "0"},
             media_type="application/json; charset=utf-8")

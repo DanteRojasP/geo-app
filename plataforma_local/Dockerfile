@@ -29,10 +29,6 @@ ENV PYTHONUTF8=1 PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
     FIRECAL_SOURCE_ROOT=/app FIRECAL_FRONTEND_DIR=/app/frontend
 WORKDIR /app/backend
 
-# libgomp1: lo necesita lightgbm (dependencia del backend) en Debian slim.
-RUN apt-get update && apt-get install -y --no-install-recommends libgomp1 \
-    && rm -rf /var/lib/apt/lists/*
-
 COPY ${PLAT_DIR}/backend/requirements-lock.txt ./
 RUN pip install -r requirements-lock.txt
 

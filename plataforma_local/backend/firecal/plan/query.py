@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 import threading
 from dataclasses import dataclass
 
@@ -28,6 +29,7 @@ import pandas as pd
 from shapely.geometry import Point, box, shape
 
 from firecal.concurrency import SingleFlight
+from firecal.i18n import t
 from firecal.plan.events import meta_path, plan_dir, region_path
 from firecal.plan.sources import COLS_FOCOS, REGION_CODE, REGION_NAME
 from firecal.regions import buffer_km, geodesic_area_km2
@@ -43,21 +45,41 @@ FUENTE = {"extrapolado": "Terra*kT", "mixto": "Terra*kT + MODIS", "referencia": 
 CATEGORY_EDGES = [(-1.0, "muy por debajo"), (-0.5, "por debajo"), (0.5, "normal"),
                   (1.0, "por encima"), (math.inf, "muy por encima")]
 EARTH_KM = 6371.0088
-UNIDAD = {"nombre": "Focos armonizados", "nombre_en": "Harmonized hotspots",
-          "definicion": "Focos armonizados: celdas de ~1 km con fuego por día, en escala "
-                        "equivalente a MODIS. Combina MODIS (2000–2012) y VIIRS (2013 en "
-                        "adelante)."}
+def unidad() -> dict:
+    """Nombre y definición de la unidad, en el idioma de la solicitud."""
+    return {"nombre": t(es="Focos armonizados", en="Harmonized hotspots"),
+            "nombre_en": "Harmonized hotspots",
+            "definicion": t(
+                es="Focos armonizados: celdas de ~1 km con fuego por día, en escala equivalente a "
+                   "MODIS. Combina MODIS (2000–2012) y VIIRS (2013 en adelante).",
+                en="Harmonized hotspots: ~1 km cells with fire per day, on a MODIS-equivalent "
+                   "scale. Combines MODIS (2000–2012) and VIIRS (2013 onwards).")}
 # Error mensual de kT (MAESTRO §7) por estrato: margen de los focos extrapolados.
 ERROR_EXTRAPOLADO = {"alto": 0.41, "bajo": 0.45}
 CATEGORIA_INCIERTA = "incierta"
-NOTE_2025 = ("2025: el valor es el que registra VIIRS. MODIS cae más que VIIRS ese año (posible "
-             "deriva orbital, no verificada), pero no afecta a la serie, que usa VIIRS desde 2013. "
-             "El último día (31-dic) puede estar incompleto.")
-NOTE_EXTRAPOLADO = ("2000-11 a 2002-06: solo Terra, escalado con kT (calidad 'extrapolado', error "
-                    "mensual ~41–45 %). Se muestra atenuado y con su margen ('rango'); si el "
-                    "margen cruza de categoría, la anomalía se marca 'incierta'.")
-NOTE_CUSTOM = ("Área dibujada: el total es la suma de eq_foco de los focos dentro del área "
-               "(igual a la suma de la descarga CSV).")
+def note_2025() -> str:
+    return t(es="2025: el valor es el que registra VIIRS. MODIS cae más que VIIRS ese año (posible "
+                "deriva orbital, no verificada), pero no afecta a la serie, que usa VIIRS desde "
+                "2013. El último día (31-dic) puede estar incompleto.",
+             en="2025: the value is what VIIRS recorded. MODIS drops more than VIIRS that year "
+                "(possible orbital drift, not verified), but this does not affect the series, "
+                "which uses VIIRS since 2013. The last day (Dec 31) may be incomplete.")
+
+
+def note_extrapolado() -> str:
+    return t(es="2000-11 a 2002-06: solo Terra, escalado con kT (calidad 'extrapolado', error "
+                "mensual ~41–45 %). Se muestra atenuado y con su margen ('rango'); si el margen "
+                "cruza de categoría, la anomalía se marca 'incierta'.",
+             en="2000-11 to 2002-06: Terra only, scaled with kT (quality 'extrapolado', monthly "
+                "error ~41–45 %). Shown faded and with its margin ('rango'); if the margin crosses "
+                "a category, the anomaly is marked 'incierta' (uncertain).")
+
+
+def note_custom() -> str:
+    return t(es="Área dibujada: el total es la suma de eq_foco de los focos dentro del área "
+                "(igual a la suma de la descarga CSV).",
+             en="Drawn area: the total is the sum of eq_foco of the hotspots inside the area "
+                "(equal to the sum of the CSV download).")
 
 
 class PlanError(ValueError):
@@ -79,27 +101,42 @@ class AOI:
     params: tuple
     label: str
     area_km2: float | None = None
+    bbox: tuple[float, float, float, float] | None = None
 
     @property
     def whole_region(self) -> bool:
         return self.kind == "departamento"
 
     def info(self) -> dict:
-        return {"tipo": self.kind, "descripcion": self.label,
-                "area_km2": None if self.area_km2 is None else round(self.area_km2, 1)}
+        out = {"tipo": self.kind, "descripcion": self.label,
+               "area_km2": None if self.area_km2 is None else round(self.area_km2, 1)}
+        if self.bbox is not None:
+            out["bbox"] = [round(v, 4) for v in self.bbox]
+        return out
 
 
 def parse_month(value: str | None, name: str) -> tuple[int, int] | None:
     if value in (None, ""):
         return None
     try:
-        y, m = (int(v) for v in value.split("-")[:2])
+        if not re.fullmatch(r"\d{4}-\d{2}", value.strip()):
+            raise ValueError
+        y, m = (int(v) for v in value.strip().split("-"))
         if not 1 <= m <= 12:
             raise ValueError
     except ValueError as exc:
-        raise PlanError(f"{name} inválida ('{value}'): usa el formato AAAA-MM, "
-                        "p. ej. 2020-08.") from exc
+        raise PlanError(t(es=f"Valor no válido para {name} ('{value}'): usa el formato "
+                             "AAAA-MM, p. ej. 2020-08.",
+                          en=f"Invalid {name} ('{value}'): use the YYYY-MM format, "
+                             "e.g. 2020-08.")) from exc
     return y, m
+
+
+def no_fire(aoi: AOI) -> str:
+    """Área de Cusco donde los satélites nunca detectaron fuego (QA de Erik, 13)."""
+    return t(es=f"No se detectaron focos en {aoi.label} entre {COVER_FROM[0]} y {COVER_TO[0]}.",
+             en=f"No hotspots were detected in {aoi.label} between {COVER_FROM[0]} and "
+                f"{COVER_TO[0]}.")
 
 
 def month_quality(y: int, m: int, fraccion_extrapolada: float | None = None) -> tuple[str, str]:
@@ -182,7 +219,9 @@ class PlanStore:
 
     def _ensure(self) -> duckdb.DuckDBPyConnection:
         if not self.ready:
-            raise PlanNotReady("Aún no se cargaron los datos de Cusco. Corre: firecal plan-events")
+            raise PlanNotReady(t(es="Aún no se cargaron los datos de Cusco. Corre: "
+                                    "firecal plan-events",
+                                 en="Cusco data is not loaded yet. Run: firecal plan-events"))
         stamp = meta_path(self.settings).stat().st_mtime
         with self._lock:
             if self._con is None or stamp != self._stamp:
@@ -225,40 +264,61 @@ class PlanStore:
         given = [departamento not in (None, ""), bbox not in (None, ""),
                  lat is not None or lon is not None]
         if sum(given) == 0:
-            raise PlanError("AOI vacío: indica 'departamento' (PE-CUS), 'bbox' "
-                            "(oeste,sur,este,norte) o 'lat', 'lon' y 'radio_km'.")
+            raise PlanError(t(es="AOI vacío: indica 'departamento' (PE-CUS), 'bbox' "
+                                 "(oeste,sur,este,norte) o 'lat', 'lon' y 'radio_km'.",
+                              en="Empty AOI: give 'departamento' (PE-CUS), 'bbox' "
+                                 "(west,south,east,north) or 'lat', 'lon' and 'radio_km'."))
         if sum(given) > 1:
-            raise PlanError("Indica un solo tipo de AOI: departamento, bbox o punto + radio.")
+            raise PlanError(t(es="Indica un solo tipo de AOI: departamento, bbox o punto + "
+                                 "radio.",
+                              en="Give only one type of AOI: departamento, bbox or point + "
+                                 "radius."))
         if departamento:
             code = departamento.strip().upper()
             if code not in (REGION_CODE, "CUSCO", "CUZCO"):
-                raise PlanNoData(f"Sin datos para '{departamento}': el prototipo solo tiene datos "
-                                 f"armonizados y validados de {REGION_NAME} ({REGION_CODE}).")
+                raise PlanNoData(t(
+                    es=f"Sin datos para '{departamento}': el prototipo solo tiene datos "
+                       f"armonizados y validados de {REGION_NAME} ({REGION_CODE}).",
+                    en=f"No data for '{departamento}': the prototype only has harmonized, "
+                       f"validated data for {REGION_NAME} ({REGION_CODE})."))
             return AOI("departamento", "TRUE", (), REGION_NAME,
                        geodesic_area_km2(self._region))
         if bbox:
             try:
                 w, s, e, n = (float(v) for v in bbox.split(","))
             except ValueError as exc:
-                raise PlanError("bbox inválido: usa 'oeste,sur,este,norte' en grados, "
-                                "p. ej. -72.5,-14,-71.5,-13.") from exc
+                raise PlanError(t(es="bbox inválido: usa 'oeste,sur,este,norte' en grados, "
+                                     "p. ej. -72.5,-14,-71.5,-13.",
+                                  en="Invalid bbox: use 'west,south,east,north' in degrees, "
+                                     "e.g. -72.5,-14,-71.5,-13.")) from exc
             if not (-180 <= w < e <= 180 and -90 <= s < n <= 90):
-                raise PlanError("bbox inválido: se espera oeste < este y sur < norte (WGS84).")
+                raise PlanError(t(es="bbox inválido: se espera oeste < este y sur < norte "
+                                     "(WGS84).",
+                                  en="Invalid bbox: expected west < east and south < north "
+                                     "(WGS84)."))
             geom = box(w, s, e, n)
             area = geodesic_area_km2(geom)
             if area > api.max_aoi_km2:
-                raise PlanError(f"Área demasiado grande: el bbox mide {area:,.0f} km² y el máximo "
-                                f"es {api.max_aoi_km2:,.0f} km². Usa el departamento o un área "
-                                "menor.")
+                raise PlanError(t(
+                    es=f"Área demasiado grande: el bbox mide {area:,.0f} km² y el máximo es "
+                       f"{api.max_aoi_km2:,.0f} km². Usa el departamento o un área menor.",
+                    en=f"Area too large: the bbox covers {area:,.0f} km² and the maximum is "
+                       f"{api.max_aoi_km2:,.0f} km². Use the department or a smaller area."))
             self._require_inside(geom)
             return AOI("bbox", "longitude BETWEEN ? AND ? AND latitude BETWEEN ? AND ?",
-                       (w, e, s, n), f"bbox [{w}, {s}, {e}, {n}]", area)
+                       (w, e, s, n), t(es="el área seleccionada", en="the selected area"), area,
+                       bbox=(w, s, e, n))
         if lat is None or lon is None or radio_km is None:
-            raise PlanError("Para un punto indica 'lat', 'lon' y 'radio_km'.")
+            raise PlanError(t(es="Para un punto indica 'lat', 'lon' y 'radio_km'.",
+                              en="For a point give 'lat', 'lon' and 'radio_km'."))
         if not (-90 <= lat <= 90 and -180 <= lon <= 180):
-            raise PlanError("lat/lon fuera de rango (WGS84).")
+            raise PlanError(t(es="lat/lon fuera de rango (WGS84).",
+                              en="lat/lon out of range (WGS84)."))
         if not 0 < radio_km <= api.max_point_radius_km:
-            raise PlanError(f"radio_km debe estar entre 0 y {api.max_point_radius_km} km.")
+            raise PlanError(t(es=f"radio_km debe ser mayor que 0 y como máximo "
+                                 f"{api.max_point_radius_km} km.",
+                              en=f"radio_km must be greater than 0 and at most "
+                                 f"{api.max_point_radius_km} km."))
         self._require_inside(buffer_km(Point(lon, lat), radio_km))
         dlat = radio_km / 111.0
         dlon = radio_km / (111.0 * max(math.cos(math.radians(lat)), 0.01))
@@ -267,13 +327,17 @@ class PlanStore:
                "cos(radians(?)) * cos(radians(latitude)) * "
                "pow(sin(radians(longitude - ?) / 2), 2))) <= ?")
         params = (lat - dlat, lat + dlat, lon - dlon, lon + dlon, lat, lat, lon, radio_km)
-        return AOI("punto", sql, params, f"{radio_km} km alrededor de ({lat}, {lon})",
+        label = t(es=f"{radio_km} km alrededor de ({lat}, {lon})",
+                  en=f"{radio_km} km around ({lat}, {lon})")
+        return AOI("punto", sql, params, label,
                    math.pi * radio_km ** 2)
 
     def _require_inside(self, geom) -> None:
         if not geom.intersects(self._region):
-            raise PlanNoData(f"Sin datos: el área está fuera de {REGION_NAME}, la única región "
-                             "con datos armonizados y validados.")
+            raise PlanNoData(t(es=f"Sin datos: el área está fuera de {REGION_NAME}, la única "
+                                  "región con datos armonizados y validados.",
+                               en=f"No data: the area is outside {REGION_NAME}, the only region "
+                                  "with harmonized, validated data."))
 
     # ---------------------------------------------------------------- series
     def monthly(self, aoi: AOI) -> pd.DataFrame:
@@ -377,12 +441,20 @@ class PlanStore:
         a = parse_month(inicio, "fecha_inicio") or COVER_FROM
         b = parse_month(fin, "fecha_fin") or COVER_TO
         if a > b:
-            raise PlanError(f"Rango invertido: fecha_inicio ({a[0]}-{a[1]:02d}) es posterior a "
-                            f"fecha_fin ({b[0]}-{b[1]:02d}).")
+            raise PlanError(t(
+                es=f"Rango invertido: fecha_inicio ({a[0]}-{a[1]:02d}) es posterior a "
+                   f"fecha_fin ({b[0]}-{b[1]:02d}).",
+                en=f"Inverted range: fecha_inicio ({a[0]}-{a[1]:02d}) is after "
+                   f"fecha_fin ({b[0]}-{b[1]:02d})."))
         if b < COVER_FROM or a > COVER_TO:
-            raise PlanNoData(f"Sin datos: la serie cubre de {COVER_FROM[0]}-{COVER_FROM[1]:02d} "
-                             f"(desde el 2000-11-04) a {COVER_TO[0]}-{COVER_TO[1]:02d}.")
-        return a, b
+            raise PlanNoData(t(
+                es=f"Sin datos: la serie cubre de {COVER_FROM[0]}-{COVER_FROM[1]:02d} "
+                   f"(desde el 2000-11-04) a {COVER_TO[0]}-{COVER_TO[1]:02d}.",
+                en=f"No data: the series covers {COVER_FROM[0]}-{COVER_FROM[1]:02d} "
+                   f"(from 2000-11-04) to {COVER_TO[0]}-{COVER_TO[1]:02d}."))
+        # QA de Erik (3): 2020-01..9999-12 armaba 7 980 años vacíos (4,7 MB, 2 s). Se recorta a
+        # los años de la cobertura; ene-oct de 2000 siguen saliendo como "sin dato".
+        return max(a, (COVER_FROM[0], 1)), min(b, (COVER_TO[0], 12))
 
     def _row(self, aoi: AOI, ym: tuple[int, int]):
         full = self.monthly(aoi)
@@ -393,7 +465,7 @@ class PlanStore:
         a, b = self._range(inicio, fin)
         full = self.monthly(aoi)
         if full["focos_modis"].sum() + full["focos_viirs"].sum() == 0:
-            raise PlanNoData(f"Sin datos: no hay focos en {aoi.label} en toda la serie.")
+            raise PlanNoData(no_fire(aoi))
         by_key = {(int(r.anio), int(r.mes)): r for r in full.itertuples(index=False)}
         months = _month_range(a, b)
         years = sorted({y for y, _ in months})
@@ -420,14 +492,17 @@ class PlanStore:
                           "fuente_serie": r.fuente_serie, "parcial": bool(r.parcial)})
         notes = []
         if any(c.get("calidad") in ("extrapolado", "mixto") for c in cells):
-            notes.append(NOTE_EXTRAPOLADO)
+            notes.append(note_extrapolado())
         if any(c["anio"] == 2025 and not c["sin_dato"] for c in cells):
-            notes.append(NOTE_2025)
+            notes.append(note_2025())
         if any(c["sin_dato"] for c in cells):
-            notes.append("Meses sin dato (fuera de 2000-11-04 a 2025-12-31) en gris: no son cero.")
+            notes.append(t(es="Meses sin dato (fuera de 2000-11-04 a 2025-12-31) en gris: no son "
+                              "cero.",
+                           en="Months without data (outside 2000-11-04 to 2025-12-31) in grey: "
+                              "they are not zero."))
         if not aoi.whole_region:
-            notes.append(NOTE_CUSTOM)
-        return {"aoi": aoi.info(), "unidad": UNIDAD, "fecha_inicio": f"{a[0]}-{a[1]:02d}",
+            notes.append(note_custom())
+        return {"aoi": aoi.info(), "unidad": unidad(), "fecha_inicio": f"{a[0]}-{a[1]:02d}",
                 "fecha_fin": f"{b[0]}-{b[1]:02d}", "anios": years, "meses": list(range(1, 13)),
                 "matriz_focos_armonizados": mat_v, "matriz_anomalia": mat_a,
                 "total_focos_armonizados": round(total, 2), "cortes_color": color_breaks(values),
@@ -436,9 +511,11 @@ class PlanStore:
     def anomaly(self, aoi: AOI, mes: str) -> dict:
         ym = parse_month(mes, "mes")
         if ym is None:
-            raise PlanError("Indica 'mes' con el formato AAAA-MM.")
+            raise PlanError(t(es="Indica 'mes' con el formato AAAA-MM.",
+                              en="Give 'mes' in the YYYY-MM format."))
         if not COVER_FROM <= ym <= COVER_TO:
-            raise PlanNoData(f"Sin datos para {mes}: la serie cubre de 2000-11 a 2025-12.")
+            raise PlanNoData(t(es=f"Sin datos para {mes}: la serie cubre de 2000-11 a 2025-12.",
+                               en=f"No data for {mes}: the series covers 2000-11 to 2025-12."))
         full, r = self._row(aoi, ym)
         hist = full[(full["mes"] == ym[1]) & full["calidad"].isin(["referencia", "calibrado"])
                     & ~full["parcial"]]
@@ -454,14 +531,16 @@ class PlanStore:
         anom = _num(r.anomalia)
         notes = []
         if r.calidad in ("extrapolado", "mixto"):
-            notes.append(NOTE_EXTRAPOLADO)
+            notes.append(note_extrapolado())
         if ym[0] == 2025:
-            notes.append(NOTE_2025)
+            notes.append(note_2025())
         if anom is None and not bool(r.parcial):
-            notes.append(f"Sin anomalía: hay menos de {MIN_YEARS} años de historia.")
+            notes.append(t(es=f"Sin anomalía: hay menos de {MIN_YEARS} años de historia.",
+                           en=f"No anomaly: there are fewer than {MIN_YEARS} years of history."))
         if bool(r.parcial):
-            notes.append("Mes parcial (la serie empieza el 2000-11-04): sin anomalía.")
-        return {"aoi": aoi.info(), "unidad": UNIDAD, "mes": f"{ym[0]}-{ym[1]:02d}",
+            notes.append(t(es="Mes parcial (la serie empieza el 2000-11-04): sin anomalía.",
+                           en="Partial month (the series starts on 2000-11-04): no anomaly."))
+        return {"aoi": aoi.info(), "unidad": unidad(), "mes": f"{ym[0]}-{ym[1]:02d}",
                 "focos_armonizados": _num(r.focos_armonizados),
                 "celdas_dia": int(r.celdas_dia),
                 "focos_modis": int(r.focos_modis), "focos_viirs": int(r.focos_viirs),
@@ -480,7 +559,8 @@ class PlanStore:
     def focos_geojson(self, aoi: AOI, inicio: str | None, fin: str | None) -> dict:
         """Focos del rango como GeoJSON para el mapa. Peso = ``eq_foco`` (sin FRP)."""
         if inicio in (None, "") or fin in (None, ""):
-            raise PlanError("Para el mapa indica 'fecha_inicio' y 'fecha_fin' (AAAA-MM).")
+            raise PlanError(t(es="Para el mapa indica 'fecha_inicio' y 'fecha_fin' (AAAA-MM).",
+                              en="For the map give 'fecha_inicio' and 'fecha_fin' (YYYY-MM)."))
         a, b = self._range(inicio, fin)
         where = f"WHERE {aoi.sql} AND (anio * 100 + mes) BETWEEN ? AND ?"
         params = [*aoi.params, a[0] * 100 + a[1], b[0] * 100 + b[1]]
@@ -489,8 +569,11 @@ class PlanStore:
         n = cur.execute(f"SELECT count(*) FROM fo {where}", params).fetchall()[0][0]
         if n > limit:
             cur.close()
-            raise PlanError(f"El mapa tendría {n:,} focos; el máximo es {limit:,}. Usa un rango "
-                            "de fechas menor (la descarga CSV no tiene este límite).")
+            raise PlanError(t(
+                es=f"El mapa tendría {n:,} focos; el máximo es {limit:,}. Usa un rango de fechas "
+                   "menor (la descarga CSV no tiene este límite).",
+                en=f"The map would have {n:,} hotspots; the maximum is {limit:,}. Use a shorter "
+                   "date range (the CSV download has no such limit)."))
         rows = cur.execute(
             "SELECT longitude, latitude, fecha_local, hora_utc, sensor, satelite, eq_foco, "
             f"en_serie, calidad FROM fo {where} ORDER BY fecha_local, hora_utc", params).fetchall()
@@ -512,7 +595,10 @@ class PlanStore:
                        ) -> tuple[str, list, int, float]:
         """SQL de la descarga (18 columnas del contrato de focos), n.º de filas y Σ eq_foco."""
         if inicio in (None, "") or fin in (None, ""):
-            raise PlanError("Para la descarga indica 'fecha_inicio' y 'fecha_fin' (AAAA-MM).")
+            raise PlanError(t(es="Para la descarga indica 'fecha_inicio' y 'fecha_fin' "
+                                 "(AAAA-MM).",
+                              en="For the download give 'fecha_inicio' and 'fecha_fin' "
+                                 "(YYYY-MM)."))
         a, b = self._range(inicio, fin)
         where = f"WHERE {aoi.sql} AND (anio * 100 + mes) BETWEEN ? AND ?"
         params = [*aoi.params, a[0] * 100 + a[1], b[0] * 100 + b[1]]
@@ -522,8 +608,10 @@ class PlanStore:
         cur.close()
         max_rows = self.settings.params.api.max_csv_rows
         if n > max_rows:
-            raise PlanError(f"La descarga tendría {n:,} filas; el máximo es {max_rows:,}. "
-                            "Usa un rango de fechas o un área menor.")
+            raise PlanError(t(es=f"La descarga tendría {n:,} filas; el máximo es "
+                                 f"{max_rows:,}. Usa un rango de fechas o un área menor.",
+                              en=f"The download would have {n:,} rows; the maximum is "
+                                 f"{max_rows:,}. Use a shorter date range or a smaller area."))
         sql = (f"SELECT {', '.join(COLS_FOCOS)} FROM fo {where} "
                "ORDER BY fecha_utc, hora_utc, latitude, longitude")
         return sql, params, int(n), float(total)

@@ -185,16 +185,45 @@ def test_csv_row_cap(plan_home):
     assert app.state.gate.stats()["pesadas_activas"] == 0   # el error también libera el turno
 
 
-def test_proxy_hops_from_env_cloud_run(plan_home, monkeypatch):
-    """Cloud Run: X-Forwarded-For = '<inventadas>, <visitante>, <proxy de Google>'."""
+def test_proxy_hops_from_env(plan_home, monkeypatch):
+    """FIRECAL_PROXY_HOPS=2: detrás de 2 proxies el visitante queda penúltimo en X-Forwarded-For.
+    (Cloud Run usa 1, el valor por defecto: '<lo que mandó el cliente>, <IP real>'.)"""
     monkeypatch.setenv("FIRECAL_TRUST_PROXY", "1")
     monkeypatch.setenv("FIRECAL_PROXY_HOPS", "2")
     s = _settings_with_limits(plan_home.settings, burst=1, requests_per_minute=1)
     api = TestClient(create_app(s))
-    gfe = "169.254.1.1"                              # misma IP de proxy para todos
-    a = {"X-Forwarded-For": f"203.0.113.1, {gfe}"}
-    b = {"X-Forwarded-For": f"203.0.113.2, {gfe}"}
-    spoof = {"X-Forwarded-For": f"1.2.3.4, 203.0.113.1, {gfe}"}
+    lb = "169.254.1.1"                               # IP del segundo proxy, igual para todos
+    a = {"X-Forwarded-For": f"203.0.113.1, {lb}"}
+    b = {"X-Forwarded-For": f"203.0.113.2, {lb}"}
+    spoof = {"X-Forwarded-For": f"1.2.3.4, 203.0.113.1, {lb}"}
     assert api.get("/api/departamentos", headers=a).status_code == 200
     assert api.get("/api/departamentos", headers=b).status_code == 200   # otro visitante: su cupo
     assert api.get("/api/departamentos", headers=spoof).status_code == 429  # inventar no sirve
+
+
+def test_gzip_and_cache_headers(plan_home):
+    """Mejora 4 de la auditoría: compresión y caché (datos históricos)."""
+    api = TestClient(create_app(plan_home.settings))
+    r = api.get("/api/focos.geojson", params={"departamento": "PE-CUS", "fecha_inicio": "2020-01",
+                                              "fecha_fin": "2020-12"},
+                headers={"Accept-Encoding": "gzip"})
+    assert r.status_code == 200 and r.headers["content-encoding"] == "gzip"
+    assert r.headers["cache-control"] == "public, max-age=3600"
+    assert api.get("/health").headers["cache-control"] == "no-store"
+    err = api.get("/api/calendario", params={"departamento": "PE-PUN"})
+    assert err.status_code == 404 and err.headers["cache-control"] == "no-store"
+
+
+def test_custom_aoi_analytics_count_as_heavy():
+    """Auditoría: focos.geojson, resumen y analíticas con área dibujada son pesadas."""
+    from starlette.requests import Request
+
+    from api.limits import is_heavy
+
+    def req(path, qs):
+        return Request({"type": "http", "path": path, "query_string": qs.encode(), "headers": []})
+
+    assert is_heavy(req("/api/focos.geojson", "bbox=1,2,3,4"))
+    assert is_heavy(req("/api/analitica/ranking", "lat=1&lon=2&radio_km=3"))
+    assert is_heavy(req("/api/resumen", "bbox=1,2,3,4"))
+    assert not is_heavy(req("/api/resumen", "departamento=PE-CUS"))

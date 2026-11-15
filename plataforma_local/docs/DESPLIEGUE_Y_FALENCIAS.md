@@ -12,7 +12,7 @@ se midieron en esta máquina en modo sintético.
 | Imagen Docker | 1,32 GB; se construye en ~1,5 min |
 | Carga de datos (`firecal plan-events`) | ~2 s |
 | Latencia de `/api/calendario` | 1.ª consulta de un AOI: 160-540 ms; repetida: ~7 ms (caché en memoria) |
-| `/api/v1/calendar` (alternativa B, precalculada) | ~27 ms |
+| ~~`/api/v1/calendar`~~ (retirado el 14-nov) | — |
 
 ## 2. Falencias que existen hoy (hay que resolverlas antes de publicar)
 
@@ -80,7 +80,7 @@ docker build -f plataforma_local/Dockerfile -t $IMG .
 docker push $IMG
 gcloud run deploy firecal --image $IMG --region southamerica-east1 --memory 1Gi `
   --min-instances 1 --max-instances 2 --allow-unauthenticated `
-  --set-env-vars FIRECAL_TRUST_PROXY=1,FIRECAL_PROXY_HOPS=2
+  --set-env-vars "FIRECAL_TRUST_PROXY=1,FIRECAL_PROXY_HOPS=1"   # comillas: en PowerShell la coma separa argumentos
 ```
 Cloud Run define `PORT` y la imagen lo respeta. Después de la evaluación: `--min-instances 0` o borrar el servicio.
 
@@ -133,13 +133,13 @@ Parámetros: `config/settings.yaml → api.rate_limit` y `api.max_csv_rows`.
   los datos no coinciden con MAESTRO §6.
 - Para Cloud Run o Azure: construir desde la raíz del repo (para que los contextos existan) o usar la imagen ya
   construida (`docker compose build`, luego `docker push` al registro de la nube).
-- El backend anterior sintético (`/api/v1`) quedó apagado (`api.legacy_v1: false`): no hay datos simulados expuestos.
+- El backend anterior sintético (`/api/v1`) se retiró del código el 14-nov (rama `archivo/backend-sintetico`).
 
 ## 7. Cambios del 14-nov (noche): interfaz de Dante y Dockerfile de Antonio
 
 - **Dockerfile** basado en `Dockerfile.modelo` de Antonio: contexto = raíz del repositorio y datos dentro de la
   imagen. Se agregaron una etapa Node que compila la interfaz y la validación con `firecal plan-events`.
-  Imagen de 1,33 GB, ~130 MB de RAM y construcción de ~2 min.
+  Imagen de 1,33 GB, ~130 MB de RAM y construcción de ~2 min (917 MB desde el 14-nov).
 - **Interfaz** de Dante (React + MapLibre) servida por la misma API: no hace falta CORS mientras vayan juntas.
 - **Tiles externos:** el mapa base usa OpenFreeMap y la vista satelital Esri World Imagery. Ambos son gratuitos
   con atribución; para tráfico alto, revisar sus condiciones de uso (falencia 5).

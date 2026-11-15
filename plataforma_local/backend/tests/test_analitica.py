@@ -145,3 +145,41 @@ def test_nota_de_2025(api):
         "/api/resumen", params={"departamento": "PE-CUS"}).json()["notes"])
     otro = api.get("/api/analitica/acumulado", params={"departamento": "PE-CUS", "anio": 2019})
     assert not any(n.startswith("2025:") for n in otro.json()["notes"])
+
+
+# ------------------------------------------------------------ QA de Erik (14-nov, rama erik/qa)
+def test_qa_erik_poco_fuego_no_inventa_temporada(api):
+    """5: con todas las medianas en 0 el 'mes pico' salía enero y la frase se contradecía."""
+    res = api.get("/api/analitica/estacionalidad", params={"lat": -13.52, "lon": -71.97,
+                                                          "radio_km": 3})
+    if res.status_code == 404:                  # sin focos en el área: también es válido
+        return
+    body = res.json()
+    if max(m["mediana"] for m in body["meses"]) < 0.5:
+        assert "muy poco fuego" in body["en_simple"]
+        assert "con unos 0" not in body["en_simple"]
+
+
+@pytest.mark.parametrize("bbox", ["-73.2,-12.2,-72.4,-11.4", "-72.2,-13.7,-71.8,-13.4"])
+def test_qa_erik_anio_tranquilo_no_es_extrapolado(api, bbox):
+    """6: 2001 o 2002 con 0 focos (solo Terra) no pueden ser 'el año más tranquilo'."""
+    body = api.get("/api/analitica/ranking", params={"bbox": bbox}).json()
+    assert all(f["calidad"] == "extrapolado" for f in body["anios"] if f["anio"] <= 2002
+               and f["calidad"] != "mixto")
+    assert "tranquilo fue 2001" not in body["en_simple"]
+    assert "tranquilo fue 2002" not in body["en_simple"]
+
+
+def test_qa_erik_plurales(api):
+    """10: '1 focos armonizados' y '1 lugares'."""
+    for ruta in ("estacionalidad", "ranking", "acumulado", "recurrencia"):
+        txt = _get(api, ruta)["en_simple"]
+        assert " 1 focos" not in txt and " 1 lugares" not in txt
+
+
+def test_qa_erik_area_sin_fuego(api):
+    """13: área de Cusco sin fuego: mensaje claro, sin coordenadas crudas."""
+    res = api.get("/api/resumen", params={"bbox": "-71.36,-13.82,-71.34,-13.80"})
+    if res.status_code == 404:
+        detail = res.json()["detail"]
+        assert "No se detectaron focos" in detail and "bbox [" not in detail

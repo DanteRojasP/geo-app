@@ -8,23 +8,23 @@
 .fc-toggle button.is-active{background:#223f35;border-color:rgba(184,243,107,.35);color:#fff}
 .fc-calendar-grid{overflow:auto;padding:0 14px}
 .fc-calendar table{border-collapse:separate;border-spacing:2px;font-size:9.5px;font-variant-numeric:tabular-nums;width:100%}
-.fc-calendar th{color:#8fa098;font:8px var(--mono);font-weight:400;padding:0 3px;position:sticky;top:0;background:rgba(8,22,18,.96)}
-.fc-calendar tbody th{text-align:right;padding-right:6px;position:static;background:none}
+.fc-calendar th{color:#d0d5dd;font:8px var(--mono);font-weight:400;padding:0 3px;position:sticky;top:0;background:rgba(8,22,18,.96)}
+.fc-calendar tbody th{text-align:right;padding-right:6px;position:static;background:none;color:#344054;font-weight:600}
 .fc-calendar td{height:19px;min-width:34px;text-align:center;border-radius:3px;cursor:pointer}
 .fc-calendar td.is-empty{background:transparent;cursor:default}
 .fc-calendar td.is-nodata,.fc-legend .sw.is-nodata{background:#3b4a44 repeating-linear-gradient(-45deg,rgba(255,255,255,.18) 0 2px,transparent 2px 6px);cursor:default}
-.fc-calendar td.is-extrap,.fc-legend .sw.is-extrap{opacity:.55;background-image:repeating-linear-gradient(45deg,rgba(255,255,255,.45) 0 3px,transparent 3px 7px)}
+.fc-calendar td.is-extrap,.fc-legend .sw.is-extrap{opacity:.72;background-image:repeating-linear-gradient(45deg,rgba(255,255,255,.45) 0 3px,transparent 3px 7px)}
 .fc-calendar td.is-uncertain,.fc-legend .sw.is-uncertain{outline:1.5px dashed #b8f36b;outline-offset:-2px}
 .fc-calendar td.is-selected{outline:2px solid #fff;outline-offset:-1px}
 .fc-calendar td.is-viirs{box-shadow:inset 3px 0 0 #b8f36b}
 .fc-calendar td:hover:not(.is-empty):not(.is-nodata){outline:2px solid #5ee7d7;outline-offset:-1px}
-.fc-legend{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;padding:8px 14px 12px;font-size:9px;color:#9fb0a8}
+.fc-legend{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;padding:8px 14px 12px;font-size:10.5px;color:#344054}
 .fc-legend .sw{display:inline-block;width:16px;height:10px;border-radius:2px;margin-right:4px;vertical-align:middle;border:1px solid rgba(255,255,255,.12)}
 .fc-cls{display:inline-flex;align-items:center}
-.fc-margin{margin:0 14px 8px;font-size:10px;color:#ffbc5d}
-.fc-notice{margin:0 14px 8px;font-size:10px;color:#b8f36b}
-.fc-notes{margin:0 14px 10px;padding-left:16px;font-size:9px;color:#9fb0a8;line-height:1.45}
-.fc-credits{margin:0 14px 12px;font:8px var(--mono);color:#83938b}
+.fc-margin{margin:0 14px 8px;font-size:11px;color:#b54708}
+.fc-notice{margin:0 14px 8px;font-size:11px;color:#067647}
+.fc-notes{margin:0 14px 10px;padding-left:16px;font-size:10.5px;color:#475467;line-height:1.45}
+.fc-credits{margin:0 14px 12px;font:9.5px var(--mono);color:#475467}
 .fw-time-info .fc-year{border:1px solid var(--line);background:rgba(255,255,255,.04);color:#dce7e1;border-radius:7px;width:24px;height:24px;display:grid;place-items:center;cursor:pointer}
 .fw-time-info .fc-year:disabled{opacity:.35;cursor:default}
 .fw-days button:disabled{opacity:.35;cursor:default}
@@ -56,3 +56,64 @@
 .fs-error{margin:0 0 10px;color:#f87171;font-size:13px}
 .fs-actions{display:flex;gap:8px;margin-top:10px}
 @media(max-width:650px){.fs-panel{left:10px;right:10px;top:70px;bottom:100px}}
+.fc-lang{display:flex;gap:2px;margin-right:6px;border:1px solid var(--line);border-radius:8px;padding:2px}
+.fc-lang button{border:0;background:transparent;color:#c8d6cf;font:600 10px var(--mono);padding:4px 7px;border-radius:6px;cursor:pointer}
+.fc-lang button.is-active{background:#223f35;color:#fff}
+
+/* ---- Integración con el diseño de Dante (rama dante, b4dbf8c): cabecera, línea de tiempo, capas ---- */
+.fc-topright{position:absolute;z-index:720;top:16px;right:16px;display:flex;align-items:center;gap:8px}
+.fc-app-name{display:flex;flex-direction:column;align-items:flex-end;padding:0 4px;color:#0f172a;text-shadow:0 1px 2px rgba(255,255,255,.8)}
+.fc-app-name b{font-size:13px;font-weight:700}
+.fc-app-name small{font-size:10.5px;color:#334155}
+.fc-live{height:32px;padding:0 10px;display:flex;align-items:center;gap:7px;border:1px solid #cbd5e1;border-radius:4px;background:rgba(255,255,255,.96);color:#0f172a;font-size:11px;font-weight:600}
+.fc-live i{width:7px;height:7px;border-radius:50%;background:#16a34a}
+.fc-lang{display:flex;gap:2px;border:1px solid #cbd5e1;border-radius:4px;padding:2px;background:rgba(255,255,255,.96)}
+.fc-lang button{border:0;background:transparent;color:#334155;font:600 11px var(--mono);padding:5px 8px;border-radius:3px;cursor:pointer}
+.fc-lang button.is-active{background:#197bb5;color:#fff}
+.fc-help{width:32px;height:32px;border:1px solid #cbd5e1;border-radius:4px;background:rgba(255,255,255,.96);color:#334155;display:grid;place-items:center;cursor:pointer}
+.fc-timeline .fw-timeline-panel .fw-days{grid-template-columns:repeat(12,1fr)}
+.fc-timeline .fw-days button{position:relative;flex-direction:column;gap:0}
+.fc-timeline .fw-days button small{font-size:9px}
+.fc-timeline .fw-days button i{position:absolute;bottom:0;left:0;height:2px;background:#31a2dc}
+.fc-timeline .fw-days button:disabled{opacity:.35;cursor:default}
+.fc-timeline .fw-year-scale .fc-year{min-width:26px;padding:0;display:grid;place-items:center;color:#d8e7ef}
+.fc-points-legend{margin-top:6px;padding:8px 4px 2px;border-top:1px solid #e2e8f0;font-size:11px;color:#334155}
+.fc-points-legend>span{display:block;font:500 8px var(--mono);letter-spacing:.09em;color:#475569;margin-bottom:4px}
+.fc-points-legend p{margin:3px 0;display:flex;align-items:center;gap:7px}
+.fc-points-legend i{width:10px;height:10px;border-radius:50%;border:1px solid #fff4df;box-shadow:0 0 0 1px rgba(0,0,0,.15)}
+.fc-points-legend i.modis{background:#ff9b3f}
+.fc-points-legend i.viirs{background:#f33932}
+.fc-points-legend i.outside{background:#f33932;opacity:.35}
+.fc-calendar{left:426px;right:196px;bottom:110px}
+/* Teclado: foco visible (auditoría: ninguna celda era alcanzable). */
+.fc-calendar td:focus-visible{outline:3px solid #197bb5;outline-offset:-2px}
+button:focus-visible,select:focus-visible{outline:2px solid #197bb5;outline-offset:2px}
+/* Celular: el menú lateral pasa a una barra horizontal bajo el logo (antes desaparecía). */
+@media(max-width:950px){
+  .fw-rail{display:flex!important;flex-direction:row;top:64px;left:10px;right:10px;bottom:auto;width:auto;height:auto;padding:4px;gap:2px;border-radius:6px;overflow-x:auto}
+  .fw-rail button{flex:1 0 54px;height:44px}
+  .fw-summary{top:120px}
+  .fc-app-name{display:none}
+  .fc-calendar{left:10px;right:10px;bottom:100px}
+}
+@media(max-width:650px){.fc-live{display:none}.fc-topright{top:12px;right:10px}}
+/* Línea de tiempo: 12 meses + 26 años (Dante la diseñó para 5 días y 820 px). */
+.fc-timeline{width:min(1180px,calc(100vw - 130px))}
+.fc-timeline .fw-timeline-panel{min-width:0}
+.fc-timeline .fw-timeline-options{min-width:0}
+.fc-timeline .fw-year-scale{flex:1 1 auto;min-width:0}
+.fc-timeline .fw-timeline-source{flex:0 0 auto}
+/* Controles de arriba a la derecha: a la izquierda de la columna de capas de Dante. */
+.fc-topright{right:72px}
+@media(max-width:950px){.fc-timeline{width:calc(100vw - 20px)}}
+/* Las etiquetas de Dante (Cusco · MODIS + VIIRS · periodo) repiten el recuadro de la línea de tiempo
+   y quedaban detrás de los controles de idioma. */
+.fw-map-meta{display:none}
+
+/* QA de Erik / revisión 7: escala de años con flechas fijas y años desplazables */
+.fc-timeline .fw-year-scale{overflow:visible;gap:2px}
+.fc-timeline .fc-years{position:relative;display:flex;gap:2px;min-width:0;flex:1 1 auto;overflow-x:auto;scrollbar-width:none}
+.fc-timeline .fc-years::-webkit-scrollbar{display:none}
+.fc-timeline .fc-years button{min-width:30px;padding:0 3px}
+@media(max-width:1500px){.fc-timeline .fw-timeline-source span{display:none}}
+@media(max-width:650px){.fc-timeline .fc-years button{min-width:28px}}

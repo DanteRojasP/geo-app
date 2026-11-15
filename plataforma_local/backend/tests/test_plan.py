@@ -170,7 +170,7 @@ def test_calendario_errors(api, params, status, text):
     assert text in r.json()["detail"]
 
 
-def test_legacy_v1_disabled_by_default(api):
+def test_legacy_v1_retired(api):
     assert api.post("/api/v1/calendar", json={}).status_code in (404, 405)
     assert "/api/v1/calendar" not in api.get("/openapi.json").json()["paths"]
 
@@ -250,3 +250,47 @@ def test_focos_geojson_for_map(api):
     big = api.get("/api/focos.geojson", params={"departamento": "PE-CUS",
                                                 "fecha_inicio": "2000-11", "fecha_fin": "2025-12"})
     assert big.status_code == 422 and "máximo" in big.json()["detail"]
+
+
+# ------------------------------------------------------------------ mejoras de la auditoría
+@pytest.mark.parametrize("mes", ["2020-01-15", "2020-8", "20-08", "2020/08"])
+def test_strict_month_format(api, mes):
+    r = api.get("/api/calendario", params={"departamento": "PE-CUS", "fecha_inicio": mes})
+    assert r.status_code == 422 and "AAAA-MM" in r.json()["detail"]
+
+
+def test_unknown_parameter_is_reported(api):
+    r = api.get("/api/calendario", params={"departmento": "PE-CUS"})
+    assert r.status_code == 422 and "departmento" in r.json()["detail"]
+
+
+def test_bbox_label_is_readable(api):
+    b = api.get("/api/calendario", params={"bbox": "-72.6,-13.8,-71.8,-13.2"}).json()
+    assert b["aoi"]["descripcion"] == "el área seleccionada"
+    assert b["aoi"]["bbox"] == [-72.6, -13.8, -71.8, -13.2]
+
+
+def test_resumen_with_charts_in_one_call(api):
+    b = api.get("/api/resumen", params={"departamento": "PE-CUS", "graficos": "true"}).json()
+    assert len(b["frases"]) == 5
+    assert set(b["graficos"]) == {"estacionalidad", "ranking", "acumulado", "altitud"}
+    assert "graficos" not in api.get("/api/resumen", params={"departamento": "PE-CUS"}).json()
+
+
+# ------------------------------------------------------------ QA de Erik (14-nov, rama erik/qa)
+def test_qa_erik_fechas_absurdas_se_recortan(api):
+    """3: 2020-01..9999-12 armaba 7 980 años (4,7 MB). Se recorta a la cobertura."""
+    body = _cal(api, departamento="PE-CUS", fecha_inicio="2020-01", fecha_fin="9999-12")
+    assert max(c["anio"] for c in body["celdas"]) == 2025
+    body = _cal(api, departamento="PE-CUS", fecha_inicio="0000-01", fecha_fin="2001-01")
+    assert min(c["anio"] for c in body["celdas"]) == 2000
+
+
+def test_qa_erik_mensajes(api):
+    """11 y 12: validación en el idioma de la persona, radio 0 y 'mes inválida'."""
+    r = api.get("/api/calendario", params={"lat": "abc", "lon": -72, "radio_km": 5})
+    assert r.status_code == 422 and r.json()["errors"][0]["error"] == "debe ser un número"
+    r = api.get("/api/calendario", params={"lat": -13.5, "lon": -72, "radio_km": 0})
+    assert r.status_code == 422 and "mayor que 0" in r.json()["detail"]
+    r = api.get("/api/anomalias", params={"departamento": "PE-CUS", "mes": "2020-13"})
+    assert r.status_code == 422 and "inválida" not in r.json()["detail"]

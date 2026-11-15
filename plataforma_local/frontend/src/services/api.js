@@ -1,6 +1,8 @@
 // Cliente de la API de FireCal (backend FastAPI de plataforma_local).
 // Por defecto usa la misma dirección que sirve la página. Para un frontend publicado aparte
 // (p. ej. Vercel), define VITE_API_BASE_URL con la URL del backend.
+import { getLang } from '../i18n.js'
+
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
 
 export const CUSCO = 'PE-CUS'
@@ -10,11 +12,20 @@ function buildUrl(path, params = {}) {
   Object.entries(params).forEach(([key, value]) => {
     if (value !== null && value !== undefined && value !== '') url.searchParams.set(key, value)
   })
+  url.searchParams.set('lang', getLang())          // textos de la API en el idioma de la interfaz
   return url
 }
 
-async function request(path, params) {
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
+async function request(path, params, retry = true) {
   const response = await fetch(buildUrl(path, params))
+  // 429 (cupo por IP) o 503 (servidor ocupado): esperar lo que pide Retry-After y reintentar una vez.
+  if (retry && (response.status === 429 || response.status === 503)) {
+    const wait = Math.min(6, Number(response.headers.get('Retry-After')) || 2)
+    await sleep(wait * 1000)
+    return request(path, params, false)
+  }
   let body = null
   try { body = await response.json() } catch { /* respuesta sin JSON */ }
   if (!response.ok) {
@@ -34,7 +45,7 @@ export const getCalendar = (aoi, fechaInicio, fechaFin) =>
   request('/api/calendario', { ...aoi, fecha_inicio: fechaInicio, fecha_fin: fechaFin })
 export const getMonth = (aoi, mes) => request('/api/anomalias', { ...aoi, mes })
 // Analíticas "en simple": cada respuesta trae titulo, en_simple, como_leerlo y los datos.
-export const getResumen = (aoi) => request('/api/resumen', aoi)
+export const getResumen = (aoi, extra = {}) => request('/api/resumen', { ...aoi, ...extra })
 export const getAnalitica = (nombre, aoi, extra = {}) => request(`/api/analitica/${nombre}`, { ...aoi, ...extra })
 export const getFocos = (aoi, fechaInicio, fechaFin) =>
   request('/api/focos.geojson', { ...aoi, fecha_inicio: fechaInicio, fecha_fin: fechaFin })
