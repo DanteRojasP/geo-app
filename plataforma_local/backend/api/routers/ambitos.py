@@ -86,10 +86,12 @@ def unidad(request: Request, nivel: str, codigo: str) -> dict:
 
 
 @router.get("/{nivel}/{codigo}/informe", response_class=HTMLResponse)
-def informe(request: Request, nivel: str, codigo: str) -> HTMLResponse:
-    """Informe automático de la unidad, listo para imprimir o guardar en PDF."""
+def informe(request: Request, nivel: str, codigo: str, mes: str | None = None) -> HTMLResponse:
+    """Informe automático de la unidad, listo para imprimir o guardar en PDF.
+
+    Con ``mes=AAAA-MM`` agrega la situación de ese mes frente a los mismos meses de otros años."""
     store = _store(request)
     return HTMLResponse(
-        _call(ambitos.informe_html, store, nivel, codigo),
+        _call(ambitos.informe_html, store, nivel, codigo, mes),
         headers={"Content-Language": t(es="es", en="en")},
     )

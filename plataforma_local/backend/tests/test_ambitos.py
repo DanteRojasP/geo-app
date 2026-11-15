@@ -131,7 +131,7 @@ def test_informe_html(api, lang):
     h = r.text
     assert "Pichari" in h and "CENEPRED" in h and "<svg" in h and "FIRMS" in h
     assert ("Nivel de peligro por focos de calor" if lang == "es" else "Hotspot hazard level") in h
-    assert ("Definiciones técnicas" if lang == "es" else "Technical definitions") in h
+    assert ("definiciones técnicas" if lang == "es" else "technical definitions") in h.lower()
     assert "MOD14" in h and "VNP14IMG" in h and "type = 0" in h
     texto = re.sub(r"<[^>]+>", " ", h)
     assert not PROHIBIDAS.search(texto), PROHIBIDAS.search(texto)
@@ -155,3 +155,20 @@ def test_definiciones_tecnicas_en_la_api(api):
         d = api.get("/api/ambitos", params={"lang": lang}).json()["metodo"]["definiciones"]
         assert set(d) == {"foco_de_calor", "foco_armonizado", "nivel_de_peligro"}
         assert d["foco_de_calor"].startswith(palabra) and "FIRMS" in d["foco_de_calor"]
+
+
+def test_informe_de_un_mes(api):
+    """Con mes=AAAA-MM el informe agrega la situación de ese mes frente a los mismos meses."""
+    h = _get(api, "/api/ambitos/provincia/0809/informe", mes="2020-08").text  # La Convención
+    assert "Situación de agosto de 2020" in h and "Puesto" in h and "Día por día" in h
+    vacio = _get(
+        api, "/api/ambitos/distrito/080403/informe", mes="2007-08"
+    ).text  # Lamay, sin focos
+    assert "Sin focos de calor" in vacio and "Puesto" not in vacio and "Día por día" not in vacio
+    assert "Muy pocos focos de calor" in vacio
+    assert (
+        api.get("/api/ambitos/provincia/0809/informe", params={"mes": "1999-01"}).status_code == 404
+    )
+    assert (
+        api.get("/api/ambitos/provincia/0809/informe", params={"mes": "2020-13"}).status_code == 422
+    )

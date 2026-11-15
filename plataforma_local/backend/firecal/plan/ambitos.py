@@ -510,7 +510,9 @@ def _svg_barras(
     ancho=620,
     color="#31688e",
 ) -> str:
-    m = max(max(valores), 1e-9)
+    if not valores or max(valores) <= 0:
+        return ""
+    m = max(valores)
     n = len(valores)
     bw = (ancho - 40) / n
     barras = []
@@ -536,8 +538,109 @@ def _svg_barras(
     )
 
 
-def informe_html(store: PlanStore, nivel: str, codigo: str) -> str:
+CATEGORIAS = {
+    "muy por debajo": ("Muy por debajo de lo habitual", "Well below usual", "#2166ac"),
+    "por debajo": ("Por debajo de lo habitual", "Below usual", "#67a9cf"),
+    "normal": ("Dentro de lo habitual", "Within usual", "#98a2b3"),
+    "por encima": ("Por encima de lo habitual", "Above usual", "#e66101"),
+    "muy por encima": ("Muy por encima de lo habitual", "Well above usual", "#b2182b"),
+    "incierta": ("Incierta (el margen de error cruza de categoría)", "Uncertain (the error margin "
+                 "crosses categories)", "#98a2b3"),
+}
+
+
+def seccion_mes(store: PlanStore, aoi: AOI, mes: str) -> str:
+    """Sección del informe para un mes: valor, mediana histórica, anomalía, puesto y días."""
+    esc = html.escape
+    a = store.anomaly(aoi, mes)
+    y, m = (int(x) for x in a["mes"].split("-"))
+    nombre_mes = t(es=["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto",
+                       "septiembre", "octubre", "noviembre", "diciembre"][m - 1],
+                   en=["January", "February", "March", "April", "May", "June", "July", "August",
+                       "September", "October", "November", "December"][m - 1])
+    valor = a["focos_armonizados"] or 0.0
+    med = a["mediana_hist"]
+    cat = a["categoria"]
+    es_, en_, color = CATEGORIAS.get(cat, ("Sin categoría", "No category", "#98a2b3"))
+    hist = sorted(a["historial"], key=lambda h: h["anio"])
+    valores = [h["focos_armonizados"] or 0.0 for h in hist]
+    puesto = 1 + sum(v > valor for v in valores)
+    propio = 1 if any(h["anio"] == y for h in hist) else 0
+    empates = sum(abs(v - valor) < 0.005 for v in valores) - propio
+    svg_hist = _svg_barras(valores, [str(h["anio"]) for h in hist],
+                           next((i for i, h in enumerate(hist) if h["anio"] == y), None))
+    dias = a["dias"]
+    n_dias = 31 if m in (1, 3, 5, 7, 8, 10, 12) else 30 if m != 2 else 29 if y % 4 == 0 else 28
+    por_dia = {int(x["fecha_local"][8:10]): x["focos_armonizados"] or 0.0 for x in dias}
+    svg_dias = _svg_barras([por_dia.get(i, 0.0) for i in range(1, n_dias + 1)],
+                           [str(i) for i in range(1, n_dias + 1)],
+                           max(por_dia, key=por_dia.get) - 1 if por_dia else None,
+                           color="#5d6677")
+    if valor <= 0:
+        es_, en_, color = ("Sin focos de calor", "No hotspots", "#98a2b3")
+        if not med:
+            comparacion = t(
+                es=f"Tampoco suele haberlos: la mediana de {nombre_mes} en otros años es 0.",
+                en=f"There usually are none either: the {nombre_mes} median in other years is 0.")
+        else:
+            comparacion = t(
+                es=f"Es poco común: la mediana de {nombre_mes} en otros años es {med:,.1f}.",
+                en=f"This is unusual: the {nombre_mes} median in other years is {med:,.1f}.")
+    elif med is None:
+        comparacion = t(es="No hay historia suficiente para compararlo.",
+                        en="There is not enough history to compare it.")
+    elif med > 0:
+        comparacion = t(es=f"La mediana de {nombre_mes} en otros años es {med:,.1f}: este mes tuvo "
+                           f"{valor / med:.1f} veces lo habitual.",
+                        en=f"The {nombre_mes} median in other years is {med:,.1f}: this month had "
+                           f"{valor / med:.1f} times the usual.")
+    else:
+        comparacion = t(es=f"La mediana de {nombre_mes} en otros años es 0.",
+                        en=f"The {nombre_mes} median in other years is 0.")
+    dia_max = (max(por_dia, key=por_dia.get), max(por_dia.values())) if por_dia else None
+    texto_dias = (t(es=f"{len(por_dia)} días con focos de calor; el más activo fue el "
+                       f"{dia_max[0]} de {nombre_mes} ({dia_max[1]:,.1f}).",
+                    en=f"{len(por_dia)} days with hotspots; the most active was {nombre_mes} "
+                       f"{dia_max[0]} ({dia_max[1]:,.1f}).")
+                  if dia_max else t(es="Ningún día con focos de calor.",
+                                    en="No day with hotspots."))
+    margen = ""
+    if a.get("incertidumbre"):
+        lo, hi = a["rango"]
+        margen = t(es=f" Margen por datos extrapolados: entre {lo:,.1f} y {hi:,.1f}.",
+                   en=f" Margin from extrapolated data: between {lo:,.1f} and {hi:,.1f}.")
+    notas = "".join(f"<li>{esc(n)}</li>" for n in a["notes"])
+    texto_puesto = ""
+    if valor > 0 and hist:
+        texto_puesto = esc(t(
+            es=f"Puesto {puesto} de {len(hist)} entre los meses de {nombre_mes} con historia"
+               + (f" (empatado con {empates})" if empates > 0 else "") + ".",
+            en=f"Rank {puesto} of {len(hist)} among {nombre_mes} months with history"
+               + (f" (tied with {empates})" if empates > 0 else "") + "."))
+    anom_txt = ""
+    if valor > 0 and a["anomalia"] is not None:
+        anom_txt = t(es=f" (anomalía {a['anomalia']:+.2f})", en=f" (anomaly {a['anomalia']:+.2f})")
+    return f"""
+<h2>{esc(t(es=f"Situación de {nombre_mes} de {y}", en=f"{nombre_mes} {y} at a glance"))}</h2>
+<div class="nivel"><span class="badge" style="background:{color}">{('0' if valor <= 0 else f'{valor:,.1f}')}</span>
+<div>{esc(t(es="focos de calor armonizados", en="harmonized hotspots"))} ·
+<b>{esc(t(es=es_, en=en_))}</b>{esc(anom_txt)}.
+{esc(comparacion)}{esc(margen)}
+{texto_puesto}</div></div>
+<p class="nota">MODIS {a["focos_modis"]} · VIIRS {a["focos_viirs"]}
+{esc(t(es="focos de calor detectados (sensores distintos: no se suman)",
+       en="hotspots detected (different sensors: not added)"))}.</p>
+{f'<h3>{esc(t(es=f"{nombre_mes.capitalize()} en cada año", en=f"{nombre_mes} in each year"))}</h3>' if svg_hist else ""}
+{svg_hist}
+{f'<h3>{esc(t(es="Día por día", en="Day by day"))}</h3>' if svg_dias else ""}
+{svg_dias}<p>{esc(texto_dias)}</p>
+{f"<ul class='nota'>{notas}</ul>" if notas else ""}
+"""  # noqa: E501 - plantilla HTML
+
+
+def informe_html(store: PlanStore, nivel: str, codigo: str, mes: str | None = None) -> str:
     d = detalle(store, nivel, codigo)
+    bloque_mes = seccion_mes(store, d["aoi"], mes) if mes else ""
     u, med = d["unidad"], d["mediana_del_nivel"]
     esc = html.escape
     meses = ["E", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"]
@@ -546,9 +649,8 @@ def informe_html(store: PlanStore, nivel: str, codigo: str) -> str:
     try:
         est = analitica.estacionalidad(store, d["aoi"])
         svg_mes = _svg_barras([m["mediana"] for m in est["meses"]], meses, est["mes_pico"] - 1)
-        txt_mes = est["en_simple"]
     except (PlanNoData, PlanError):
-        svg_mes, txt_mes = "", t(es="Sin focos en el periodo.", en="No hotspots in the period.")
+        svg_mes = ""
     serie = d["serie_anual"]
     anios = list(serie)
     svg_anio = _svg_barras(
@@ -557,6 +659,20 @@ def informe_html(store: PlanStore, nivel: str, codigo: str) -> str:
         anios.index(u["anio_max"]) if u["anio_max"] in anios else None,
     )
     nombre_nivel = d["titulo_nivel"]
+    # La frase ya está en "En simple": la sección solo se muestra si hay gráfico.
+    bloque_estacional = (
+        "<h2>" + esc(t(es="¿Cuándo hay más focos de calor?", en="When are there more hotspots?"))
+        + "</h2>" + svg_mes
+        if svg_mes
+        else ""
+    )
+    aviso_pocos = ""
+    if (u["media_anual"] or 0) < 1:
+        aviso_pocos = "<br><b>" + esc(t(
+            es="Muy pocos focos de calor (menos de 1 por año en promedio): el nivel, las frases y "
+               "los gráficos son poco robustos.",
+            en="Very few hotspots (less than 1 per year on average): the level, sentences and "
+               "charts are not robust.")) + "</b>"
     puesto = (
         t(
             es=f"puesto {u['puesto']} de {d['n_unidades']}",
@@ -610,8 +726,12 @@ dt{{font-weight:600;margin-top:8px}} .defs dd{{font-size:13px}} dd{{margin:2px 0
     }
 · {u["area_km2"]:,.1f} km² {esc(t(es="dentro de Cusco", en="within Cusco"))}</p>
 
-<h2>{esc(t(es="Definiciones técnicas", en="Technical definitions"))}</h2>
-<dl class="defs">{defs}</dl>
+<p class="nota">{esc(t(es="Foco de calor: anomalía térmica detectada por satélite (MODIS, VIIRS; NASA "
+                        "FIRMS). No es un incendio ni un área quemada. Definiciones técnicas "
+                        "completas al final.",
+                     en="Hotspot: a thermal anomaly detected by satellite (MODIS, VIIRS; NASA "
+                        "FIRMS). It is not a fire or a burned area. Full technical definitions at "
+                        "the end."))}</p>
 
 <h2>{
         esc(
@@ -627,7 +747,7 @@ dt{{font-weight:600;margin-top:8px}} .defs dd{{font-size:13px}} dd{{margin:2px 0
     }.
 {esc(t(es="Índice", en="Index"))} {
         ("—" if u["indice"] is None else f"{u['indice']:.2f}")
-    } (0–1).</div></div>
+    } (0–1).{aviso_pocos}</div></div>
 <table><tr><th>{esc(t(es="Parámetro", en="Parameter"))}</th><th class=n>{
         esc(t(es="Esta unidad", en="This unit"))
     }</th>
@@ -668,6 +788,7 @@ dt{{font-weight:600;margin-top:8px}} .defs dd{{font-size:13px}} dd{{margin:2px 0
 (Saaty, {esc(t(es="razón de consistencia", en="consistency ratio"))} {m["razon_consistencia"]}).
 {esc(" ".join(m["notas"][:2]))}</p>
 
+{bloque_mes}
 <h2>{esc(t(es="En simple", en="In plain words"))}</h2>
 <dl>{
         frases
@@ -681,13 +802,12 @@ dt{{font-weight:600;margin-top:8px}} .defs dd{{font-size:13px}} dd{{margin:2px 0
         + "</dd>"
     }</dl>
 
-<h2>{esc(t(es="¿Cuándo hay más focos de calor?", en="When are there more hotspots?"))}</h2>
-{svg_mes}<p>{esc(txt_mes)}</p>
+{bloque_estacional}
 
 <h2>{
         esc(
             t(
-                es="Focos armonizados por año (2003–2025)",
+                es="Focos de calor armonizados por año (2003–2025)",
                 en="Harmonized hotspots per year (2003–2025)",
             )
         )
@@ -708,6 +828,8 @@ dt{{font-weight:600;margin-top:8px}} .defs dd{{font-size:13px}} dd{{margin:2px 0
 <li>{esc(t(es="Límites del ámbito", en="Scope boundaries"))}: {
         esc(_capa(nivel)["fuente"])
     }.</li></ul>
+<h2>{esc(t(es="Anexo: definiciones técnicas", en="Annex: technical definitions"))}</h2>
+<dl class="defs">{defs}</dl>
 <p class="nota">We acknowledge the use of data and/or imagery from NASA's FIRMS
 (https://earthdata.nasa.gov/firms).</p>
 </body></html>"""  # noqa: E501 - plantilla HTML
