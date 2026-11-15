@@ -3,7 +3,10 @@
 // (p. ej. Vercel), define VITE_API_BASE_URL con la URL del backend.
 import { getLang, tr } from '../i18n.js'
 
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
+const configuredApiUrl = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
+// En Vercel usamos /api en el mismo dominio y vercel.json reenvía la petición a Cloud Run.
+// Esto evita depender de CORS y mantiene VITE_API_BASE_URL disponible para otros hosts.
+const API_BASE_URL = window.location.hostname.endsWith('.vercel.app') ? '' : configuredApiUrl
 
 export const CUSCO = 'PE-CUS'
 
