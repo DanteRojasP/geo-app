@@ -1,6 +1,6 @@
 # Cambios, recomendaciones, seguridad y costos (14-nov-2026)
 
-*Julio · revisión de Cloud Run `firecal-00006` · https://firecal-316891526626.southamerica-east1.run.app*
+*Julio · revisión de Cloud Run `firecal-00008` · https://firecal-316891526626.southamerica-east1.run.app*
 
 ## 1. Qué cambió
 
@@ -24,6 +24,11 @@ Comprobado en la URL pública:
 - Parámetro mal escrito → 422.
 - Gzip activo.
 - Una IP falsificada en `X-Forwarded-For` no crea clientes nuevos.
+
+### Revisión 8: QA de Erik
+
+Corregidos los 14 errores de `QA_ERIK.md` (detalle al final de ese archivo) y la escala de años, que se cortaba en
+2021 en pantallas de 1440 px. 90 pruebas en verde.
 
 ## 2. Recomendaciones (no implementadas)
 

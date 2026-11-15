@@ -152,3 +152,30 @@ Los scripts están en [`qa/`](qa/). Necesitan la API corriendo en local (`fireca
 | `ui_test.py` | Interfaz en Chrome sin pantalla, escritorio y celular | 8200, con límites activos |
 
 Para cambiar el puerto, editar la constante al inicio de cada script.
+
+## Respuesta (Julio, revisión `firecal-00008`, 14-nov-2026, noche)
+
+Erik probó `f53ad18`. La revisión 6 (`caade78`) ya corregía varios puntos y la revisión 8 corrige el resto. Todo se
+verificó en la URL pública.
+
+| # | Estado | Qué se hizo |
+|---|---|---|
+| 1 | ✅ (falta un teléfono real) | Revisión 6: la barra lateral pasa a ser horizontal en el celular. Revisión 8: las flechas de año quedan fijas y el año elegido se centra. Comprobado a 500 px: 6/6 botones visibles y las 2 flechas. El dibujo usa eventos `pointer`, que funcionan con el dedo. |
+| 2 | ✅ | Revisión 3: durante el ▶ las consultas del área se pausan (aviso "Reproducción en curso") y se piden al pausar. Ya no se generan 429. `play_por_anio.py` simula la interfaz anterior. |
+| 3 | ✅ | Las fechas se recortan a 2000–2025: `9999-12` → 25 KB en 0,25 s (antes 4,7 MB en 2 s). |
+| 4 | ✅ | Revisión 3: el cero se pinta gris claro (`#e4e7ec`). |
+| 5 | ✅ | Si todas las medianas son 0: "En esta área hay muy poco fuego para hablar de una temporada…". Con un solo mes dice "ese mes reúne". |
+| 6 | ✅ | Los años antes de 2002-07 son `extrapolado` aunque tengan 0 focos: 2001 y 2002 ya no salen como "el más tranquilo". |
+| 7 | ✅ | El ▶ salta los meses sin dato. Comprobado: en 2000 recorre solo noviembre y diciembre. |
+| 8 | ✅ | Revisión 6: el calendario empieza cerrado en pantallas de menos de 1600 px y, abierto a 1440 × 900, no se cruza con Capas. |
+| 9 | ✅ | El aviso del CSV dice "N registros, X focos armonizados" y se borra a los 8 s. La leyenda dice "Densidad (focos armonizados)". Los ms quedan solo en el tooltip. |
+| 10 | ✅ | Plurales: "1 foco armonizado", "1 lugar", "1 año". |
+| 11 | ✅ | Errores de validación en el idioma elegido: "debe ser un número", "falta este parámetro"… |
+| 12 | ✅ | "radio_km debe ser mayor que 0…", "Valor no válido para mes". Desde la revisión 6 solo se acepta `AAAA-MM`: una fecha con día da 422. |
+| 13 | ✅ | "No se detectaron focos en el área seleccionada entre 2000 y 2025", sin coordenadas. |
+| 14 | ✅ | Se nombraron la X del panel, "Año completo" (en el celular su texto se oculta) y los años. Botones sin nombre: 0. |
+
+Nuevo, encontrado al verificar: en 1440 px la escala de años se cortaba en 2021 y la flecha "siguiente" quedaba
+oculta. Ya está corregido.
+
+Pruebas automáticas nuevas: `test_qa_erik_*` en `backend/tests/` (90 pruebas en verde).

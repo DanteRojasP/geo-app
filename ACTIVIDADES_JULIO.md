@@ -288,6 +288,18 @@ falsifique `X-Forwarded-For`. Detalle, recomendaciones, seguridad y costos: `CAM
 - [x] La tarjeta de selección ya no tapa el panel "En simple"; riel horizontal en el celular.
 - [x] Se rotulan los dos conteos: armonizados frente a "detecciones en el mapa (sin ponderar)".
 
+## QA de Erik (rama `erik/qa`) aplicado (sáb 14 nov 2026, noche)
+
+Revisión **`firecal-00008`** (imagen `firecal-cusco:qa-erik-v2`). La rama de Erik (`QA_ERIK.md` y `qa/`) quedó unida.
+El estado de cada uno de los 14 errores está al final de `QA_ERIK.md`.
+- [x] API: fechas recortadas a 2000-2025, mensajes de validación en el idioma de la persona, radio 0, "mes
+      inválida" y área sin fuego con un mensaje claro.
+- [x] "En simple": áreas con poco fuego, año más tranquilo nunca extrapolado y plurales.
+- [x] Interfaz: el ▶ salta los meses sin dato, sin jerga técnica, botones con nombre y escala de años con flechas
+      fijas (se cortaba en 2021).
+- [x] 90 pruebas en verde (7 nuevas `test_qa_erik_*`).
+- [ ] Probar en un teléfono real y dibujar un área con el dedo.
+
 ## Pendientes que me afectan
 
 - [x] Datos reales de FIRMS (Cusco, de Antonio).

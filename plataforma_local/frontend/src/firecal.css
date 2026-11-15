@@ -109,3 +109,11 @@ button:focus-visible,select:focus-visible{outline:2px solid #197bb5;outline-offs
 /* Las etiquetas de Dante (Cusco · MODIS + VIIRS · periodo) repiten el recuadro de la línea de tiempo
    y quedaban detrás de los controles de idioma. */
 .fw-map-meta{display:none}
+
+/* QA de Erik / revisión 7: escala de años con flechas fijas y años desplazables */
+.fc-timeline .fw-year-scale{overflow:visible;gap:2px}
+.fc-timeline .fc-years{position:relative;display:flex;gap:2px;min-width:0;flex:1 1 auto;overflow-x:auto;scrollbar-width:none}
+.fc-timeline .fc-years::-webkit-scrollbar{display:none}
+.fc-timeline .fc-years button{min-width:30px;padding:0 3px}
+@media(max-width:1500px){.fc-timeline .fw-timeline-source span{display:none}}
+@media(max-width:650px){.fc-timeline .fc-years button{min-width:28px}}

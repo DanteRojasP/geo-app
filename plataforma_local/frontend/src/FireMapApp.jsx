@@ -279,6 +279,8 @@ function FireMapApp() {
   const [calendarOpen, setCalendarOpen] = useState(window.innerWidth >= 1600
     && new URLSearchParams(window.location.search).get('calendario') !== '0')
   const [playing, setPlaying] = useState(false)
+  const playableRef = useRef(new Set())
+  const yearsRef = useRef(null)
   const [simpleOpen, setSimpleOpen] = useState(false)
   const [detailsOpen, setDetailsOpen] = useState(true)
   const [layersOpen, setLayersOpen] = useState(true)
@@ -296,6 +298,7 @@ function FireMapApp() {
   const yearCells = useMemo(() => (calendar?.celdas || []).filter((c) => c.anio === selected.year), [calendar, selected.year])
   const yearTotal = useMemo(() => yearCells.reduce((s, c) => s + (c.focos_armonizados || 0), 0), [yearCells])
   const yearMax = useMemo(() => Math.max(1, ...yearCells.map((c) => c.focos_armonizados || 0)), [yearCells])
+  playableRef.current = new Set(yearCells.filter((c) => !c.sin_dato).map((c) => c.mes))
   selectionModeRef.current = selectionMode
   focosRef.current = focos
 
@@ -345,11 +348,29 @@ function FireMapApp() {
     return () => { active = false }
   }, [selectionBounds, periodo, playing])
 
+  // Mantener visible el año elegido en la escala de años (se desplaza si no cabe).
+  useEffect(() => {
+    const center = () => {
+      const el = yearsRef.current
+      const a = el?.querySelector('.is-active')
+      if (el && a) el.scrollTo({ left: a.offsetLeft - (el.clientWidth - a.offsetWidth) / 2 })
+    }
+    const t = window.setTimeout(center, 250)          // tras cargar fuentes y diseño
+    window.addEventListener('resize', center)
+    return () => { window.clearTimeout(t); window.removeEventListener('resize', center) }
+  }, [selected.year])
+
   // Reproducir: recorre los meses del año seleccionado.
   useEffect(() => {
     if (!playing) return undefined
     const timer = window.setInterval(() => {
-      setSelected((s) => ({ year: s.year, month: s.month ? (s.month % 12) + 1 : 1 }))
+      // QA de Erik (7): saltar los meses sin dato (ene-oct de 2000) en vez de mostrar "Sin datos".
+      const ok = playableRef.current
+      setSelected((s) => {
+        let m = s.month || 0
+        for (let k = 0; k < 12; k += 1) { m = (m % 12) + 1; if (!ok.size || ok.has(m)) break }
+        return { year: s.year, month: m }
+      })
     }, 1600)
     return () => window.clearInterval(timer)
   }, [playing])
@@ -556,7 +577,8 @@ function FireMapApp() {
     setNotice(tr('csv.preparing'))
     try {
       const r = await downloadCsv(aoiParams, periodo.inicio, periodo.fin)
-      setNotice(tr('csv.done', { label, n: fmt(r.rows), total: fmt(r.total, 2) }))
+      setNotice(tr('csv.done', { label, n: fmt(r.rows), total: fmt(r.total, 0) }))
+      window.setTimeout(() => setNotice(''), 8000)
     } catch (e) { setNotice(e.message) }
   }
 
@@ -589,7 +611,7 @@ function FireMapApp() {
         <button title={tr('rail.infoTitle')} onClick={() => setDetailsOpen((v) => !v)}><Info size={20}/><span>{tr('rail.info')}</span></button>
       </nav>
       {detailsOpen && <aside className="fw-summary">
-        <div className="fw-summary-head"><div><p>{tr('summary.kicker')}</p><h1>{unidad?.nombre || tr('unit.name')}</h1><span>{periodo.label}{month?.calidad ? ` · ${calidadLabel(month.calidad)}` : ''}</span></div><button onClick={() => setDetailsOpen(false)}><X size={17}/></button></div>
+        <div className="fw-summary-head"><div><p>{tr('summary.kicker')}</p><h1>{unidad?.nombre || tr('unit.name')}</h1><span>{periodo.label}{month?.calidad ? ` · ${calidadLabel(month.calidad)}` : ''}</span></div><button onClick={() => setDetailsOpen(false)} title={tr('btn.close')} aria-label={tr('btn.close')}><X size={17}/></button></div>
         <div className="fw-summary-status">{selected.month ? <CategoryBadge categoria={month?.categoria}/> : <span className="fw-risk fw-risk--bajo"><i/>{tr('summary.yearTotal')}</span>}<span>{loading ? tr('summary.loading') : tr('summary.onMap', { n: fmt(focos.n_focos || 0) })}</span></div>
         {error && <div className="fw-error"><ShieldAlert size={16}/>{error}</div>}
         <div className="fw-metrics">
@@ -654,13 +676,15 @@ function FireMapApp() {
             })}
           </div>
           <div className="fw-timeline-options">
-            <button className={selected.month === null ? 'is-active' : ''} onClick={() => { setSelected((s) => ({ year: s.year, month: null })); setPlaying(false) }}><Layers3 size={13}/><span>{tr('timeline.allYear')}</span></button>
+            <button className={selected.month === null ? 'is-active' : ''} title={tr('timeline.allYear')} aria-label={tr('timeline.allYear')} onClick={() => { setSelected((s) => ({ year: s.year, month: null })); setPlaying(false) }}><Layers3 size={13}/><span>{tr('timeline.allYear')}</span></button>
             <div className="fw-year-scale" aria-label={tr('timeline.years')}>
               <button className="fc-year" onClick={() => shiftYear(-1)} title={tr('timeline.prevYear')} disabled={selected.year <= FIRST_YEAR}><ChevronLeft size={13}/></button>
-              {YEARS.map((y) => <button key={y} className={selected.year === y ? 'is-active' : ''} onClick={() => { setPlaying(false); setSelected({ year: y, month: null }) }}>{String(y).slice(2)}</button>)}
+              <div className="fc-years" ref={yearsRef}>
+                {YEARS.map((y) => <button key={y} aria-label={String(y)} title={String(y)} className={selected.year === y ? 'is-active' : ''} onClick={() => { setPlaying(false); setSelected({ year: y, month: null }) }}>{String(y).slice(2)}</button>)}
+              </div>
               <button className="fc-year" onClick={() => shiftYear(1)} title={tr('timeline.nextYear')} disabled={selected.year >= LAST_YEAR}><ChevronRight size={13}/></button>
             </div>
-            <div className="fw-timeline-source"><span>NASA FIRMS · UTC−5</span><b>{latency ? `${latency} ms` : tr('timeline.historic')}</b></div>
+            <div className="fw-timeline-source"><span>NASA FIRMS · UTC−5</span><b title={latency ? `${latency} ms` : undefined}>{tr('timeline.historic')}</b></div>
           </div>
         </div>
       </section>

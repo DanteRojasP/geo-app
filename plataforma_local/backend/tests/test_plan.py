@@ -275,3 +275,22 @@ def test_resumen_with_charts_in_one_call(api):
     assert len(b["frases"]) == 5
     assert set(b["graficos"]) == {"estacionalidad", "ranking", "acumulado", "altitud"}
     assert "graficos" not in api.get("/api/resumen", params={"departamento": "PE-CUS"}).json()
+
+
+# ------------------------------------------------------------ QA de Erik (14-nov, rama erik/qa)
+def test_qa_erik_fechas_absurdas_se_recortan(api):
+    """3: 2020-01..9999-12 armaba 7 980 años (4,7 MB). Se recorta a la cobertura."""
+    body = _cal(api, departamento="PE-CUS", fecha_inicio="2020-01", fecha_fin="9999-12")
+    assert max(c["anio"] for c in body["celdas"]) == 2025
+    body = _cal(api, departamento="PE-CUS", fecha_inicio="0000-01", fecha_fin="2001-01")
+    assert min(c["anio"] for c in body["celdas"]) == 2000
+
+
+def test_qa_erik_mensajes(api):
+    """11 y 12: validación en el idioma de la persona, radio 0 y 'mes inválida'."""
+    r = api.get("/api/calendario", params={"lat": "abc", "lon": -72, "radio_km": 5})
+    assert r.status_code == 422 and r.json()["errors"][0]["error"] == "debe ser un número"
+    r = api.get("/api/calendario", params={"lat": -13.5, "lon": -72, "radio_km": 0})
+    assert r.status_code == 422 and "mayor que 0" in r.json()["detail"]
+    r = api.get("/api/anomalias", params={"departamento": "PE-CUS", "mes": "2020-13"})
+    assert r.status_code == 422 and "inválida" not in r.json()["detail"]

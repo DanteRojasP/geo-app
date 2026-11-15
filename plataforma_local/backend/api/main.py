@@ -51,6 +51,29 @@ def cache_control(request: Request, status: int) -> str:
     return "no-cache"                                   # index.html: siempre revalidar
 
 
+def _validation_msg(e: dict) -> str:
+    """Mensaje de validación de FastAPI en el idioma de la persona (QA de Erik, 11)."""
+    kind, ctx = e.get("type", ""), e.get("ctx") or {}
+    if kind == "missing":
+        return t(es="falta este parámetro", en="this parameter is required")
+    if kind in ("float_parsing", "float_type", "finite_number"):
+        return t(es="debe ser un número", en="must be a number")
+    if kind in ("int_parsing", "int_type", "int_from_float"):
+        return t(es="debe ser un número entero", en="must be a whole number")
+    if kind in ("bool_parsing", "bool_type"):
+        return t(es="debe ser true o false", en="must be true or false")
+    for key, es, en in (("ge", "mayor o igual que", "greater than or equal to"),
+                        ("gt", "mayor que", "greater than"),
+                        ("le", "menor o igual que", "less than or equal to"),
+                        ("lt", "menor que", "less than")):
+        if key in ctx:
+            return t(es=f"debe ser {es} {ctx[key]}", en=f"must be {en} {ctx[key]}")
+    if "max_length" in ctx:
+        return t(es=f"admite como máximo {ctx['max_length']} caracteres",
+                 en=f"at most {ctx['max_length']} characters")
+    return t(es="valor no válido", en="invalid value")
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     """Crea la app. Recibe ``settings`` explícitos en tests; si no, usa los globales."""
     settings = settings or get_settings()
@@ -107,7 +130,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.exception_handler(RequestValidationError)
     def _validation_error(_: Request, exc: RequestValidationError) -> JSONResponse:
         errors = [{"campo": ".".join(str(x) for x in e.get("loc", [])[1:]),
-                   "error": e.get("msg", "")} for e in exc.errors()]
+                   "error": _validation_msg(e)} for e in exc.errors()]
         return UTF8JSONResponse(status_code=422, content={
             "detail": t(es="Solicitud inválida: revisa los campos indicados en 'errors'.",
                         en="Invalid request: check the fields listed in 'errors'."),

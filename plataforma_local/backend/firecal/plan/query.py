@@ -125,11 +125,18 @@ def parse_month(value: str | None, name: str) -> tuple[int, int] | None:
         if not 1 <= m <= 12:
             raise ValueError
     except ValueError as exc:
-        raise PlanError(t(es=f"{name} inválida ('{value}'): usa el formato AAAA-MM, "
-                             "p. ej. 2020-08.",
+        raise PlanError(t(es=f"Valor no válido para {name} ('{value}'): usa el formato "
+                             "AAAA-MM, p. ej. 2020-08.",
                           en=f"Invalid {name} ('{value}'): use the YYYY-MM format, "
                              "e.g. 2020-08.")) from exc
     return y, m
+
+
+def no_fire(aoi: AOI) -> str:
+    """Área de Cusco donde los satélites nunca detectaron fuego (QA de Erik, 13)."""
+    return t(es=f"No se detectaron focos en {aoi.label} entre {COVER_FROM[0]} y {COVER_TO[0]}.",
+             en=f"No hotspots were detected in {aoi.label} between {COVER_FROM[0]} and "
+                f"{COVER_TO[0]}.")
 
 
 def month_quality(y: int, m: int, fraccion_extrapolada: float | None = None) -> tuple[str, str]:
@@ -308,8 +315,10 @@ class PlanStore:
             raise PlanError(t(es="lat/lon fuera de rango (WGS84).",
                               en="lat/lon out of range (WGS84)."))
         if not 0 < radio_km <= api.max_point_radius_km:
-            raise PlanError(t(es=f"radio_km debe estar entre 0 y {api.max_point_radius_km} km.",
-                              en=f"radio_km must be between 0 and {api.max_point_radius_km} km."))
+            raise PlanError(t(es=f"radio_km debe ser mayor que 0 y como máximo "
+                                 f"{api.max_point_radius_km} km.",
+                              en=f"radio_km must be greater than 0 and at most "
+                                 f"{api.max_point_radius_km} km."))
         self._require_inside(buffer_km(Point(lon, lat), radio_km))
         dlat = radio_km / 111.0
         dlon = radio_km / (111.0 * max(math.cos(math.radians(lat)), 0.01))
@@ -443,7 +452,9 @@ class PlanStore:
                    f"(desde el 2000-11-04) a {COVER_TO[0]}-{COVER_TO[1]:02d}.",
                 en=f"No data: the series covers {COVER_FROM[0]}-{COVER_FROM[1]:02d} "
                    f"(from 2000-11-04) to {COVER_TO[0]}-{COVER_TO[1]:02d}."))
-        return a, b
+        # QA de Erik (3): 2020-01..9999-12 armaba 7 980 años vacíos (4,7 MB, 2 s). Se recorta a
+        # los años de la cobertura; ene-oct de 2000 siguen saliendo como "sin dato".
+        return max(a, (COVER_FROM[0], 1)), min(b, (COVER_TO[0], 12))
 
     def _row(self, aoi: AOI, ym: tuple[int, int]):
         full = self.monthly(aoi)
@@ -454,9 +465,7 @@ class PlanStore:
         a, b = self._range(inicio, fin)
         full = self.monthly(aoi)
         if full["focos_modis"].sum() + full["focos_viirs"].sum() == 0:
-            raise PlanNoData(t(es=f"Sin datos: no hay focos en {aoi.label} en toda la serie.",
-                               en=f"No data: there are no hotspots in {aoi.label} in the whole "
-                                  "series."))
+            raise PlanNoData(no_fire(aoi))
         by_key = {(int(r.anio), int(r.mes)): r for r in full.itertuples(index=False)}
         months = _month_range(a, b)
         years = sorted({y for y, _ in months})
