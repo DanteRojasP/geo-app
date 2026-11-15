@@ -234,5 +234,5 @@ button:focus-visible,select:focus-visible{outline:2px solid #197bb5;outline-offs
 
 /* The live Cusco map becomes the hero image on the editorial entry screen. */
 .fc-intro:not(.is-loading){background:rgba(6,20,29,.28);backdrop-filter:none}
-.fc-intro-map{background:linear-gradient(180deg,rgba(6,24,34,.02),rgba(6,24,34,.16))}
-.fc-intro-map:after{background:linear-gradient(90deg,rgba(6,22,32,.12),transparent 34%),linear-gradient(0deg,rgba(6,22,32,.48),transparent 48%)}
+.fc-intro-map{background-image:linear-gradient(180deg,rgba(6,24,34,.04),rgba(6,24,34,.18)),url('/cusco-hero.png');background-position:center;background-size:cover}
+.fc-intro-map:after{background:linear-gradient(90deg,rgba(6,22,32,.18),transparent 36%),linear-gradient(0deg,rgba(6,22,32,.58),transparent 52%)}
