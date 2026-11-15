@@ -55,6 +55,8 @@ export const getAmbitos = () => request('/api/ambitos')
 export const getAmbitoNivel = (nivel) => request(`/api/ambitos/${nivel}`)
 export const getAmbitoGeojson = (nivel) => request(`/api/ambitos/${nivel}.geojson`)
 export const ambitoUrl = (path) => buildUrl(path).toString()
+// Informe técnico imprimible (HTML) de cualquier área y periodo; opcional mes=AAAA-MM.
+export const informeUrl = (aoi, extra = {}) => buildUrl('/api/informe', { ...aoi, ...extra }).toString()
 export const getFocos = (aoi, fechaInicio, fechaFin) =>
   request('/api/focos.geojson', { ...aoi, fecha_inicio: fechaInicio, fecha_fin: fechaFin })
 

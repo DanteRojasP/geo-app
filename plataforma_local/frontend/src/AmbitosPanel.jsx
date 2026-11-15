@@ -3,7 +3,7 @@
 // y la tabla CSV del nivel. Datos: /api/ambitos/* del backend.
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Download, FileText, X } from 'lucide-react'
-import { ambitoUrl, getAmbitoGeojson, getAmbitoNivel, getAmbitos } from './services/api.js'
+import { ambitoUrl, getAmbitoGeojson, getAmbitoNivel, getAmbitos, informeUrl } from './services/api.js'
 import { tr } from './i18n.js'
 
 const LEVELS = ['muy_alto', 'alto', 'medio', 'bajo', 'sin_clasificar']
@@ -131,6 +131,7 @@ function AmbitosPanel({ map, onClose }) {
               <span className="fa-badge" style={{ background: u.color }}>{u.etiqueta}</span>
               <span className="fa-name"><b>{u.nombre}</b><small>{u.provincia ? `${u.provincia} · ` : ''}{u.codigo} · {tr('amb.density', { v: u.densidad ?? 0 })}</small></span>
               <a className="fa-btn" href={ambitoUrl(`/api/ambitos/${nivel}/${u.codigo}/informe`)} target="_blank" rel="noreferrer" title={tr('amb.report')}><FileText size={14}/>{tr('amb.reportShort')}</a>
+              <a className="fa-btn" href={informeUrl({ ambito: `${nivel}:${u.codigo}` })} target="_blank" rel="noreferrer" title={tr('report.tip')}>{tr('amb.technical')}</a>
             </li>
           ))}
         </ol>

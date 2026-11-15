@@ -136,12 +136,13 @@ def _capa(nivel: str) -> dict:
 def _preparar(store: PlanStore) -> None:
     """Asigna cada celda de la serie a sus ámbitos (tabla ``ambito_celdas`` en DuckDB)."""
     store.meta  # noqa: B018 - carga los datos
-    if _Cache.stamp == store._stamp:
+    con = store._ensure()
+    clave = (id(con), store._stamp)  # por conexión: otro PlanStore con los mismos datos también
+    if _Cache.stamp == clave:
         return
     with _Cache.lock:
-        if _Cache.stamp == store._stamp:
+        if _Cache.stamp == clave:
             return
-        con = store._ensure()
         celdas = con.execute("SELECT DISTINCT cell_lat, cell_lon FROM cd").df()
         pts = shapely.points(celdas["cell_lon"].to_numpy(), celdas["cell_lat"].to_numpy())
         filas = []
@@ -167,7 +168,7 @@ def _preparar(store: PlanStore) -> None:
         con.execute("CREATE OR REPLACE TABLE ambito_celdas AS SELECT * FROM _amb_tmp")
         con.unregister("_amb_tmp")
         _Cache.tipos = {}
-        _Cache.stamp = store._stamp
+        _Cache.stamp = clave
 
 
 # ------------------------------------------------------------------ tipificación

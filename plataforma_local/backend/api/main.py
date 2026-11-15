@@ -19,7 +19,7 @@ from pydantic import BaseModel
 
 from api.cache import ResponseCacheMiddleware, ResponseCacheStore
 from api.limits import HeavyGate, RateLimiter
-from api.routers import ambitos, plan
+from api.routers import ambitos, informe, plan
 from firecal import __version__
 from firecal.i18n import reset_lang, set_lang, t
 from firecal.plan.query import PlanNotReady, PlanStore
@@ -178,6 +178,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(plan.router)
     app.include_router(ambitos.router)
+    app.include_router(informe.router)
 
     frontend = Path(os.environ.get("FIRECAL_FRONTEND_DIR", DEFAULT_FRONTEND))
     if os.environ.get("FIRECAL_FRONTEND_DIR") != "" and (frontend / "index.html").is_file():
