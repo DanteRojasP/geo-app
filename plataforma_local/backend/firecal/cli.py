@@ -1,4 +1,4 @@
-"""CLI de FireCal Cusco (Typer).
+"""CLI de Nikal Cusco (Typer).
 
 - ``firecal plan-events``: valida los CSV armonizados de Cusco (MAESTRO.md §6) y arma el Parquet.
 - ``firecal serve``: levanta la API (y la interfaz compilada) con uvicorn.
@@ -23,7 +23,7 @@ force_utf8_stdio()
 
 app = typer.Typer(
     name="firecal",
-    help="FireCal Cusco: calendario armonizado de focos MODIS + VIIRS (datos de MAESTRO.md).",
+    help="Nikal Cusco: calendario armonizado de focos MODIS + VIIRS (datos de MAESTRO.md).",
     no_args_is_help=True,
     add_completion=False,
 )
@@ -95,7 +95,7 @@ def informes(
                 f"</span></td><td>{u['densidad']}</td><td>{u['recurrencia']}</td></tr>")
         titulo = html.escape(res["titulo"])
         (out / "index.html").write_text(
-            "<!doctype html><meta charset='utf-8'><title>FireCal Cusco - " + titulo + "</title>"
+            "<!doctype html><meta charset='utf-8'><title>Nikal Cusco - " + titulo + "</title>"
             "<style>body{font:14px system-ui;margin:24px}td,th{padding:4px 8px;border-bottom:"
             "1px solid #eee;text-align:left}</style><h1>" + titulo + "</h1><p>"
             + html.escape(" ".join(res["metodo"]["notas"][:2])) + "</p><table><tr><th>#</th>"

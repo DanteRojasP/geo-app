@@ -1,4 +1,4 @@
-// Cliente de la API de FireCal (backend FastAPI de plataforma_local).
+// Cliente de la API de Nikal (backend FastAPI de plataforma_local).
 // Por defecto usa la misma dirección que sirve la página. Para un frontend publicado aparte
 // (p. ej. Vercel), define VITE_API_BASE_URL con la URL del backend.
 import { getLang, tr } from '../i18n.js'

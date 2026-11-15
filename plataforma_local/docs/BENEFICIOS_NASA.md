@@ -1,4 +1,4 @@
-# Beneficios de NASA Space Apps: ¿cuáles sirven a FireCal Perú?
+# Beneficios de NASA Space Apps: ¿cuáles sirven a Nikal Perú?
 
 Evaluación de cada oferta para este proyecto: un geovisor web con API Python, datos FIRMS MODIS + VIIRS y un
 calendario por departamento. Los montos de crédito y las condiciones de cada oferta hay que confirmarlos al

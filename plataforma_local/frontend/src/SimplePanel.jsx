@@ -12,7 +12,7 @@ const GRAFICOS = [
 
 function Grafico({ tipo, slug, datos, etiqueta, anios, onAnio }) {
   const { svg, csv } = Charts[tipo](datos)
-  const nombre = `firecal_${etiqueta}_${slug}${tipo === 'acumulado' ? `_${datos.anio}` : ''}`
+  const nombre = `nikal_${etiqueta}_${slug}${tipo === 'acumulado' ? `_${datos.anio}` : ''}`
   return (
     <article className="fs-chart">
       <header>

@@ -1,4 +1,4 @@
-# Aviso al equipo: FireCal Cusco ya está publicado 🚀
+# Aviso al equipo: Nikal Cusco ya está publicado 🚀
 
 *Sábado 14-nov-2026, ~17:20 · Julio*
 

@@ -1,1 +1,1 @@
-"""API HTTP de FireCal (FastAPI)."""
+"""API HTTP de Nikal (FastAPI)."""

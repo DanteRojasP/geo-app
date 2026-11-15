@@ -1,4 +1,4 @@
-# FireCal Cusco: plataforma local (guía)
+# Nikal Cusco: plataforma local (guía)
 
 Prototipo del reto *Calendario de incendios armonizado (MODIS + VIIRS)*, NASA Space Apps 2026.
 Une el trabajo del equipo con `PLAN.md` (en `main`) como eje:

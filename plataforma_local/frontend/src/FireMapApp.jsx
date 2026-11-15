@@ -1,4 +1,4 @@
-// FireCal Cusco: interfaz de Dante (rama `dante`, "Firewatch Perú") adaptada a la plataforma.
+// Nikal Cusco: interfaz de Dante (rama `dante`, "Firewatch Perú") adaptada a la plataforma.
 // Cambios respecto al original: datos reales de Cusco desde nuestra API (sin datos demo ni FIRMS
 // en vivo), solo Cusco, unidad "focos armonizados", sin FRP, y la línea de tiempo de 5 días pasa a
 // ser el calendario histórico mes x año del PLAN (2000-11 a 2025-12).
@@ -717,7 +717,7 @@ function FireMapApp() {
   return (
     <div className={`fw-app ${liveOn ? 'is-live' : ''}`}>
       <div ref={mapContainerRef} className="fw-map" aria-label={tr('map.aria')} />
-      <div className="fw-nubel-brand" aria-label="Nubel Team · FireCal Cusco"><img src="./nubel-team-logo.png" alt="Nubel Team"/></div>
+      <div className="fw-nubel-brand" aria-label="Nubel Team · Nikal Cusco"><img src="./nubel-team-logo.png" alt="Nubel Team"/></div>
       <div className="fc-mode" role="group" aria-label={tr('mode.label')}>
         <button className={!liveOn ? 'is-active' : ''} aria-pressed={!liveOn} title={tr('mode.historic')} onClick={goHistoric}><CalendarDays size={14}/><span>{tr('mode.historic')}</span></button>
         <button className={liveOn ? 'is-active live' : ''} aria-pressed={liveOn} title={tr('mode.live')} onClick={goLive}><Radio size={14}/><span>{tr('mode.live')}</span></button>

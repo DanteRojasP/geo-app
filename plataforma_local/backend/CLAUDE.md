@@ -1,4 +1,4 @@
-# CLAUDE.md — FireCal Cusco (backend)
+# CLAUDE.md — Nikal Cusco (backend)
 
 **Antes de tocar datos o armonización, lee `MAESTRO.md` (raíz del repositorio).**
 

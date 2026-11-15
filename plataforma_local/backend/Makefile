@@ -1,4 +1,4 @@
-# Atajos a la CLI de FireCal. Funciona en Linux/macOS/WSL y en Windows con GNU make.
+# Atajos a la CLI de Nikal. Funciona en Linux/macOS/WSL y en Windows con GNU make.
 
 ifeq ($(OS),Windows_NT)
   PYTHON_BOOT ?= py -3.12

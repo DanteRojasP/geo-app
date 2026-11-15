@@ -1,4 +1,4 @@
-# Backend de FireCal Cusco
+# Backend de Nikal Cusco
 
 API FastAPI + DuckDB que sirve los datos armonizados de Cusco (`MAESTRO.md`, `data/harmonized/`) y la interfaz
 compilada (`../frontend/dist`). La guía completa (instalación, endpoints, protocolo, despliegue) está en

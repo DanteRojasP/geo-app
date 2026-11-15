@@ -1,4 +1,4 @@
-# Protocolo de evaluación preventiva con múltiples fuentes · FireCal Cusco
+# Protocolo de evaluación preventiva con múltiples fuentes · Nikal Cusco
 
 *Domingo 15-nov-2026 · Julio · rama `julio/actividades` · estado: **propuesta para decisión del equipo***
 

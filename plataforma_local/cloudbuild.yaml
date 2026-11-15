@@ -1,4 +1,4 @@
-# Construye la imagen de FireCal en Google Cloud Build (sin usar Docker ni memoria en tu PC).
+# Construye la imagen de Nikal en Google Cloud Build (sin usar Docker ni memoria en tu PC).
 # Desde la RAÍZ del repositorio:
 #   gcloud builds submit --config plataforma_local/cloudbuild.yaml \
 #     --substitutions _IMAGE=southamerica-east1-docker.pkg.dev/sonic-mile-514718-r5/firecal/firecal-cusco:<etiqueta> .

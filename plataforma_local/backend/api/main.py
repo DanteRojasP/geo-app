@@ -1,4 +1,4 @@
-"""Aplicación FastAPI de FireCal Cusco: idioma, límites, caché, rutas /api y la interfaz."""
+"""Aplicación FastAPI de Nikal Cusco: idioma, límites, caché, rutas /api y la interfaz."""
 
 from __future__ import annotations
 
@@ -101,7 +101,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(
         lifespan=lifespan,
         default_response_class=UTF8JSONResponse,
-        title="FireCal Cusco API",
+        title="Nikal Cusco API",
         version=__version__,
         description=(
             "Calendario armonizado de focos de calor MODIS + VIIRS para **Cusco** (2000-11 a "

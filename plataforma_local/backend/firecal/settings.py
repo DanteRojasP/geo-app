@@ -1,4 +1,4 @@
-"""Configuración central de FireCal.
+"""Configuración central de Nikal.
 
 Dos fuentes:
 - Variables de entorno / archivo ``.env`` (modo de datos, MAP_KEY, región, rutas): ``EnvSettings``.

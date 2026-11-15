@@ -6,7 +6,7 @@ const DEFAULT = 'en'
 
 const STRINGS = {
   en: {
-    'doc.title': 'FireCal Cusco · Harmonized MODIS + VIIRS calendar',
+    'doc.title': 'Nikal Cusco · Harmonized MODIS + VIIRS calendar',
     'brand.subtitle': 'Harmonized MODIS + VIIRS calendar',
     'search.small': 'Study area (the only one with validated data)',
     'search.title': 'Cusco, Peru · 2000–2025',
@@ -251,7 +251,7 @@ const STRINGS = {
     'chart.bandTip': '{b}: {v} harmonized hotspots',
   },
   es: {
-    'doc.title': 'FireCal Cusco · Calendario armonizado MODIS + VIIRS',
+    'doc.title': 'Nikal Cusco · Calendario armonizado MODIS + VIIRS',
     'brand.subtitle': 'Calendario armonizado MODIS + VIIRS',
     'search.small': 'Área de estudio (única con datos validados)',
     'search.title': 'Cusco, Perú · 2000–2025',

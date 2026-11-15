@@ -716,7 +716,7 @@ td,th{{border-bottom:1px solid #eef0f3;padding:4px 6px;text-align:left}} .n{{tex
 dt{{font-weight:600;margin-top:8px}} .defs dd{{font-size:13px}} dd{{margin:2px 0 0}} .nota{{color:#5d6677;font-size:12px}}
 @media print{{body{{margin:0}} a{{color:inherit}}}}
 </style></head><body>
-<p class="nota">FireCal Cusco · {esc(t(es="Informe automático", en="Automated report"))} · {hoy} ·
+<p class="nota">Nikal Cusco · {esc(t(es="Informe automático", en="Automated report"))} · {hoy} ·
 {esc(t(es="datos", en="data"))} {esc(version)}</p>
 <h1>{esc(u["nombre"])}</h1>
 <p class="sub">{esc(nombre_nivel)} · {esc(t(es="código", en="code"))} {esc(u["codigo"])}

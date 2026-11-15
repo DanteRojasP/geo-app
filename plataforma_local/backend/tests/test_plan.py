@@ -190,7 +190,7 @@ def test_frontend_served(api):
     if not (DEFAULT_FRONTEND / "index.html").is_file():
         pytest.skip("frontend sin compilar: cd frontend && npm run build")
     r = api.get("/")
-    assert r.status_code == 200 and "FireCal Cusco" in r.text
+    assert r.status_code == 200 and "Nikal Cusco" in r.text
 
 
 def test_quality_comes_from_data(api):

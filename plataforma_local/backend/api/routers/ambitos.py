@@ -60,7 +60,7 @@ def nivel_csv(request: Request, nivel: str) -> Response:
         media_type="text/csv; charset=utf-8",
         headers={
             "Content-Disposition": "attachment; "
-            f'filename="firecal_cusco_{nivel}_nivel_de_peligro.csv"'
+            f'filename="nikal_cusco_{nivel}_nivel_de_peligro.csv"'
         },
     )
 

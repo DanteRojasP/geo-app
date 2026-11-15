@@ -1,4 +1,4 @@
-# FireCal Cusco: API (FastAPI) + interfaz (React + MapLibre) + datos armonizados de Cusco.
+# Nikal Cusco: API (FastAPI) + interfaz (React + MapLibre) + datos armonizados de Cusco.
 # Basado en plataforma_local/Dockerfile.modelo de Antonio (rama antonio/backend-modelo):
 # contexto = RAÍZ del repositorio, datos dentro de la imagen, sin pipeline sintético.
 # Agregado: etapa Node que compila la interfaz y validación de los datos contra MAESTRO §6.

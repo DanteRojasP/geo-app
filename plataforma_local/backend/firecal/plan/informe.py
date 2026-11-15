@@ -300,7 +300,7 @@ table.matriz td{{text-align:center;padding:2px}} table.matriz th{{text-align:cen
 code{{font-size:11.5px}} ol.api li{{font-family:ui-monospace,monospace;font-size:11.5px;word-break:break-all}}
 @media print{{body{{margin:0;max-width:none}} h2{{break-after:avoid}} table{{break-inside:auto}}}}
 </style></head><body>
-<p class="nota">FireCal Cusco · {esc(t(es="Informe técnico automático", en="Automated technical report"))} · {ahora} · {esc(t(es="datos", en="data"))} {esc(meta.get("plan_version", ""))}</p>
+<p class="nota">Nikal Cusco · {esc(t(es="Informe técnico automático", en="Automated technical report"))} · {ahora} · {esc(t(es="datos", en="data"))} {esc(meta.get("plan_version", ""))}</p>
 <h1>{esc(t(es="Focos de calor en", en="Hotspots in"))} {esc(aoi.label)}</h1>
 <p class="sub">{esc(t(es="Periodo", en="Period"))} {a0} – {a1}{area_txt}</p>
 <p class="nota">{esc(unidad()["definicion"])}</p>
