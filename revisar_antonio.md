@@ -64,6 +64,67 @@ Comprobado con la API de FIRMS, en el rectángulo de Cusco:
 
 Detalle en `PROTOCOLO_PREVENTIVO.md` §6.1 y §6.2.
 
+## Earth Engine con el proyecto de Google Cloud de Julio
+
+Tus scripts ya leen el proyecto de `EE_PROJECT` (`harmonizacion/cusco_referencia.py` y
+`harmonizacion/sequia_fuego/clima_cusco_ee.py`). Puedes usar el proyecto de Julio, `sonic-mile-514718-r5`.
+
+**Estado hoy (15-nov, comprobado):** la API de Earth Engine está disponible para el proyecto, pero todavía **no
+está activada ni registrada**. Julio es propietario, así que puede hacerlo.
+
+**Pasos:**
+1. **Julio** registra el proyecto para **uso no comercial** en https://console.cloud.google.com/earth-engine
+   (NASA Space Apps califica) y activa la API `earthengine.googleapis.com`.
+2. **Julio** te da acceso en el proyecto con **tu propia cuenta de Google**. Los roles que pide la guía de acceso de
+   Earth Engine son "Earth Engine Resource Writer" (o "Viewer") y "Service Usage Consumer"; se confirman al
+   asignarlos. **No se comparten contraseñas ni archivos de credenciales.**
+3. **Tú**, en tu computadora:
+   ```powershell
+   pip install earthengine-api          # en un entorno aparte, no en el del backend
+   earthengine authenticate             # abre el navegador: entra con tu cuenta
+   $env:EE_PROJECT = "sonic-mile-514718-r5"
+   ```
+4. El registro no comercial se **revalida una vez al año**.
+
+### ¿Cuántos créditos gasta?
+
+**Earth Engine: nada, si el proyecto está registrado como no comercial.** La documentación de Google dice que la
+cuenta de facturación no se cobra por el uso de Earth Engine mientras el proyecto esté registrado para uso no
+comercial, aunque el proyecto pague otros servicios.
+
+Lo que sí hay es una **cuota mensual de cómputo**, medida en EECU-hora (unidades de cómputo de Earth Engine por
+hora). Es por proyecto y se reinicia el día 1 de cada mes:
+
+| Nivel no comercial | Cuota al mes | Requisito |
+|---|---|---|
+| Community (por defecto) | 150 EECU-hora | Ninguno |
+| **Contributor** | **1.000 EECU-hora** | Tener una cuenta de facturación activa (el proyecto de Julio la tiene). Earth Engine sigue sin cobrarse |
+| Partner | 100.000 EECU-hora | Solicitud aparte; la aprobación puede tardar semanas |
+
+Si se pasa de la cuota, **no se cobra**: el proyecto entra en modo restringido y las tareas siguen funcionando, pero
+más lento. Fuente: guía de niveles no comerciales de Earth Engine (vigente desde el 27-abr-2026).
+
+**Estimación de nuestro uso (no medida):** Cusco es una región chica (~72.000 km²).
+- MODIS mensual a 1 km para 2003–2025 son ~276 imágenes de ~72.000 píxeles.
+- CHIRPS a 0,05° son ~2.400 píxeles por imagen.
+- Lo más pesado sería SRTM o MapBiomas a 30 m: ~80 millones de píxeles por imagen.
+
+Calculo **unas pocas EECU-hora, del orden de 1 a 10**, para todo lo planificado: tus scripts, el NDVI y el área
+quemada por zona del protocolo preventivo y MapBiomas. Está muy por debajo incluso de la cuota Community. El consumo
+real se ve en Cloud Monitoring (métricas de Earth Engine); conviene mirarlo después de la primera corrida.
+
+**Lo que sí puede generar costos (aparte de Earth Engine):**
+- Exportar resultados a Cloud Storage: centavos por GB al mes.
+- Los servicios que ya usa la app (Cloud Run, Artifact Registry, Secret Manager), que ya se pagan con el crédito.
+- Activar otras APIs de pago en el proyecto: Google recomienda no activar nada fuera de Earth Engine sin avisar.
+
+Lo más simple para no gastar nada es descargar los resultados a tu computadora (`getInfo`, o exportar a Drive) en
+vez de a Cloud Storage.
+
+**Earthdata de NASA** es otra cuenta, aparte de Google Cloud: registro gratuito con correo en
+https://urs.earthdata.nasa.gov. Para estos scripts no hace falta, porque Earth Engine ya tiene MODIS, CHIRPS, SRTM y
+SMAP.
+
 ## Otra cosa, para cuando se amplíe a otras regiones
 
 En 2022, aun sin los días del hueco, la razón MODIS/VIIRS sube a la vez en Cusco, Puno, Ayacucho y Apurímac (en la
