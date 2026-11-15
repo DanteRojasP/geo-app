@@ -1,4 +1,4 @@
-// Nikal Cusco: interfaz de Dante (rama `dante`, "Firewatch Perú") adaptada a la plataforma.
+// FireCal Cusco: interfaz de Dante (rama `dante`, "Firewatch Perú") adaptada a la plataforma.
 // Cambios respecto al original: datos reales de Cusco desde nuestra API (sin datos demo ni FIRMS
 // en vivo), solo Cusco, unidad "focos armonizados", sin FRP, y la línea de tiempo de 5 días pasa a
 // ser el calendario histórico mes x año del PLAN (2000-11 a 2025-12).
@@ -14,6 +14,7 @@ import {
 import AmbitosPanel from './AmbitosPanel.jsx'
 import SimplePanel from './SimplePanel.jsx'
 import ComparisonWorkspace from './ComparisonWorkspace.jsx'
+import IntroScreen from './IntroScreen.jsx'
 import { LANGS, getLang, locale, months, setLang, tr } from './i18n.js'
 import { CUSCO, downloadCsv, getCalendar, getDepartments, getFocos, getMonth, getTiempoReal, informeUrl } from './services/api.js'
 
@@ -308,6 +309,7 @@ function FireMapApp() {
   const [simpleOpen, setSimpleOpen] = useState(false)
   const [compareOpen, setCompareOpen] = useState(false)
   const [ambitosOpen, setAmbitosOpen] = useState(false)
+  const [introOpen, setIntroOpen] = useState(() => new URLSearchParams(window.location.search).get('intro') !== '0')
   const [detailsOpen, setDetailsOpen] = useState(true)
   const [layersOpen, setLayersOpen] = useState(false)
   const [toolsOpen, setToolsOpen] = useState(false)
@@ -717,7 +719,8 @@ function FireMapApp() {
   return (
     <div className={`fw-app ${liveOn ? 'is-live' : ''}`}>
       <div ref={mapContainerRef} className="fw-map" aria-label={tr('map.aria')} />
-      <div className="fw-nubel-brand" aria-label="Nubel Team · Nikal Cusco"><img src="./nubel-team-logo.png" alt="Nubel Team"/></div>
+      {introOpen && <IntroScreen key={lang} lang={lang} mapReady={Boolean(region && !loading)} onLanguage={changeLang} onEnter={() => setIntroOpen(false)}/>}
+      <div className="fw-nubel-brand" aria-label="Nubel Team · FireCal Cusco"><img src="./nubel-team-logo.png" alt="Nubel Team"/></div>
       <div className="fc-mode" role="group" aria-label={tr('mode.label')}>
         <button className={!liveOn ? 'is-active' : ''} aria-pressed={!liveOn} title={tr('mode.historic')} onClick={goHistoric}><CalendarDays size={14}/><span>{tr('mode.historic')}</span></button>
         <button className={liveOn ? 'is-active live' : ''} aria-pressed={liveOn} title={tr('mode.live')} onClick={goLive}><Radio size={14}/><span>{tr('mode.live')}</span></button>

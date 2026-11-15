@@ -110,7 +110,7 @@ export default function ComparisonPanel({ calendar, calendarA, calendarB, region
         <section className="fc-compare-chart"><header><div><span>01</span><h3>{tr('compare.monthly')}</h3></div><p>{tr('compare.monthlyHelp')}</p></header><div className="fc-compare-legend"><i className="is-first"/>A<i className="is-second"/>B</div><MonthlyBars first={first} second={second}/></section>
         <section className="fc-compare-chart"><header><div><span>02</span><h3>{tr('compare.cumulative')}</h3></div><p>{tr('compare.cumulativeHelp')}</p></header><div className="fc-compare-legend"><i className="is-first"/>A<i className="is-second"/>B</div><CumulativeLines first={first} second={second}/></section>
       </div>
-      <section className="fc-compare-notes"><ChartNoAxesCombined size={18}/><div><b>{tr('compare.interpretation')}</b><small>{tr('compare.quality')}: {first.quality.join(', ') || '—'} / {second.quality.join(', ') || '—'}</small></div></section>
+      <section className="fc-compare-notes"><ChartNoAxesCombined size={18}/><div><b>{tr('compare.interpretation')}</b><p>{tr('compare.note')}</p><small>{tr('compare.quality')}: {first.quality.join(', ') || '—'} / {second.quality.join(', ') || '—'}</small></div></section>
     </div>
     <footer className="fc-compare-footer"><span>NASA FIRMS · Nubel Team · UTC−5</span><button onClick={() => downloadComparison(first, second)}><Download size={14}/>{tr('compare.csv')}</button></footer>
   </aside>

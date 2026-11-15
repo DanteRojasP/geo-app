@@ -1,14 +1,13 @@
 // Panel "Ámbitos": nivel de peligro por focos de calor (formato CENEPRED) por provincia, distrito
 // o cuenca Pfafstetter, con el mapa pintado por nivel, la lista ordenada, el informe de cada unidad
 // y la tabla CSV del nivel. Datos: /api/ambitos/* del backend.
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { Download, FileText, X } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { CalendarDays, Download, Eye, LoaderCircle, X } from 'lucide-react'
 import { ambitoUrl, getAmbitoGeojson, getAmbitoNivel, getAmbitos, informeUrl } from './services/api.js'
 import { tr } from './i18n.js'
 
 const LEVELS = ['muy_alto', 'alto', 'medio', 'bajo', 'sin_clasificar']
 const COLORS = { muy_alto: '#c0392b', alto: '#e67e22', medio: '#f1c40f', bajo: '#27ae60', sin_clasificar: '#98a2b3' }
-const MAX_ROWS = 80
 
 function paint(map, geojson) {
   if (!map) return
@@ -33,14 +32,91 @@ function hide(map) {
   }
 }
 
+async function captureReportMap(map, codigo) {
+  if (!map?.getCanvas?.()) return ''
+  const pointsLayer = map.getLayer('fire-points') ? map.getLayoutProperty('fire-points', 'visibility') : null
+  const fillFilter = map.getLayer('ambitos-fill') ? map.getFilter('ambitos-fill') : null
+  const lineFilter = map.getLayer('ambitos-line') ? map.getFilter('ambitos-line') : null
+  try {
+    if (map.getLayer('fire-points')) map.setLayoutProperty('fire-points', 'visibility', 'visible')
+    if (codigo && map.getLayer('ambitos-fill')) map.setFilter('ambitos-fill', ['==', ['get', 'codigo'], codigo])
+    if (codigo && map.getLayer('ambitos-line')) map.setFilter('ambitos-line', ['==', ['get', 'codigo'], codigo])
+    await new Promise((resolve) => {
+      let finished = false
+      const done = () => { if (!finished) { finished = true; resolve() } }
+      map.once('render', done)
+      map.triggerRepaint()
+      window.setTimeout(done, 500)
+    })
+    return map.getCanvas().toDataURL('image/jpeg', 0.9)
+  } finally {
+    if (map.getLayer('fire-points')) map.setLayoutProperty('fire-points', 'visibility', pointsLayer || 'none')
+    if (map.getLayer('ambitos-fill')) map.setFilter('ambitos-fill', fillFilter || null)
+    if (map.getLayer('ambitos-line')) map.setFilter('ambitos-line', lineFilter || null)
+    map.triggerRepaint()
+  }
+}
+
+function addMapToReport(html, image, caption) {
+  if (!image) return html
+  const doc = new DOMParser().parseFromString(html, 'text/html')
+  const style = doc.createElement('style')
+  style.textContent = '.fc-report-summary{display:grid;grid-template-columns:minmax(0,.86fr) minmax(280px,1.14fr);gap:18px;align-items:start}.fc-report-summary>p{margin-top:0}.fc-report-map{margin:0;border:1px solid #cdd9df;background:#f4f7f8;break-inside:avoid}.fc-report-map img{display:block;width:100%;aspect-ratio:16/10;object-fit:cover}.fc-report-map figcaption{padding:7px 9px;color:#526671;font-size:9px;line-height:1.35}@media(max-width:720px){.fc-report-summary{grid-template-columns:1fr}}'
+  doc.head.append(style)
+  const heading = doc.querySelector('h2')
+  const summary = heading?.nextElementSibling
+  if (summary) {
+    const grid = doc.createElement('div')
+    grid.className = 'fc-report-summary'
+    const figure = doc.createElement('figure')
+    figure.className = 'fc-report-map'
+    const img = doc.createElement('img')
+    img.src = image
+    img.alt = caption
+    const figcaption = doc.createElement('figcaption')
+    figcaption.textContent = caption
+    figure.append(img, figcaption)
+    summary.replaceWith(grid)
+    grid.append(summary, figure)
+  }
+  return `<!doctype html>${doc.documentElement.outerHTML}`
+}
+
+async function downloadReportPdf(html, filename) {
+  const frame = document.createElement('iframe')
+  frame.setAttribute('aria-hidden', 'true')
+  frame.style.cssText = 'position:fixed;left:-12000px;top:0;width:1000px;height:1400px;border:0;opacity:0;pointer-events:none'
+  document.body.append(frame)
+  try {
+    const doc = frame.contentDocument
+    doc.open()
+    doc.write(html)
+    doc.close()
+    await new Promise((resolve) => window.setTimeout(resolve, 350))
+    if (doc.fonts?.ready) await doc.fonts.ready
+    const module = await import('html2pdf.js')
+    const html2pdf = module.default || module
+    await html2pdf().set({
+      margin: [8, 8, 8, 8], filename,
+      image: { type: 'jpeg', quality: 0.95 },
+      html2canvas: { scale: 1.45, useCORS: true, logging: false, windowWidth: 1000 },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak: { mode: ['css', 'legacy'] },
+    }).from(doc.body).save()
+  } finally {
+    frame.remove()
+  }
+}
+
 function AmbitosPanel({ map, onClose }) {
   const [niveles, setNiveles] = useState([])
   const [nivel, setNivel] = useState('provincia')
   const [datos, setDatos] = useState(null)
   const [error, setError] = useState('')
-  const [filtro, setFiltro] = useState('')
   const [elegido, setElegido] = useState(null)
-  const listRef = useRef(null)
+  const [fechaInicio, setFechaInicio] = useState('2000-11-01')
+  const [fechaFin, setFechaFin] = useState('2025-12-31')
+  const [reportLoading, setReportLoading] = useState('')
 
   useEffect(() => {
     getAmbitos().then(({ body }) => setNiveles(body.niveles)).catch((e) => setError(e.message))
@@ -81,24 +157,53 @@ function AmbitosPanel({ map, onClose }) {
     }
   }, [map])
 
-  useEffect(() => {
-    if (elegido) listRef.current?.querySelector(`[data-codigo="${elegido}"]`)?.scrollIntoView({ block: 'nearest' })
-  }, [elegido])
-
-  const filas = useMemo(() => {
-    const us = datos?.unidades || []
-    const q = filtro.trim().toLowerCase()
-    const sel = q ? us.filter((u) => u.nombre.toLowerCase().includes(q) || u.codigo.includes(q)) : us
-    if (elegido && !sel.slice(0, MAX_ROWS).some((u) => u.codigo === elegido)) {
-      const u = us.find((x) => x.codigo === elegido)
-      if (u) return [u, ...sel.slice(0, MAX_ROWS - 1)]
-    }
-    return sel.slice(0, MAX_ROWS)
-  }, [datos, filtro, elegido])
-
   const politicos = niveles.filter((n) => n.grupo === 'politico')
   const hidro = niveles.filter((n) => n.grupo === 'hidrografico')
   const conteo = datos?.conteo || {}
+  const periodoValido = Boolean(fechaInicio && fechaFin && fechaInicio <= fechaFin)
+  const inicioMes = fechaInicio.slice(0, 7)
+  const finMes = fechaFin.slice(0, 7)
+  const unidadElegida = datos?.unidades?.find((u) => u.codigo === elegido)
+  const reportUrl = (codigo = elegido) => codigo && periodoValido
+    ? informeUrl({ ambito: `${nivel}:${codigo}` }, { fecha_inicio: inicioMes, fecha_fin: finMes })
+    : ''
+
+  const openGeneratedReport = async (mode, codigo = elegido) => {
+    const url = reportUrl(codigo)
+    if (!url || reportLoading) return
+    const popup = mode === 'view' ? window.open('', '_blank') : null
+    if (mode === 'view' && !popup) { setError(tr('amb.popupBlocked')); return }
+    const loadingText = tr(mode === 'pdf' ? 'amb.preparingPdf' : 'amb.preparingReport')
+    setReportLoading(mode)
+    if (popup) {
+      popup.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${loadingText}</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#f5f8fa;color:#29404d;font:14px system-ui}.loader{text-align:center}.spin{width:34px;height:34px;margin:0 auto 16px;border:3px solid #d5e2e9;border-top-color:#2c86ad;border-radius:50%;animation:s .8s linear infinite}@keyframes s{to{transform:rotate(360deg)}}small{display:block;margin-top:7px;color:#71838d}</style></head><body><div class="loader"><div class="spin"></div><b>${loadingText}</b><small>${tr('amb.loadingWait')}</small></div></body></html>`)
+      popup.document.close()
+    }
+    try {
+      const [response, mapImage] = await Promise.all([fetch(url), captureReportMap(map, codigo)])
+      if (!response.ok) throw new Error(`${response.status} ${response.statusText}`)
+      let html = await response.text()
+      html = html.replace('<head>', `<head><base href="${window.location.origin}/">`)
+      const unit = datos?.unidades?.find((u) => u.codigo === codigo)
+      html = addMapToReport(html, mapImage, tr('amb.mapCaption', { u: unit?.nombre || codigo, a: inicioMes, b: finMes }))
+      if (mode === 'pdf') {
+        const safeName = (unit?.nombre || codigo).toLowerCase().replace(/[^a-z0-9]+/gi, '-')
+        await downloadReportPdf(html, `firecal-${nivel}-${safeName}-${inicioMes}-${finMes}.pdf`)
+      } else {
+        popup.document.open()
+        popup.document.write(html)
+        popup.document.close()
+      }
+    } catch (e) {
+      if (popup) {
+        popup.document.open()
+        popup.document.write(`<p style="font:14px system-ui;padding:24px;color:#9f2424">${tr('amb.reportError')}: ${e.message}</p>`)
+        popup.document.close()
+      } else setError(`${tr('amb.reportError')}: ${e.message}`)
+    } finally {
+      setReportLoading('')
+    }
+  }
 
   return (
     <aside className="fa-panel" aria-label={tr('amb.title')}>
@@ -113,7 +218,28 @@ function AmbitosPanel({ map, onClose }) {
             <optgroup label={tr('amb.hydro')}>{hidro.map((n) => <option key={n.nivel} value={n.nivel}>{n.titulo} ({n.n_unidades})</option>)}</optgroup>
           </select>
         </label>
-        <input type="search" value={filtro} onChange={(e) => setFiltro(e.target.value)} placeholder={tr('amb.filter')} aria-label={tr('amb.filter')}/>
+        <label>{tr('amb.unit')}
+          <select value={elegido || ''} disabled={!datos} onChange={(e) => setElegido(e.target.value || null)}>
+            <option value="">{tr('amb.chooseUnit')}</option>
+            {(datos?.unidades || []).map((u) => <option key={u.codigo} value={u.codigo}>{u.nombre} · {u.codigo}</option>)}
+          </select>
+        </label>
+        <div className="fa-period">
+          <strong><CalendarDays size={14}/>{tr('amb.reportPeriod')}</strong>
+          <div>
+            <label>{tr('filter.from')}<input type="date" min="2000-11-01" max="2025-12-31" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)}/></label>
+            <label>{tr('filter.to')}<input type="date" min="2000-11-01" max="2025-12-31" value={fechaFin} onChange={(e) => setFechaFin(e.target.value)}/></label>
+          </div>
+          {!periodoValido && <small className="fa-period-error">{tr('filter.invalid')}</small>}
+          <small>{tr('amb.monthResolution')}</small>
+          {reportUrl()
+            ? <div className="fa-report-buttons">
+              <button type="button" className="fa-btn" disabled={Boolean(reportLoading)} onClick={() => openGeneratedReport('view')}><Eye size={15}/>{tr('amb.viewReport')}</button>
+              <button type="button" className="fa-btn fa-report-primary" disabled={Boolean(reportLoading)} onClick={() => openGeneratedReport('pdf')}><Download size={15}/>{tr('amb.downloadPdf')}</button>
+            </div>
+            : <small>{tr('amb.chooseReportUnit')}</small>}
+          {reportLoading && <div className="fa-report-loading" role="status" aria-live="polite"><LoaderCircle size={16}/><span>{tr(reportLoading === 'pdf' ? 'amb.preparingPdf' : 'amb.preparingReport')}</span></div>}
+        </div>
       </div>
       {error && <p className="fa-error">{error}</p>}
       {!datos && !error && <p className="fa-note">{tr('amb.loading')}</p>}
@@ -124,20 +250,9 @@ function AmbitosPanel({ map, onClose }) {
           ))}
         </div>
         <p className="fa-note">{tr('amb.coverage', { p: Math.round((datos.cobertura || 0) * 1000) / 10 })}</p>
-        <ol className="fa-list" ref={listRef}>
-          {filas.map((u) => (
-            <li key={u.codigo} data-codigo={u.codigo} className={u.codigo === elegido ? 'is-picked' : ''}>
-              <span className="fa-rank">{u.puesto ?? '–'}</span>
-              <span className="fa-badge" style={{ background: u.color }}>{u.etiqueta}</span>
-              <span className="fa-name"><b>{u.nombre}</b><small>{u.provincia ? `${u.provincia} · ` : ''}{u.codigo} · {tr('amb.density', { v: u.densidad ?? 0 })}</small></span>
-              <a className="fa-btn" href={ambitoUrl(`/api/ambitos/${nivel}/${u.codigo}/informe`)} target="_blank" rel="noreferrer" title={tr('amb.report')}><FileText size={14}/>{tr('amb.reportShort')}</a>
-              <a className="fa-btn" href={informeUrl({ ambito: `${nivel}:${u.codigo}` })} target="_blank" rel="noreferrer" title={tr('report.tip')}>{tr('amb.technical')}</a>
-            </li>
-          ))}
-        </ol>
-        {(datos.unidades.length > filas.length) && <p className="fa-note">{tr('amb.more', { n: datos.unidades.length - filas.length })}</p>}
         <div className="fa-actions">
           <a className="fa-btn" href={ambitoUrl(`/api/ambitos/${nivel}.csv`)}><Download size={14}/>{tr('amb.csv')}</a>
+          {unidadElegida && <span>{unidadElegida.nombre} · {inicioMes}–{finMes}</span>}
         </div>
         <p className="fa-note">{datos.metodo.notas[0]} {datos.metodo.notas[1]}</p>
         <p className="fa-note">{datos.fuente}</p>
