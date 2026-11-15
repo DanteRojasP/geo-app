@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import SimplePanel from './SimplePanel.jsx'
 import ComparisonWorkspace from './ComparisonWorkspace.jsx'
+import IntroScreen from './IntroScreen.jsx'
 import { LANGS, getLang, locale, months, setLang, tr } from './i18n.js'
 import { CUSCO, downloadCsv, getCalendar, getDepartments, getFocos, getMonth } from './services/api.js'
 
@@ -297,6 +298,7 @@ function FireMapApp() {
   const yearsRef = useRef(null)
   const [simpleOpen, setSimpleOpen] = useState(false)
   const [compareOpen, setCompareOpen] = useState(false)
+  const [introOpen, setIntroOpen] = useState(() => new URLSearchParams(window.location.search).get('intro') !== '0')
   const [detailsOpen, setDetailsOpen] = useState(true)
   const [layersOpen, setLayersOpen] = useState(false)
   const [toolsOpen, setToolsOpen] = useState(false)
@@ -651,6 +653,7 @@ function FireMapApp() {
   return (
     <div className="fw-app">
       <div ref={mapContainerRef} className="fw-map" aria-label={tr('map.aria')} />
+      {introOpen && <IntroScreen key={lang} lang={lang} mapReady={Boolean(region && !loading)} onLanguage={changeLang} onEnter={() => setIntroOpen(false)}/>} 
       <div className="fw-nubel-brand" aria-label="Nubel Team · FireCal Cusco"><img src="./nubel-team-logo.png" alt="Nubel Team"/></div>
       <button className={`fc-data-launcher ${detailsOpen ? 'is-active' : ''}`} aria-label={tr('data.open')} aria-expanded={detailsOpen} onClick={() => { setSimpleOpen(false); setCompareOpen(false); setDetailsOpen((v) => !v) }}><Database size={19}/><span>{tr('data.label')}</span></button>
       <button className={`fc-data-launcher fc-simple-launcher ${simpleOpen ? 'is-active' : ''}`} aria-label={tr('rail.simpleTitle')} aria-expanded={simpleOpen} onClick={() => { setDetailsOpen(false); setCompareOpen(false); setSimpleOpen((v) => !v) }}><MessageCircleQuestion size={19}/><span>{tr('rail.simple')}</span></button>
