@@ -1,19 +1,24 @@
+// FireCal Cusco: interfaz de Dante (rama `dante`, "Firewatch Perú") adaptada a la plataforma.
+// Cambios respecto al original: datos reales de Cusco desde nuestra API (sin datos demo ni FIRMS
+// en vivo), solo Cusco, unidad "focos armonizados", sin FRP, y la línea de tiempo de 5 días pasa a
+// ser el calendario histórico mes x año del PLAN (2000-11 a 2025-12).
 import { createElement, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as maplibregl from 'maplibre-gl'
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import {
-  Activity, CloudSun, Download, Flame, Gauge, Info,
-  Layers3, Map as MapIcon, MapPin, Mountain, Pause, Play, RefreshCw, Satellite,
-  Scan, ShieldAlert, SlidersHorizontal, ThermometerSun, Trash2, X,
+  ArrowLeftRight, CalendarDays, ChevronLeft, ChevronRight, Database, Download, Flame, Gauge,
+  Layers3, Map as MapIcon, MapPin, MessageCircleQuestion, Mountain, Pause, Play, Satellite, Scan, ShieldAlert,
+  SlidersHorizontal,
+  ThermometerSun, Trash2, X,
 } from 'lucide-react'
-import cuscoBoundaryRaw from './data/cusco-boundary.json'
-import { getFireOverview } from './services/fireApi.js'
+import SimplePanel from './SimplePanel.jsx'
+import ComparisonWorkspace from './ComparisonWorkspace.jsx'
+import { LANGS, getLang, locale, months, setLang, tr } from './i18n.js'
+import { CUSCO, downloadCsv, getCalendar, getDepartments, getFocos, getMonth } from './services/api.js'
 
 maplibregl.setWorkerUrl(maplibreWorkerUrl)
 
 const MAP_STYLE = 'https://tiles.openfreemap.org/styles/positron'
-const PERU_DEPARTMENTS_URL = 'https://raw.githubusercontent.com/juaneladio/peru-geojson/master/peru_departamental_simple.geojson'
-const EMPTY_FEATURE_COLLECTION = { type: 'FeatureCollection', features: [] }
 const SATELLITE_STYLE = {
   version: 8,
   sources: {
@@ -26,136 +31,91 @@ const SATELLITE_STYLE = {
   },
   layers: [{ id: 'satellite-imagery', type: 'raster', source: 'imagery', paint: { 'raster-saturation': 0.08, 'raster-contrast': 0.08 } }],
 }
-const CUSCO_CENTER = [-71.97, -13.53]
-const HISTORICAL_YEARS = [2021, 2022, 2023, 2024, 2025, 2026]
-const PERU_BOUNDS = new maplibregl.LngLatBounds([-81.45, -18.5], [-68.55, 0.25])
-const CUSCO_FEATURE = { ...cuscoBoundaryRaw.features[0], id: 'cusco' }
-const CUSCO_BOUNDARY = { type: 'FeatureCollection', features: [CUSCO_FEATURE] }
-const CUSCO_RING = CUSCO_FEATURE.geometry.coordinates[0]
-const CUSCO_POINTS = CUSCO_FEATURE.geometry.coordinates.flat()
-const CUSCO_BOUNDS = CUSCO_POINTS.reduce(
-  (bounds, point) => bounds.extend(point),
-  new maplibregl.LngLatBounds(CUSCO_POINTS[0], CUSCO_POINTS[0]),
-)
-const CUSCO_MASK = {
-  type: 'FeatureCollection',
-  features: [{
-    type: 'Feature',
-    properties: {},
-    geometry: {
-      type: 'Polygon',
-      coordinates: [
-        [[-180, -85], [180, -85], [180, 85], [-180, 85], [-180, -85]],
-        [...CUSCO_RING].reverse(),
-      ],
-    },
-  }],
+const EMPTY = { type: 'FeatureCollection', features: [] }
+const FIRST_YEAR = 2000
+const LAST_YEAR = 2025
+const YEARS = Array.from({ length: LAST_YEAR - FIRST_YEAR + 1 }, (_, i) => FIRST_YEAR + i)
+// YlOrRd (ColorBrewer, apta para daltonismo) para los tramos con fuego; el 0 va en gris neutro.
+const YLORRD = ['#ffffb2', '#fecc5c', '#fd8d3c', '#f03b20', '#bd0026']
+const ZERO = '#e4e7ec'               // 0 focos: gris claro (no debe resaltar)
+const calidadLabel = (q) => tr(`calidad.${q}`)
+const catLabel = (c) => (c ? tr(`cat.${c}`) : tr('noData'))
+const CATEGORIA = {
+  'muy por debajo': 'bajo', 'por debajo': 'bajo', normal: 'moderado',
+  'por encima': 'alto', 'muy por encima': 'alto', incierta: 'incierto',
+}
+const fmt = (v, d = 0) => (v === null || v === undefined || Number.isNaN(v)) ? '–'
+  : Number(v).toLocaleString(locale(), { minimumFractionDigits: d, maximumFractionDigits: d })
+const fmtFocos = (v) => (v > 0 && v < 1 ? fmt(v, 1) : fmt(v))
+const ym = (y, m) => `${y}-${String(m).padStart(2, '0')}`
+const monthStart = (y, m) => `${ym(y, m)}-01`
+const monthEnd = (y, m) => `${ym(y, m)}-${String(new Date(y, m, 0).getDate()).padStart(2, '0')}`
+const filterFocosByDate = (body, from, to) => {
+  if (!from || !to) return body
+  const features = (body?.features || []).filter((feature) => {
+    const date = feature.properties?.fecha_local
+    return date && date >= from && date <= to
+  })
+  return { ...body, features, n_focos: features.length }
 }
 
-function hotspotsToGeoJson(points) {
+function classColor(value, breaks) {
+  if (!value) return ZERO
+  let i = 0
+  while (i < breaks.length && value > breaks[i]) i++
+  return YLORRD[Math.min(i, YLORRD.length - 1)]
+}
+
+// Anomalía: azul (por debajo) - blanco - rojo (por encima), de -2 a +2 (apta para daltonismo).
+const DIVERGING = [[-2, '#2166ac'], [-1, '#67a9cf'], [0, '#f7f7f7'], [1, '#ef8a62'], [2, '#b2182b']]
+function mixHex(a, b, t) {
+  const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16)
+  const ch = (s) => Math.round(((pa >> s) & 255) + (((pb >> s) & 255) - ((pa >> s) & 255)) * t)
+  return `#${[16, 8, 0].map((s) => ch(s).toString(16).padStart(2, '0')).join('')}`
+}
+function divergingColor(v) {
+  if (v <= DIVERGING[0][0]) return DIVERGING[0][1]
+  for (let i = 1; i < DIVERGING.length; i++) {
+    const [x1, c1] = DIVERGING[i], [x0, c0] = DIVERGING[i - 1]
+    if (v <= x1) return mixHex(c0, c1, (v - x0) / (x1 - x0))
+  }
+  return DIVERGING[DIVERGING.length - 1][1]
+}
+
+// Texto oscuro sobre colores claros (amarillos) y claro sobre oscuros.
+function inkFor(color) {
+  if (!color.startsWith('#')) return '#f7fbf8'
+  const n = parseInt(color.slice(1), 16)
+  const lum = 0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)
+  return lum > 150 ? '#1d2330' : '#f7fbf8'
+}
+
+function boundsOf(geojson) {
+  const coords = geojson.features.flatMap((f) => (f.geometry.type === 'MultiPolygon'
+    ? f.geometry.coordinates.flatMap((p) => p[0]) : f.geometry.coordinates[0]))
+  return coords.reduce((b, c) => b.extend(c), new maplibregl.LngLatBounds(coords[0], coords[0]))
+}
+
+// Máscara: oscurece todo lo que está fuera de Cusco (los anillos de Cusco son agujeros).
+function maskOf(geojson) {
+  const holes = geojson.features.flatMap((f) => (f.geometry.type === 'MultiPolygon'
+    ? f.geometry.coordinates.map((p) => [...p[0]].reverse()) : [[...f.geometry.coordinates[0]].reverse()]))
   return {
     type: 'FeatureCollection',
-    features: points.map((point) => ({
-      type: 'Feature',
-      id: point.id,
-      properties: {
-        date: point.date,
-        sensor: point.sensor,
-        source: point.source || point.sensor,
-        frp: Number(point.frp) || 0,
-        confidence: Number(point.confidence) || 0,
-      },
-      geometry: { type: 'Point', coordinates: [point.lon, point.lat] },
-    })),
-  }
-}
-
-function pointInRing(lon, lat, ring) {
-  let inside = false
-  for (let index = 0, previous = ring.length - 1; index < ring.length; previous = index++) {
-    const [x1, y1] = ring[index]
-    const [x2, y2] = ring[previous]
-    if ((y1 > lat) !== (y2 > lat) && lon < ((x2 - x1) * (lat - y1)) / (y2 - y1) + x1) inside = !inside
-  }
-  return inside
-}
-
-function isInsideCusco(point) {
-  const rings = CUSCO_FEATURE.geometry.coordinates
-  return pointInRing(point.lon, point.lat, rings[0]) && !rings.slice(1).some((ring) => pointInRing(point.lon, point.lat, ring))
-}
-
-function isInsideGeometry(point, geometry) {
-  if (!geometry) return false
-  const polygons = geometry.type === 'MultiPolygon' ? geometry.coordinates : [geometry.coordinates]
-  return polygons.some((polygon) => pointInRing(point.lon, point.lat, polygon[0])
-    && !polygon.slice(1).some((ring) => pointInRing(point.lon, point.lat, ring)))
-}
-
-function isInsidePeru(point, departments) {
-  return departments.features.some((feature) => isInsideGeometry(point, feature.geometry))
-}
-
-function addActivityToDepartments(departments, points) {
-  return {
-    ...departments,
-    features: departments.features.map((feature) => {
-      const matches = points.filter((point) => isInsideGeometry(point, feature.geometry))
-      const frp = matches.reduce((sum, point) => sum + point.frp, 0)
-      const confidence = matches.length
-        ? Math.round(matches.reduce((sum, point) => sum + point.confidence, 0) / matches.length)
-        : 0
-      return {
-        ...feature,
-        properties: {
-          ...feature.properties,
-          fireCount: matches.length,
-          frp: Number(frp.toFixed(1)),
-          confidence,
-        },
-      }
-    }),
+    features: [{ type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[[-180, -85], [180, -85], [180, 85], [-180, 85], [-180, -85]], ...holes] } }],
   }
 }
 
 function boundsToGeoJson(bounds) {
-  if (!bounds) return { type: 'FeatureCollection', features: [] }
+  if (!bounds) return EMPTY
   const { west, east, south, north } = bounds
-  return {
-    type: 'FeatureCollection',
-    features: [{
-      type: 'Feature',
-      properties: {},
-      geometry: { type: 'Polygon', coordinates: [[[west, south], [east, south], [east, north], [west, north], [west, south]]] },
-    }],
-  }
+  return { type: 'FeatureCollection', features: [{ type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[[west, south], [east, south], [east, north], [west, north], [west, south]]] } }] }
 }
 
-function summarizeHotspots(points) {
-  const frp = points.reduce((sum, point) => sum + point.frp, 0)
-  const confidence = points.length ? Math.round(points.reduce((sum, point) => sum + point.confidence, 0) / points.length) : 0
-  const modis = points.filter((point) => point.sensor === 'MODIS').length
-  const risk = points.length >= 25 || frp >= 600 ? 'Alto' : points.length >= 10 || frp >= 180 ? 'Moderado' : 'Bajo'
-  return { frp, confidence, modis, viirs: points.length - modis, risk }
-}
-
-function fitToCusco(map, compact = window.innerWidth < 650) {
-  map.fitBounds(CUSCO_BOUNDS, {
-    padding: compact
-      ? { top: 76, right: 24, bottom: 112, left: 24 }
-      : { top: 100, right: 160, bottom: 130, left: 430 },
-    duration: 900,
-    maxZoom: 8.2,
-  })
-}
-
-function fitToPeru(map, compact = window.innerWidth < 650) {
-  map.fitBounds(PERU_BOUNDS, {
-    padding: compact
-      ? { top: 76, right: 24, bottom: 112, left: 24 }
-      : { top: 100, right: 160, bottom: 130, left: 430 },
-    duration: 900,
-    maxZoom: 5.7,
+function fitTo(map, bounds, compact = window.innerWidth < 650) {
+  map.fitBounds(bounds, {
+    padding: compact ? { top: 76, right: 24, bottom: 112, left: 24 } : { top: 100, right: 160, bottom: 300, left: 430 },
+    duration: 900, maxZoom: 8.6,
   })
 }
 
@@ -173,9 +133,10 @@ function createPopupContent(title, lines) {
   return root
 }
 
-function RiskBadge({ level }) {
-  const activityLevel = { Alto: 'alta', Moderado: 'moderada', Bajo: 'baja' }[level] || level
-  return <span className={`fw-risk fw-risk--${level.toLowerCase()}`}><i />Actividad {activityLevel}</span>
+function CategoryBadge({ categoria }) {
+  if (!categoria) return <span className="fw-risk fw-risk--bajo"><i />{tr('badge.noAnomaly')}</span>
+  const tone = CATEGORIA[categoria] || 'bajo'
+  return <span className={`fw-risk fw-risk--${tone}`}><i />{categoria === 'incierta' ? tr('badge.uncertain') : tr('badge.activity', { cat: catLabel(categoria) })}</span>
 }
 
 function LayerButton({ active, icon, label, onClick, tone }) {
@@ -186,39 +147,34 @@ function Metric({ icon, label, value, tone }) {
   return <div className="fw-metric"><span className={tone}>{createElement(icon, { size: 16 })}</span><div><b>{value}</b><small>{label}</small></div></div>
 }
 
-function SatelliteSelectionMap({ bounds, hotspots }) {
+function SatelliteSelectionMap({ bounds, focos }) {
   const containerRef = useRef(null)
   const previewMapRef = useRef(null)
   const previewReadyRef = useRef(false)
-  const hotspotsRef = useRef(hotspots)
+  const focosRef = useRef(focos)
   const boundsRef = useRef(bounds)
-  hotspotsRef.current = hotspots
+  focosRef.current = focos
   boundsRef.current = bounds
 
-  const fitPreview = useCallback((map, nextBounds) => {
-    map.fitBounds([[nextBounds.west, nextBounds.south], [nextBounds.east, nextBounds.north]], { padding: 22, duration: 0, maxZoom: 12 })
+  const fitPreview = useCallback((map, b) => {
+    map.fitBounds([[b.west, b.south], [b.east, b.north]], { padding: 22, duration: 0, maxZoom: 12 })
   }, [])
 
   useEffect(() => {
     const map = new maplibregl.Map({
-      container: containerRef.current,
-      style: SATELLITE_STYLE,
+      container: containerRef.current, style: SATELLITE_STYLE,
       center: [(boundsRef.current.west + boundsRef.current.east) / 2, (boundsRef.current.south + boundsRef.current.north) / 2],
-      zoom: 8,
-      minZoom: 5,
-      maxZoom: 16,
-      attributionControl: false,
-      antialias: true,
+      zoom: 8, minZoom: 5, maxZoom: 16, attributionControl: false, antialias: true,
     })
     previewMapRef.current = map
     map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-left')
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right')
     map.on('load', () => {
-      map.addSource('preview-hotspots', { type: 'geojson', data: hotspotsToGeoJson(hotspotsRef.current) })
+      map.addSource('preview-focos', { type: 'geojson', data: focosRef.current })
       map.addLayer({
-        id: 'preview-heat', type: 'heatmap', source: 'preview-hotspots', maxzoom: 14,
+        id: 'preview-heat', type: 'heatmap', source: 'preview-focos', maxzoom: 14,
         paint: {
-          'heatmap-weight': ['interpolate', ['linear'], ['get', 'frp'], 0, 0.2, 40, 0.6, 100, 1],
+          'heatmap-weight': ['interpolate', ['linear'], ['get', 'eq_foco'], 0, 0.15, 0.5, 0.6, 1, 1],
           'heatmap-intensity': 1.35,
           'heatmap-color': ['interpolate', ['linear'], ['heatmap-density'], 0, 'rgba(255,230,110,0)', 0.25, '#ffe66d', 0.5, '#ff9f32', 0.72, '#ff4c2f', 1, '#9f001f'],
           'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 6, 18, 12, 42],
@@ -226,171 +182,286 @@ function SatelliteSelectionMap({ bounds, hotspots }) {
         },
       })
       map.addLayer({
-        id: 'preview-points', type: 'circle', source: 'preview-hotspots',
-        paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 6, 4, 12, 8], 'circle-color': '#ff5a3d', 'circle-opacity': 0.95, 'circle-stroke-color': '#fff5dc', 'circle-stroke-width': 1.4 },
+        id: 'preview-points', type: 'circle', source: 'preview-focos',
+        paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 6, 3, 12, 7], 'circle-color': '#ff5a3d', 'circle-opacity': 0.95, 'circle-stroke-color': '#fff5dc', 'circle-stroke-width': 1.2 },
       })
       previewReadyRef.current = true
       fitPreview(map, boundsRef.current)
     })
-    return () => {
-      previewReadyRef.current = false
-      map.remove()
-      previewMapRef.current = null
-    }
+    return () => { previewReadyRef.current = false; map.remove(); previewMapRef.current = null }
   }, [fitPreview])
 
   useEffect(() => {
     const map = previewMapRef.current
     if (!previewReadyRef.current || !map) return
-    map.getSource('preview-hotspots').setData(hotspotsToGeoJson(hotspots))
+    map.getSource('preview-focos').setData(focos)
     fitPreview(map, bounds)
-  }, [bounds, fitPreview, hotspots])
+  }, [bounds, fitPreview, focos])
 
-  return <div className="fw-satellite-preview"><div ref={containerRef} className="fw-satellite-map"/><span className="fw-satellite-badge"><i/>IMAGEN SATELITAL</span><div className="fw-satellite-legend"><span><i className="heat"/>Calor FIRMS</span><span><i className="point"/>Detección</span></div></div>
+  return <div className="fw-satellite-preview"><div ref={containerRef} className="fw-satellite-map"/><span className="fw-satellite-badge"><i/>{tr('sat.badge')}</span><div className="fw-satellite-legend"><span><i className="heat"/>{tr('sat.density')}</span><span><i className="point"/>{tr('sat.point')}</span></div></div>
+}
+
+function CalendarPanel({ calendar, mode, setMode, selected, onSelect, onClose }) {
+  const byKey = useMemo(() => new Map((calendar?.celdas || []).map((c) => [`${c.anio}-${c.mes}`, c])), [calendar])
+  if (!calendar) return null
+  const MESES = months()
+  const breaks = calendar.cortes_color || []
+  const edges = [0, ...breaks]
+  return (
+    <aside className="fc-calendar" aria-label={tr('cal.aria')}>
+      <div className="fc-calendar-head">
+        <div><p>{tr('cal.kicker')}</p><h2>{tr('cal.title', { aoi: calendar.aoi.descripcion })}</h2></div>
+        <div className="fc-toggle">
+          <button className={mode === 'valor' ? 'is-active' : ''} onClick={() => setMode('valor')}>{tr('cal.hotspots')}</button>
+          <button className={mode === 'anomalia' ? 'is-active' : ''} onClick={() => setMode('anomalia')}>{tr('cal.anomaly')}</button>
+          <button onClick={onClose} title={tr('cal.close')}><X size={15}/></button>
+        </div>
+      </div>
+      <div className="fc-calendar-grid">
+        <table>
+          <thead><tr><th/>{MESES.map((m) => <th key={m}>{m}</th>)}</tr></thead>
+          <tbody>
+            {[...calendar.anios].reverse().map((y) => (
+              <tr key={y}>
+                <th>{y}</th>
+                {MESES.map((_, idx) => {
+                  const m = idx + 1
+                  const c = byKey.get(`${y}-${m}`)
+                  if (!c) return <td key={m} className="is-empty"/>
+                  if (c.sin_dato) return <td key={m} className="is-nodata" title={tr('cal.nodataTip', { m: MESES[idx], y })}/>
+                  const anomColor = c.anomalia === null ? '#d0d5dd' : divergingColor(c.anomalia)
+                  const bg = mode === 'anomalia' ? anomColor : classColor(c.focos_armonizados, breaks)
+                  const extrap = c.calidad === 'extrapolado' || c.calidad === 'mixto'
+                  const isSel = selected.year === y && selected.month === m
+                  const rango = c.incertidumbre ? tr('cal.range', { a: fmt(c.rango[0], 1), b: fmt(c.rango[1], 1) }) : ''
+                  const tip = tr('cal.tip', { m: MESES[idx], y, v: fmt(c.focos_armonizados, 2), range: rango, q: calidadLabel(c.calidad), med: fmt(c.mediana_hist, 1), a: c.anomalia ?? '–', cat: catLabel(c.categoria) })
+                  return (
+                    <td key={m} title={tip} aria-label={tip} role="button" tabIndex={0} onClick={() => onSelect(y, m)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(y, m) } }}
+                      className={[extrap ? 'is-extrap' : '', c.categoria === 'incierta' ? 'is-uncertain' : '', isSel ? 'is-selected' : '', y === 2013 && m === 1 ? 'is-viirs' : ''].join(' ')}
+                      style={{ background: bg, color: inkFor(bg) }}>
+                      {mode === 'anomalia' ? (c.anomalia === null ? '–' : `${c.anomalia > 0 ? '+' : ''}${c.anomalia.toFixed(1)}`) : fmtFocos(c.focos_armonizados)}
+                    </td>
+                  )
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="fc-legend">
+        {mode === 'valor' ? <>
+          <span className="sw" style={{ background: ZERO }}/>0
+          {YLORRD.map((color, i) => i < edges.length && <span key={color} className="fc-cls"><span className="sw" style={{ background: color }}/>{edges[i + 1] === undefined ? `> ${fmt(edges[i])}` : `${fmt(edges[i])}–${fmt(edges[i + 1])}`}</span>)}
+        </> : <span>{tr('cal.anomLegend')}</span>}
+        <span className="fc-cls"><span className="sw is-nodata"/>{tr('legend.nodata')}</span>
+        <span className="fc-cls"><span className="sw is-extrap" style={{ background: YLORRD[2] }}/>{tr('legend.extrap')}</span>
+        <span className="fc-cls"><span className="sw is-uncertain"/>{tr('legend.uncertain')}</span>
+        <span>{tr('legend.note')}</span>
+      </div>
+    </aside>
+  )
 }
 
 function FireMapApp() {
   const mapContainerRef = useRef(null)
   const mapRef = useRef(null)
   const mapReadyRef = useRef(false)
-  const hotspotsRef = useRef([])
-  const departmentsRef = useRef(EMPTY_FEATURE_COLLECTION)
+  const focosRef = useRef(EMPTY)
+  const regionRef = useRef(null)
   const selectionModeRef = useRef(false)
-  const [result, setResult] = useState({ hotspots: [], mode: 'demo', metadata: {} })
-  const [departments, setDepartments] = useState(EMPTY_FEATURE_COLLECTION)
-  const [activeScope, setActiveScope] = useState('peru')
-  const [baseMap, setBaseMap] = useState('relief')
+
+  const [region, setRegion] = useState(null)
+  const [departments, setDepartments] = useState([])
+  const [selectedRegionCode, setSelectedRegionCode] = useState(CUSCO)
+  const [calendar, setCalendar] = useState(null)
+  const [selected, setSelected] = useState({ year: LAST_YEAR, month: null })
+  const [filterDraft, setFilterDraft] = useState({ region: CUSCO, from: monthStart(LAST_YEAR, 1), to: monthEnd(LAST_YEAR, 12) })
+  const [customPeriod, setCustomPeriod] = useState(null)
+  const [month, setMonth] = useState(null)
+  const [focos, setFocos] = useState(EMPTY)
+  const [latency, setLatency] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
   const [activeLayer, setActiveLayer] = useState('surface')
-  const [selectedYear, setSelectedYear] = useState(2026)
-  const [selectedDate, setSelectedDate] = useState('all')
+  const [showBoundary, setShowBoundary] = useState(false)
+  const [baseMap, setBaseMap] = useState('relief')      // Dante (450cc43): relieve por defecto
+  const [calendarMode, setCalendarMode] = useState('valor')
+  // ?calendario=0 abre la página sin el calendario (p. ej. para incrustarla en una presentación).
+  // Abierto solo en pantallas anchas: en 1440x900 tapaba Cusco (auditoría de Gabriel).
+  const [calendarOpen, setCalendarOpen] = useState(window.innerWidth >= 1600
+    && new URLSearchParams(window.location.search).get('calendario') !== '0')
   const [playing, setPlaying] = useState(false)
+  const playableRef = useRef(new Set())
+  const yearsRef = useRef(null)
+  const [simpleOpen, setSimpleOpen] = useState(false)
+  const [compareOpen, setCompareOpen] = useState(false)
   const [detailsOpen, setDetailsOpen] = useState(true)
-  const [layersOpen, setLayersOpen] = useState(true)
-  const [studySelected, setStudySelected] = useState(false)
+  const [layersOpen, setLayersOpen] = useState(false)
+  const [toolsOpen, setToolsOpen] = useState(false)
   const [selectionMode, setSelectionMode] = useState(false)
   const [selectionBounds, setSelectionBounds] = useState(null)
+  const [selection, setSelection] = useState(null)
+  const [lang, setLangState] = useState(getLang())
+  const changeLang = (l) => { setLang(l); setLangState(l) }
+  const MESES = months()
+  const selectedRegion = departments.find((d) => d.code === selectedRegionCode) || { code: CUSCO, name: 'Cusco', datos: 'armonizados' }
 
-  const loadData = useCallback(async () => {
-    setLoading(true)
-    setError('')
-    try {
-      const startYear = selectedYear === 'all' ? HISTORICAL_YEARS[0] : selectedYear
-      const endYear = selectedYear === 'all' ? HISTORICAL_YEARS.at(-1) : selectedYear
-      const data = await getFireOverview({ department: 'peru', startYear, endYear })
-      setResult(data)
-    } catch (caught) {
-      setError(caught.message || 'No se pudieron consultar las detecciones.')
-    } finally {
-      setLoading(false)
-    }
-  }, [selectedYear])
+  const periodo = useMemo(() => {
+    if (customPeriod) return { inicio: customPeriod.from.slice(0, 7), fin: customPeriod.to.slice(0, 7), exactFrom: customPeriod.from, exactTo: customPeriod.to, label: `${customPeriod.from} – ${customPeriod.to}` }
+    return selected.month
+      ? { inicio: ym(selected.year, selected.month), fin: ym(selected.year, selected.month), label: `${months()[selected.month - 1]} ${selected.year}` }
+      : { inicio: ym(selected.year, selected.year === FIRST_YEAR ? 11 : 1), fin: ym(selected.year, 12), label: tr('period.year', { y: selected.year }) }
+  }, [selected, lang, customPeriod]) // eslint-disable-line react-hooks/exhaustive-deps
+  const aoi = { departamento: selectedRegionCode }
+  const yearCells = useMemo(() => (calendar?.celdas || []).filter((c) => c.anio === selected.year), [calendar, selected.year])
+  const yearTotal = useMemo(() => yearCells.reduce((s, c) => s + (c.focos_armonizados || 0), 0), [yearCells])
+  const yearMax = useMemo(() => Math.max(1, ...yearCells.map((c) => c.focos_armonizados || 0)), [yearCells])
+  const periodCells = useMemo(() => {
+    if (!customPeriod) return yearCells
+    const fromMonth = customPeriod.from.slice(0, 7)
+    const toMonth = customPeriod.to.slice(0, 7)
+    return (calendar?.celdas || []).filter((c) => {
+      const key = ym(c.anio, c.mes)
+      return key >= fromMonth && key <= toMonth
+    })
+  }, [calendar, customPeriod, yearCells])
+  playableRef.current = new Set(yearCells.filter((c) => !c.sin_dato).map((c) => c.mes))
+  selectionModeRef.current = selectionMode
+  focosRef.current = focos
 
-  useEffect(() => { loadData() }, [loadData])
-
+  // Datos base: catálogo regional, contorno, metadatos y calendario de la región elegida.
   useEffect(() => {
     let active = true
-    fetch(PERU_DEPARTMENTS_URL)
-      .then((response) => {
-        if (!response.ok) throw new Error(`Límites: ${response.status}`)
-        return response.json()
+    Promise.all([getDepartments(), getCalendar({ departamento: selectedRegionCode })])
+      .then(([d, c]) => {
+        if (!active) return
+        const features = (d.body.geojson?.features || []).filter((f) => f.properties?.code === selectedRegionCode)
+        setDepartments(d.body.departamentos || [])
+        setRegion({ ...(d.body.geojson || EMPTY), features })
+        setCalendar(c.body); setLatency(c.ms)
       })
-      .then((data) => { if (active) setDepartments(data) })
-      .catch(() => { if (active) setError('El mapa funciona, pero no se pudieron cargar los límites departamentales.') })
+      .catch((e) => active && setError(e.message))
+      .finally(() => active && setLoading(false))
     return () => { active = false }
-  }, [])
+  }, [lang, selectedRegionCode])          // en otro idioma, la API devuelve notas y unidad traducidas
 
-  const peruHotspots = useMemo(() => departments.features.length
-    ? result.hotspots.filter((point) => isInsidePeru(point, departments))
-    : result.hotspots, [departments, result.hotspots])
-  const scopedHotspots = useMemo(() => activeScope === 'cusco'
-    ? peruHotspots.filter(isInsideCusco)
-    : peruHotspots, [activeScope, peruHotspots])
-  const yearHotspots = useMemo(() => selectedYear === 'all'
-    ? scopedHotspots
-    : scopedHotspots.filter((point) => String(point.date || '').startsWith(`${selectedYear}-`)), [scopedHotspots, selectedYear])
-  const dates = useMemo(() => [...new Set(yearHotspots.map((point) => point.date).filter(Boolean))].sort().slice(-5), [yearHotspots])
-  const visibleHotspots = useMemo(() => selectedDate === 'all' ? yearHotspots : yearHotspots.filter((point) => point.date === selectedDate), [yearHotspots, selectedDate])
-  const mappedDepartments = useMemo(() => addActivityToDepartments(departments, visibleHotspots), [departments, visibleHotspots])
-  const selectedHotspots = useMemo(() => selectionBounds ? visibleHotspots.filter((point) => point.lon >= selectionBounds.west && point.lon <= selectionBounds.east && point.lat >= selectionBounds.south && point.lat <= selectionBounds.north) : [], [selectionBounds, visibleHotspots])
-  hotspotsRef.current = visibleHotspots
-  departmentsRef.current = mappedDepartments
-  selectionModeRef.current = selectionMode
-
+  // Focos del periodo seleccionado (mapa) y detalle del mes.
   useEffect(() => {
-    if (!playing || !dates.length) return undefined
-    const timer = window.setInterval(() => {
-      setSelectedDate((current) => {
-        const index = current === 'all' ? -1 : dates.indexOf(current)
-        return dates[(index + 1) % dates.length]
+    let active = true
+    setLoading(true)
+    setMonth(null)                 // vaciar el detalle: no mostrar números de otro mes mientras carga
+    setError('')
+    const tasks = [getFocos({ departamento: selectedRegionCode }, periodo.inicio, periodo.fin)]
+    if (!customPeriod && selected.month) tasks.push(getMonth({ departamento: selectedRegionCode }, periodo.inicio))
+    Promise.all(tasks)
+      .then(([f, mo]) => {
+        if (!active) return
+        setFocos(customPeriod ? filterFocosByDate(f.body, customPeriod.from, customPeriod.to) : f.body); setLatency(f.ms); setMonth(mo ? mo.body : null); setError('')
       })
-    }, 1400)
+      .catch((e) => active && setError(e.message))
+      .finally(() => active && setLoading(false))
+    return () => { active = false }
+  }, [periodo, selected.month, selectedRegionCode, customPeriod])
+
+  // Área dibujada: calendario del área en el periodo y sus focos.
+  useEffect(() => {
+    if (!selectionBounds) { setSelection(null); return undefined }
+    const b = selectionBounds
+    const bbox = { bbox: [b.west, b.south, b.east, b.north].map((v) => v.toFixed(4)).join(',') }
+    // Las consultas de un área son "pesadas" (cupo de 5 seguidas): durante la reproducción se pausan.
+    if (playing) { setSelection({ bbox, paused: true }); return undefined }
+    let active = true
+    setSelection({ loading: true, bbox })
+    Promise.all([getCalendar(bbox, periodo.inicio, periodo.fin), getFocos(bbox, periodo.inicio, periodo.fin)])
+      .then(([c, f]) => active && setSelection({ bbox, calendar: c.body, focos: customPeriod ? filterFocosByDate(f.body, customPeriod.from, customPeriod.to) : f.body }))
+      .catch((e) => active && setSelection({ bbox, error: e.message }))
+    return () => { active = false }
+  }, [selectionBounds, periodo, playing, customPeriod])
+
+  // Mantener visible el año elegido en la escala de años (se desplaza si no cabe).
+  useEffect(() => {
+    const center = () => {
+      const el = yearsRef.current
+      const a = el?.querySelector('.is-active')
+      if (el && a) el.scrollTo({ left: a.offsetLeft - (el.clientWidth - a.offsetWidth) / 2 })
+    }
+    const t = window.setTimeout(center, 250)          // tras cargar fuentes y diseño
+    window.addEventListener('resize', center)
+    return () => { window.clearTimeout(t); window.removeEventListener('resize', center) }
+  }, [selected.year])
+
+  // Si la línea temporal cambia el periodo, mantener el formulario alineado con esa vista.
+  useEffect(() => {
+    if (customPeriod) return
+    setFilterDraft((current) => ({
+      ...current,
+      region: selectedRegionCode,
+      from: selected.month ? monthStart(selected.year, selected.month) : monthStart(selected.year, selected.year === FIRST_YEAR ? 11 : 1),
+      to: selected.month ? monthEnd(selected.year, selected.month) : monthEnd(selected.year, 12),
+    }))
+  }, [customPeriod, selected, selectedRegionCode])
+
+  // Reproducir: recorre los meses del año seleccionado.
+  useEffect(() => {
+    if (!playing) return undefined
+    const timer = window.setInterval(() => {
+      // QA de Erik (7): saltar los meses sin dato (ene-oct de 2000) en vez de mostrar "Sin datos".
+      const ok = playableRef.current
+      setSelected((s) => {
+        let m = s.month || 0
+        for (let k = 0; k < 12; k += 1) { m = (m % 12) + 1; if (!ok.size || ok.has(m)) break }
+        return { year: s.year, month: m }
+      })
+    }, 1600)
     return () => window.clearInterval(timer)
-  }, [dates, playing])
+  }, [playing])
 
   useEffect(() => {
     const map = new maplibregl.Map({
-      container: mapContainerRef.current,
-      style: MAP_STYLE,
-      center: [-75.1, -9.2],
-      zoom: 4.2,
-      minZoom: 3.4,
-      maxZoom: 14,
-      attributionControl: false,
-      antialias: true,
+      container: mapContainerRef.current, style: MAP_STYLE, center: [-71.97, -13.53], zoom: 6.2,
+      minZoom: 4, maxZoom: 14, attributionControl: false, antialias: true,
+      // Conserva el dibujo del lienzo: permite guardar el mapa como imagen (MAESTRO P4).
+      canvasContextAttributes: { preserveDrawingBuffer: true },
     })
     mapRef.current = map
-    map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right')
+    map.addControl(new maplibregl.AttributionControl({ compact: true, customAttribution: 'NASA FIRMS · FAO GAUL' }), 'bottom-right')
     map.addControl(new maplibregl.NavigationControl({ showCompass: false, visualizePitch: false }), 'bottom-right')
     const canvas = map.getCanvas()
     const canvasContainer = map.getCanvasContainer()
     let dragStart = null
     let drawBox = null
     let suppressNextClick = false
-    let hoveredDepartmentId = null
 
     const pointerPosition = (event) => {
       const rect = canvas.getBoundingClientRect()
       return { x: event.clientX - rect.left, y: event.clientY - rect.top }
     }
-
-    const removeDrawBox = () => {
-      drawBox?.remove()
-      drawBox = null
-      dragStart = null
-    }
-
+    const removeDrawBox = () => { drawBox?.remove(); drawBox = null; dragStart = null }
     const onPointerDown = (event) => {
       if (!selectionModeRef.current || event.button !== 0) return
-      event.preventDefault()
-      event.stopPropagation()
+      event.preventDefault(); event.stopPropagation()
       dragStart = pointerPosition(event)
       drawBox = document.createElement('div')
       drawBox.className = 'fw-selection-box'
       canvasContainer.appendChild(drawBox)
       canvas.setPointerCapture?.(event.pointerId)
     }
-
     const onPointerMove = (event) => {
       if (!dragStart || !drawBox) return
-      event.preventDefault()
-      event.stopPropagation()
+      event.preventDefault(); event.stopPropagation()
       const current = pointerPosition(event)
       drawBox.style.left = `${Math.min(dragStart.x, current.x)}px`
       drawBox.style.top = `${Math.min(dragStart.y, current.y)}px`
       drawBox.style.width = `${Math.abs(current.x - dragStart.x)}px`
       drawBox.style.height = `${Math.abs(current.y - dragStart.y)}px`
     }
-
     const onPointerUp = (event) => {
       if (!dragStart || !drawBox) return
-      event.preventDefault()
-      event.stopPropagation()
+      event.preventDefault(); event.stopPropagation()
       const end = pointerPosition(event)
-      const width = Math.abs(end.x - dragStart.x)
-      const height = Math.abs(end.y - dragStart.y)
-      if (width >= 8 && height >= 8) {
+      if (Math.abs(end.x - dragStart.x) >= 8 && Math.abs(end.y - dragStart.y) >= 8) {
         suppressNextClick = true
         window.setTimeout(() => { suppressNextClick = false }, 0)
         const first = map.unproject([Math.min(dragStart.x, end.x), Math.max(dragStart.y, end.y)])
@@ -402,175 +473,72 @@ function FireMapApp() {
       removeDrawBox()
       canvas.releasePointerCapture?.(event.pointerId)
     }
-
     canvas.addEventListener('pointerdown', onPointerDown, true)
     canvas.addEventListener('pointermove', onPointerMove, true)
     canvas.addEventListener('pointerup', onPointerUp, true)
     canvas.addEventListener('pointercancel', removeDrawBox, true)
 
-    const showAreaPopup = (lngLat) => {
-      new maplibregl.Popup({ closeButton: false, offset: 12, className: 'fw-map-popup' })
-        .setLngLat(lngLat)
-        .setDOMContent(createPopupContent('Zona de estudio · Cusco', [
-          { value: 'Límite departamental oficial' },
-          { value: 'Fuente: INEI vía IGN', strong: true },
-        ]))
-        .addTo(map)
-    }
-
     map.on('load', () => {
-      map.addSource('peru-departments', { type: 'geojson', data: departmentsRef.current, generateId: true })
-      map.addSource('relief-imagery', {
-        type: 'raster',
-        tiles: ['https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
-        tileSize: 256,
-        attribution: 'Esri, Vantor, Earthstar Geographics, and the GIS User Community',
-      })
-      map.addSource('relief-reference', {
-        type: 'raster',
-        tiles: ['https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}'],
-        tileSize: 256,
-      })
-      map.addSource('cusco-area', { type: 'geojson', data: CUSCO_BOUNDARY })
-      map.addSource('fire-hotspots', { type: 'geojson', data: hotspotsToGeoJson([]) })
-      map.addSource('selection-area', { type: 'geojson', data: boundsToGeoJson(null) })
-      map.addSource('selected-hotspots', { type: 'geojson', data: hotspotsToGeoJson([]) })
-
+      map.addSource('relief-imagery', { type: 'raster', tileSize: 256, attribution: 'Esri, Vantor, Earthstar Geographics, and the GIS User Community', tiles: ['https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'] })
+      map.addSource('relief-reference', { type: 'raster', tileSize: 256, tiles: ['https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}'] })
+      map.addLayer({ id: 'relief-imagery-layer', type: 'raster', source: 'relief-imagery', layout: { visibility: 'visible' }, paint: { 'raster-saturation': -0.12, 'raster-contrast': 0.08, 'raster-brightness-min': 0.08, 'raster-brightness-max': 0.92 } })
+      map.addLayer({ id: 'relief-reference-layer', type: 'raster', source: 'relief-reference', layout: { visibility: 'visible' }, paint: { 'raster-opacity': 0.82 } })
+      map.addSource('cusco-mask', { type: 'geojson', data: EMPTY })
+      map.addSource('cusco-area', { type: 'geojson', data: EMPTY })
+      map.addSource('focos', { type: 'geojson', data: EMPTY })
+      map.addSource('selection-area', { type: 'geojson', data: EMPTY })
+      map.addLayer({ id: 'cusco-mask', type: 'fill', source: 'cusco-mask', paint: { 'fill-color': '#0b1712', 'fill-opacity': 0.38 } })
+      map.addLayer({ id: 'study-area-fill', type: 'fill', source: 'cusco-area', paint: { 'fill-color': '#0f766e', 'fill-opacity': 0.035 } })
+      map.addLayer({ id: 'study-area-glow', type: 'line', source: 'cusco-area', paint: { 'line-color': '#0f766e', 'line-width': 4, 'line-opacity': 0.18, 'line-blur': 4 } })
+      map.addLayer({ id: 'study-area-border', type: 'line', source: 'cusco-area', paint: { 'line-color': '#0f766e', 'line-width': 1.8, 'line-opacity': 0.9, 'line-dasharray': [2, 1.6] } })
       map.addLayer({
-        id: 'relief-imagery-layer', type: 'raster', source: 'relief-imagery',
-        layout: { visibility: 'visible' },
-        paint: { 'raster-saturation': -0.12, 'raster-contrast': 0.08, 'raster-brightness-min': 0.08, 'raster-brightness-max': 0.92 },
-      })
-      map.addLayer({
-        id: 'relief-reference-layer', type: 'raster', source: 'relief-reference',
-        layout: { visibility: 'visible' },
-        paint: { 'raster-opacity': 0.82 },
-      })
-      map.addLayer({
-        id: 'department-fill', type: 'fill', source: 'peru-departments',
+        id: 'fire-heat', type: 'heatmap', source: 'focos', maxzoom: 12, layout: { visibility: 'visible' },
         paint: {
-          'fill-color': ['interpolate', ['linear'], ['coalesce', ['get', 'fireCount'], 0],
-            0, '#e2e8f0', 1, '#fef3c7', 5, '#fde68a', 15, '#f59e0b', 35, '#ea580c', 70, '#991b1b'],
-          'fill-opacity': ['case', ['boolean', ['feature-state', 'hover'], false], 0.18, 0.045],
-        },
-      })
-      map.addLayer({
-        id: 'department-lines', type: 'line', source: 'peru-departments',
-        paint: { 'line-color': '#9eb3a8', 'line-width': ['interpolate', ['linear'], ['zoom'], 4, 0.7, 8, 1.5], 'line-opacity': 0.58 },
-      })
-      map.addLayer({
-        id: 'study-area-fill', type: 'fill', source: 'cusco-area',
-        paint: { 'fill-color': '#0f766e', 'fill-opacity': ['case', ['boolean', ['feature-state', 'selected'], false], 0.18, ['boolean', ['feature-state', 'hover'], false], 0.12, 0.025] },
-      })
-      map.addLayer({
-        id: 'study-area-glow', type: 'line', source: 'cusco-area',
-        paint: { 'line-color': '#0f766e', 'line-width': ['case', ['boolean', ['feature-state', 'hover'], false], 6, 4], 'line-opacity': 0.18, 'line-blur': 4 },
-      })
-      map.addLayer({
-        id: 'study-area-border', type: 'line', source: 'cusco-area',
-        paint: { 'line-color': '#0f766e', 'line-width': ['case', ['boolean', ['feature-state', 'selected'], false], 2.6, ['boolean', ['feature-state', 'hover'], false], 2.3, 1.5], 'line-opacity': 0.9, 'line-dasharray': [2, 1.6] },
-      })
-      map.addLayer({
-        id: 'fire-heat', type: 'heatmap', source: 'fire-hotspots', maxzoom: 12,
-        layout: { visibility: 'visible' },
-        paint: {
-          'heatmap-weight': ['interpolate', ['linear'], ['get', 'frp'], 0, 0.04, 15, 0.16, 45, 0.38, 110, 0.72],
-          'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 3.5, 0.42, 6, 0.68, 10, 1.15],
+          // Peso = aporte del foco a la serie armonizada (eq_foco); sin FRP.
+          'heatmap-weight': ['interpolate', ['linear'], ['get', 'eq_foco'], 0, 0.04, 0.25, 0.3, 1, 0.75, 3, 1],
+          'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 5, 0.5, 8, 0.9, 11, 1.3],
           'heatmap-color': ['interpolate', ['linear'], ['heatmap-density'],
             0, 'rgba(245,158,11,0)', 0.16, 'rgba(245,158,11,0)', 0.24, 'rgba(245,158,11,.22)',
-            0.36, '#fde68a', 0.52, '#f59e0b', 0.68, '#ea580c', 0.84, '#dc2626',
-            1, '#7f1d1d'],
-          'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 3.5, 15, 5, 22, 7, 32, 10, 52],
-          'heatmap-opacity': ['interpolate', ['linear'], ['zoom'], 3.5, 0.72, 8, 0.68, 11, 0.48],
+            0.36, '#fde68a', 0.52, '#f59e0b', 0.68, '#ea580c', 0.84, '#dc2626', 1, '#7f1d1d'],
+          'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 5, 10, 7, 18, 10, 34],
+          'heatmap-opacity': ['interpolate', ['linear'], ['zoom'], 5, 0.8, 11, 0.5],
         },
       })
       map.addLayer({
-        id: 'fire-points', type: 'circle', source: 'fire-hotspots',
-        layout: { visibility: 'none' },
+        id: 'fire-points', type: 'circle', source: 'focos', layout: { visibility: 'none' },
         paint: {
-          'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, 4, 10, 8],
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, 2.5, 10, 6],
           'circle-color': ['match', ['get', 'sensor'], 'MODIS', '#ff9b3f', '#f33932'],
-          'circle-opacity': 0.92,
-          'circle-stroke-color': '#fff4df',
-          'circle-stroke-width': 1.2,
+          'circle-opacity': ['case', ['==', ['get', 'en_serie'], 1], 0.92, 0.35],
+          'circle-stroke-color': '#fff4df', 'circle-stroke-width': 1,
         },
       })
       map.addLayer({ id: 'selection-area-fill', type: 'fill', source: 'selection-area', paint: { 'fill-color': '#5ee7d7', 'fill-opacity': 0.12 } })
       map.addLayer({ id: 'selection-area-line', type: 'line', source: 'selection-area', paint: { 'line-color': '#5ee7d7', 'line-width': 2.5, 'line-dasharray': [2, 1.4] } })
-      map.addLayer({
-        id: 'selected-fire-points', type: 'circle', source: 'selected-hotspots',
-        paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, 7, 10, 11], 'circle-color': '#5ee7d7', 'circle-opacity': 0.95, 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 2 },
-      })
 
-      map.on('mousemove', 'department-fill', (event) => {
-        if (selectionModeRef.current) return
-        const feature = event.features?.[0]
-        if (!feature) return
-        if (hoveredDepartmentId !== null) map.setFeatureState({ source: 'peru-departments', id: hoveredDepartmentId }, { hover: false })
-        hoveredDepartmentId = feature.id
-        map.setFeatureState({ source: 'peru-departments', id: hoveredDepartmentId }, { hover: true })
-        map.getCanvas().style.cursor = 'pointer'
-      })
-      map.on('mouseleave', 'department-fill', () => {
-        if (hoveredDepartmentId !== null) map.setFeatureState({ source: 'peru-departments', id: hoveredDepartmentId }, { hover: false })
-        hoveredDepartmentId = null
-        map.getCanvas().style.cursor = ''
-      })
-      map.on('click', 'department-fill', (event) => {
-        if (selectionModeRef.current || suppressNextClick) return
-        const feature = event.features?.[0]
-        if (!feature || feature.properties?.NOMBDEP === 'CUSCO') return
-        const properties = feature.properties
-        new maplibregl.Popup({ offset: 10, className: 'fw-map-popup' })
-          .setLngLat(event.lngLat)
-          .setDOMContent(createPopupContent(properties.NOMBDEP || 'Departamento', [
-            { value: `${properties.fireCount || 0} detecciones recientes` },
-            { value: `${Number(properties.frp || 0).toFixed(1)} MW FRP`, strong: true },
-            { value: properties.fireCount ? `Confianza media ${properties.confidence}%` : 'Sin actividad térmica visible' },
-          ]))
-          .addTo(map)
-      })
-
-      map.on('mouseenter', 'study-area-fill', () => {
-        map.getCanvas().style.cursor = 'pointer'
-        map.setFeatureState({ source: 'cusco-area', id: 'cusco' }, { hover: true })
-      })
-      map.on('mouseleave', 'study-area-fill', () => {
-        map.getCanvas().style.cursor = ''
-        map.setFeatureState({ source: 'cusco-area', id: 'cusco' }, { hover: false })
-      })
-      map.on('click', 'study-area-fill', (event) => {
-        if (suppressNextClick) return
-        map.setFeatureState({ source: 'cusco-area', id: 'cusco' }, { selected: true })
-        setStudySelected(true)
-        setActiveScope('cusco')
-        setSelectedDate('all')
-        setSelectionBounds(null)
-        fitToCusco(map)
-        showAreaPopup(event.lngLat)
-      })
       map.on('mouseenter', 'fire-points', () => { map.getCanvas().style.cursor = 'pointer' })
       map.on('mouseleave', 'fire-points', () => { map.getCanvas().style.cursor = '' })
       map.on('click', 'fire-points', (event) => {
         if (suppressNextClick) return
-        const feature = event.features?.[0]
-        if (!feature) return
-        const properties = feature.properties
+        const p = event.features?.[0]?.properties
+        if (!p) return
         new maplibregl.Popup({ offset: 12, className: 'fw-map-popup' })
-          .setLngLat(feature.geometry.coordinates)
-          .setDOMContent(createPopupContent('Posible incendio', [
-            { value: `${properties.sensor} · ${properties.date}` },
-            { value: `${Number(properties.frp).toFixed(1)} MW`, strong: true },
-            { value: `Confianza ${properties.confidence}%` },
+          .setLngLat(event.features[0].geometry.coordinates)
+          .setDOMContent(createPopupContent(tr('popup.title', { sensor: p.sensor, sat: p.satelite }), [
+            { value: `${p.fecha_local} · ${String(p.hora_utc).slice(0, 2)}:${String(p.hora_utc).slice(2)} UTC` },
+            { value: Number(p.en_serie) === 1 ? tr('popup.weight', { v: fmt(Number(p.eq_foco), 3) }) : tr('popup.out'), strong: true },
+            { value: p.calidad ? tr('popup.quality', { q: calidadLabel(p.calidad) }) : tr('popup.noweight') },
           ]))
           .addTo(map)
       })
-
       mapReadyRef.current = true
-      map.getSource('fire-hotspots').setData(hotspotsToGeoJson(hotspotsRef.current))
-      fitToPeru(map)
+      map.getSource('focos').setData(focosRef.current)
+      if (regionRef.current) {
+        map.getSource('cusco-area').setData(regionRef.current)
+        map.getSource('cusco-mask').setData(maskOf(regionRef.current))
+        fitTo(map, boundsOf(regionRef.current))
+      }
     })
-
     return () => {
       mapReadyRef.current = false
       canvas.removeEventListener('pointerdown', onPointerDown, true)
@@ -584,58 +552,43 @@ function FireMapApp() {
   }, [])
 
   useEffect(() => {
+    regionRef.current = region
     const map = mapRef.current
-    if (!mapReadyRef.current || !map?.getSource('fire-hotspots')) return
-    map.getSource('fire-hotspots').setData(hotspotsToGeoJson(visibleHotspots))
-  }, [visibleHotspots])
+    if (!region || !mapReadyRef.current || !map) return
+    map.getSource('cusco-area').setData(region)
+    map.getSource('cusco-mask').setData(maskOf(region))
+    fitTo(map, boundsOf(region))
+  }, [region])
 
   useEffect(() => {
     const map = mapRef.current
-    if (!mapReadyRef.current || !map?.getSource('peru-departments')) return
-    map.getSource('peru-departments').setData(mappedDepartments)
-  }, [mappedDepartments])
+    if (mapReadyRef.current && map?.getSource('focos')) map.getSource('focos').setData(focos)
+  }, [focos])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (mapReadyRef.current && map?.getSource('selection-area')) map.getSource('selection-area').setData(boundsToGeoJson(selectionBounds))
+  }, [selectionBounds])
 
   useEffect(() => {
     const map = mapRef.current
     if (!mapReadyRef.current || !map) return
     map.getContainer().classList.toggle('is-selecting', selectionMode)
-    if (selectionMode) {
-      map.dragPan.disable()
-      map.touchZoomRotate.disable()
-      map.doubleClickZoom.disable()
-    } else {
-      map.dragPan.enable()
-      map.touchZoomRotate.enable()
-      map.doubleClickZoom.enable()
-    }
+    const handlers = [map.dragPan, map.touchZoomRotate, map.doubleClickZoom]
+    handlers.forEach((h) => (selectionMode ? h.disable() : h.enable()))
   }, [selectionMode])
 
   useEffect(() => {
-    const map = mapRef.current
-    if (!mapReadyRef.current || !map?.getSource('selection-area')) return
-    map.getSource('selection-area').setData(boundsToGeoJson(selectionBounds))
-    map.getSource('selected-hotspots').setData(hotspotsToGeoJson(selectedHotspots))
-  }, [selectedHotspots, selectionBounds])
-
-  useEffect(() => {
-    const cancelSelection = (event) => {
-      if (event.key === 'Escape') setSelectionMode(false)
-    }
-    window.addEventListener('keydown', cancelSelection)
-    return () => window.removeEventListener('keydown', cancelSelection)
+    const cancel = (event) => { if (event.key === 'Escape') setSelectionMode(false) }
+    window.addEventListener('keydown', cancel)
+    return () => window.removeEventListener('keydown', cancel)
   }, [])
 
   useEffect(() => {
     const map = mapRef.current
-    if (!mapReadyRef.current) return
+    if (!mapReadyRef.current || !map) return
     map.setLayoutProperty('fire-heat', 'visibility', activeLayer === 'surface' ? 'visible' : 'none')
     map.setLayoutProperty('fire-points', 'visibility', activeLayer === 'points' ? 'visible' : 'none')
-    map.setPaintProperty('department-fill', 'fill-opacity', activeLayer === 'activity'
-      ? ['case', ['boolean', ['feature-state', 'hover'], false], 0.9, 0.72]
-      : ['case', ['boolean', ['feature-state', 'hover'], false], 0.18, 0.045])
-    map.setPaintProperty('study-area-fill', 'fill-opacity', activeLayer === 'aoi'
-      ? ['case', ['boolean', ['feature-state', 'selected'], false], 0.3, ['boolean', ['feature-state', 'hover'], false], 0.22, 0.12]
-      : ['case', ['boolean', ['feature-state', 'selected'], false], 0.22, ['boolean', ['feature-state', 'hover'], false], 0.16, 0.035])
   }, [activeLayer])
 
   useEffect(() => {
@@ -646,132 +599,154 @@ function FireMapApp() {
     map.setLayoutProperty('relief-reference-layer', 'visibility', visibility)
   }, [baseMap])
 
-  const focusStudyArea = () => {
+  // "Límite" resalta Cusco sin apagar la densidad ni los puntos.
+  useEffect(() => {
     const map = mapRef.current
     if (!mapReadyRef.current || !map) return
-    const nextScope = activeScope === 'peru' ? 'cusco' : 'peru'
-    const nextSelected = nextScope === 'cusco'
-    setActiveScope(nextScope)
-    setStudySelected(nextSelected)
-    setSelectedDate('all')
-    setSelectionBounds(null)
-    map.setFeatureState({ source: 'cusco-area', id: 'cusco' }, { selected: nextSelected })
-    if (nextSelected) fitToCusco(map)
-    else fitToPeru(map)
-  }
+    map.setPaintProperty('study-area-fill', 'fill-opacity', showBoundary ? 0.22 : 0.035)
+    map.setPaintProperty('study-area-border', 'line-width', showBoundary ? 3 : 1.8)
+  }, [showBoundary])
 
+  const selectMonth = (year, m) => { setPlaying(false); setCustomPeriod(null); setSelected({ year, month: m }) }
+  const shiftYear = (delta) => { setCustomPeriod(null); setSelected((s) => ({ year: Math.min(LAST_YEAR, Math.max(FIRST_YEAR, s.year + delta)), month: null })) }
   const toggleSelectionMode = () => {
     setPlaying(false)
-    setSelectionMode((active) => {
-      if (!active) setSelectionBounds(null)
-      return !active
-    })
+    setSelectionMode((active) => { if (!active) setSelectionBounds(null); return !active })
+  }
+  const clearSelection = () => { setSelectionMode(false); setSelectionBounds(null) }
+  const focusRegion = () => { if (mapReadyRef.current && region) fitTo(mapRef.current, boundsOf(region)) }
+  const applyFilters = (event) => {
+    event.preventDefault()
+    if (filterDraft.from > filterDraft.to) { setError(tr('filter.invalid')); return }
+    const [year] = filterDraft.to.split('-').map(Number)
+    setPlaying(false); setError(''); setSelectionBounds(null)
+    setSelectedRegionCode(filterDraft.region)
+    setSelected({ year, month: null })
+    setCustomPeriod({ from: filterDraft.from, to: filterDraft.to })
+  }
+  const clearFilters = () => {
+    const initial = { region: CUSCO, from: monthStart(LAST_YEAR, 1), to: monthEnd(LAST_YEAR, 12) }
+    setPlaying(false); setError(''); setSelectionBounds(null)
+    setFilterDraft(initial); setSelectedRegionCode(CUSCO); setSelected({ year: LAST_YEAR, month: null }); setCustomPeriod(null)
   }
 
-  const clearSelection = () => {
-    setSelectionMode(false)
-    setSelectionBounds(null)
+  const runDownload = async (aoiParams, label) => {
+    setNotice(tr('csv.preparing'))
+    try {
+      const r = await downloadCsv(aoiParams, periodo.inicio, periodo.fin)
+      setNotice(tr('csv.done', { label, n: fmt(r.rows), total: fmt(r.total, 0) }))
+      window.setTimeout(() => setNotice(''), 8000)
+    } catch (e) { setNotice(e.message) }
   }
 
-  const stats = useMemo(() => summarizeHotspots(visibleHotspots), [visibleHotspots])
-  const selectionStats = useMemo(() => summarizeHotspots(selectedHotspots), [selectedHotspots])
   const selectionArea = useMemo(() => {
     if (!selectionBounds) return 0
-    const middleLatitude = (selectionBounds.north + selectionBounds.south) / 2 * Math.PI / 180
-    const width = Math.abs(selectionBounds.east - selectionBounds.west) * 111.32 * Math.cos(middleLatitude)
-    const height = Math.abs(selectionBounds.north - selectionBounds.south) * 110.57
-    return width * height
+    const mid = (selectionBounds.north + selectionBounds.south) / 2 * Math.PI / 180
+    return Math.abs(selectionBounds.east - selectionBounds.west) * 111.32 * Math.cos(mid) * Math.abs(selectionBounds.north - selectionBounds.south) * 110.57
   }, [selectionBounds])
 
-  const downloadCsv = (points, suffix) => {
-    const rows = ['fecha,sensor,fuente,latitud,longitud,frp_mw,confianza']
-    points.forEach((point) => rows.push([point.date, point.sensor, point.source || point.sensor, point.lat, point.lon, point.frp, point.confidence].join(',')))
-    const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8' })
-    const link = document.createElement('a')
-    link.href = URL.createObjectURL(blob)
-    link.download = `${activeScope}-posibles-incendios-${suffix}.csv`
-    link.click()
-    URL.revokeObjectURL(link.href)
-  }
-
-  const formatDay = (date) => new Intl.DateTimeFormat('es-PE', { weekday: 'short', day: '2-digit' }).format(new Date(`${date}T12:00:00`)).replace('.', '')
-  const formatDate = (date) => date ? new Intl.DateTimeFormat('es-PE', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(`${date}T12:00:00`)) : 'Últimos 5 días'
-  const timelineIndex = selectedDate === 'all' ? Math.max(0, dates.length - 1) : Math.max(0, dates.indexOf(selectedDate))
-  const timelineProgress = dates.length > 1 ? (timelineIndex / (dates.length - 1)) * 100 : 0
-  const timelineLabel = selectedDate !== 'all'
-    ? formatDate(selectedDate)
-    : selectedYear === 'all' ? '2021 – 2026' : selectedYear === 2026 ? 'Últimos 5 días' : String(selectedYear)
-
+  const summaryValue = customPeriod
+    ? (focos.features || []).reduce((sum, feature) => sum + (Number(feature.properties?.eq_foco) || 0), 0)
+    : selected.month ? month?.focos_armonizados : yearTotal
   return (
     <div className="fw-app">
-      <div ref={mapContainerRef} className="fw-map" aria-label="Mapa nacional interactivo de focos térmicos en Perú" />
-      <div className="fw-nubel-brand" aria-label="Nubel Team"><img src="/nubel-team-logo.png" alt="Nubel Team"/></div>
-      <nav className="fw-rail" aria-label="Herramientas del mapa">
-        <button className="is-active" title="Monitoreo"><Flame size={20}/><span>Fuego</span></button>
-        <button className={selectionMode ? 'is-active select' : ''} title="Seleccionar área" onClick={toggleSelectionMode}><Scan size={20}/><span>Área</span></button>
-        <button title="Capas" onClick={() => setLayersOpen((value) => !value)}><Layers3 size={20}/><span>Capas</span></button>
-        <button title="Alertas"><ShieldAlert size={20}/><span>Alertas</span></button>
-        <button title="Información" onClick={() => setDetailsOpen((value) => !value)}><Info size={20}/><span>Info</span></button>
-      </nav>
+      <div ref={mapContainerRef} className="fw-map" aria-label={tr('map.aria')} />
+      <div className="fw-nubel-brand" aria-label="Nubel Team · FireCal Cusco"><img src="./nubel-team-logo.png" alt="Nubel Team"/></div>
+      <button className={`fc-data-launcher ${detailsOpen ? 'is-active' : ''}`} aria-label={tr('data.open')} aria-expanded={detailsOpen} onClick={() => { setSimpleOpen(false); setCompareOpen(false); setDetailsOpen((v) => !v) }}><Database size={19}/><span>{tr('data.label')}</span></button>
+      <button className={`fc-data-launcher fc-simple-launcher ${simpleOpen ? 'is-active' : ''}`} aria-label={tr('rail.simpleTitle')} aria-expanded={simpleOpen} onClick={() => { setDetailsOpen(false); setCompareOpen(false); setSimpleOpen((v) => !v) }}><MessageCircleQuestion size={19}/><span>{tr('rail.simple')}</span></button>
+      <button className={`fc-data-launcher fc-compare-launcher ${compareOpen ? 'is-active' : ''}`} aria-label={tr('compare.open')} aria-expanded={compareOpen} onClick={() => { setDetailsOpen(false); setSimpleOpen(false); setCompareOpen((v) => !v) }}><ArrowLeftRight size={19}/><span>{tr('compare.button')}</span></button>
+      <div className="fc-map-menu">
+        <div className="fc-lang" role="group" aria-label={tr('lang.title')}>{LANGS.map((l) => <button key={l} className={l === lang ? 'is-active' : ''} aria-pressed={l === lang} onClick={() => changeLang(l)}>{l.toUpperCase()}</button>)}</div>
+        <button className={`fc-menu-toggle ${toolsOpen ? 'is-open' : ''}`} aria-label={tr('rail.label')} aria-expanded={toolsOpen} onClick={() => setToolsOpen((v) => !v)}><Layers3 size={21}/></button>
+        {toolsOpen && <nav className="fw-rail" aria-label={tr('rail.label')}>
+          <button className="is-active" title={tr('rail.hotspotsTitle')} onClick={() => { focusRegion(); setDetailsOpen(true); setActiveLayer('surface') }}><Flame size={19}/><span>{tr('rail.hotspots')}</span></button>
+          <button className={calendarOpen ? 'is-active' : ''} title={tr('rail.calendar')} onClick={() => setCalendarOpen((v) => !v)}><CalendarDays size={19}/><span>{tr('rail.calendar')}</span></button>
+          <button className={selectionMode ? 'is-active select' : ''} title={tr('rail.areaTitle')} onClick={toggleSelectionMode}><Scan size={19}/><span>{tr('rail.area')}</span></button>
+          <button className={layersOpen ? 'is-active' : ''} title={tr('rail.layers')} onClick={() => setLayersOpen((v) => !v)}><SlidersHorizontal size={19}/><span>{tr('rail.layers')}</span></button>
+        </nav>}
+      </div>
       {detailsOpen && <aside className="fw-summary">
-        <div className="fw-summary-head"><div><p>{activeScope === 'peru' ? 'MONITOREO NACIONAL' : 'ZONA PILOTO'}</p><h1>Actividad térmica</h1><span>{activeScope === 'peru' ? 'Perú' : 'Cusco'} · {timelineLabel}</span></div><button onClick={() => setDetailsOpen(false)}><X size={17}/></button></div>
-        <div className="fw-summary-status"><RiskBadge level={stats.risk}/><span>{loading ? 'Actualizando satélites…' : `${visibleHotspots.length} detecciones visibles`}</span></div>
+        <div className="fw-summary-head"><div><p>{selectedRegion.name.toUpperCase()} · {tr('summary.series')}</p><h1>{tr('filter.title')}</h1><span>{periodo.label}{!customPeriod && month?.calidad ? ` · ${calidadLabel(month.calidad)}` : ''}</span></div><button onClick={() => setDetailsOpen(false)} title={tr('btn.close')} aria-label={tr('btn.close')}><X size={17}/></button></div>
+        <form className="fc-filter-panel" onSubmit={applyFilters}>
+          <p>{tr('filter.hint')}</p>
+          <label htmlFor="fc-region"><span>{tr('filter.department')}</span><select id="fc-region" value={filterDraft.region} onChange={(e) => setFilterDraft((f) => ({ ...f, region: e.target.value }))}>{departments.map((d) => <option key={d.code} value={d.code}>{d.name}</option>)}</select></label>
+          <div className="fc-filter-period"><strong><CalendarDays/>{tr('compare.dateRange')}</strong><div>
+            <label htmlFor="fc-from"><span>{tr('filter.from')}</span><input id="fc-from" type="date" min="2000-11-01" max="2025-12-31" value={filterDraft.from} onChange={(e) => setFilterDraft((f) => ({ ...f, from: e.target.value }))}/></label>
+            <label htmlFor="fc-to"><span>{tr('filter.to')}</span><input id="fc-to" type="date" min="2000-11-01" max="2025-12-31" value={filterDraft.to} onChange={(e) => setFilterDraft((f) => ({ ...f, to: e.target.value }))}/></label>
+          </div></div>
+          <button className="fc-filter-apply" type="submit"><SlidersHorizontal size={14}/>{tr('filter.apply')}</button>
+          <button className="fc-filter-clear" type="button" onClick={clearFilters}>{tr('filter.clear')}</button>
+          <small><i/>{tr('filter.validatedOnly')}</small>
+        </form>
+        <div className="fw-summary-status">{!customPeriod && selected.month ? <CategoryBadge categoria={month?.categoria}/> : <span className="fw-risk fw-risk--bajo"><i/>{customPeriod ? tr('filter.active') : tr('summary.yearTotal')}</span>}<span>{loading ? tr('summary.loading') : tr('summary.onMap', { n: fmt(focos.n_focos || 0) })}</span></div>
         {error && <div className="fw-error"><ShieldAlert size={16}/>{error}</div>}
         <div className="fw-metrics">
-          <Metric icon={Flame} label="Detecciones" value={visibleHotspots.length} tone="red"/>
-          <Metric icon={Gauge} label="FRP acumulado" value={`${stats.frp.toFixed(1)} MW`} tone="orange"/>
-          <Metric icon={Activity} label="Confianza media" value={`${stats.confidence}%`} tone="green"/>
-          <Metric icon={Satellite} label="MODIS / VIIRS" value={`${stats.modis} / ${stats.viirs}`} tone="blue"/>
+          <Metric icon={Flame} label={tr('metric.hotspots')} value={fmtFocos(summaryValue)} tone="red"/>
+          <Metric icon={Gauge} label={!customPeriod && selected.month ? tr('metric.monthMedian') : tr('metric.monthsFire')} value={!customPeriod && selected.month ? fmt(month?.mediana_hist, 1) : periodCells.filter((c) => c.focos_armonizados > 0).length} tone="orange"/>
+          <Metric icon={CalendarDays} label={!customPeriod && selected.month ? tr('metric.anomaly') : tr('metric.cellDays')} value={!customPeriod && selected.month ? (month?.anomalia ?? '–') : fmt(periodCells.reduce((s, c) => s + (c.celdas_dia || 0), 0))} tone="green"/>
+          <Metric icon={Satellite} label={tr('metric.modisViirs')} value={!customPeriod && selected.month ? `${fmt(month?.focos_modis)} / ${fmt(month?.focos_viirs)}` : `${fmt(periodCells.reduce((s, c) => s + (c.focos_modis || 0), 0))} / ${fmt(periodCells.reduce((s, c) => s + (c.focos_viirs || 0), 0))}`} tone="blue"/>
         </div>
+        {!customPeriod && selected.month && month?.incertidumbre > 0 && <p className="fc-margin">{tr('summary.margin', { a: fmt(month.rango[0], 1), b: fmt(month.rango[1], 1) })}</p>}
         <div className="fw-sensor-row"><span><i className="modis"/>MODIS · 1 km</span><span><i className="viirs"/>VIIRS · 375 m</span></div>
-        <div className="fw-summary-actions"><button onClick={loadData} disabled={loading}><RefreshCw className={loading ? 'spin' : ''} size={16}/>Actualizar</button><button onClick={() => downloadCsv(visibleHotspots, selectedDate)}><Download size={16}/>CSV</button></div>
-        <p className="fw-disclaimer">Superficie localizada alrededor de detecciones FIRMS. Las zonas sin evidencia suficiente permanecen transparentes; no es un pronóstico.</p>
+        <div className="fw-summary-actions"><button onClick={() => setCalendarOpen(true)}><CalendarDays size={16}/>{tr('rail.calendar')}</button><button onClick={() => runDownload(aoi, selectedRegion.name)}><Download size={16}/>CSV</button></div>
+        {notice && <p className="fc-notice">{notice}</p>}
       </aside>}
       {layersOpen && !selectionBounds && <aside className="fw-layers">
-        <div className="fw-layers-title"><span>CAPAS DEL MAPA</span><SlidersHorizontal size={15}/></div>
-        <LayerButton active={activeLayer === 'surface'} icon={ThermometerSun} label="Superficie" tone="heat" onClick={() => setActiveLayer('surface')}/>
-        <LayerButton active={activeLayer === 'activity'} icon={Gauge} label="Regiones" tone="activity" onClick={() => setActiveLayer('activity')}/>
-        <LayerButton active={activeLayer === 'points'} icon={MapPin} label="Puntos" tone="points" onClick={() => setActiveLayer('points')}/>
-        <LayerButton active={activeLayer === 'aoi'} icon={Layers3} label="Límite" tone="boundary" onClick={() => setActiveLayer('aoi')}/>
-        <LayerButton active={selectionMode} icon={Scan} label="Área" tone="select" onClick={toggleSelectionMode}/>
-        <div className="fw-scale"><span>{activeLayer === 'surface' ? 'INTENSIDAD CONTINUA' : activeLayer === 'activity' ? 'ACTIVIDAD POR REGIÓN' : 'INTENSIDAD FRP'}</span><div/><section><small>Baja</small><small>Media</small><small>Alta</small></section></div>
+        <div className="fw-layers-title"><span>{tr('layers.title')}</span><SlidersHorizontal size={15}/></div>
+        <LayerButton active={activeLayer === 'surface'} icon={ThermometerSun} label={tr('layers.density')} tone="heat" onClick={() => setActiveLayer('surface')}/>
+        <LayerButton active={activeLayer === 'points'} icon={MapPin} label={tr('layers.points')} tone="points" onClick={() => setActiveLayer('points')}/>
+        <LayerButton active={showBoundary} icon={Layers3} label={tr('layers.boundary')} tone="boundary" onClick={() => setShowBoundary((v) => !v)}/>
       </aside>}
-      {layersOpen && !selectionBounds && <aside className="fw-display-dock" aria-label="Fondo y escala del mapa">
-        <div className="fw-display-modes" role="group" aria-label="Fondo cartográfico">
-          <button className={baseMap === 'standard' ? 'is-active' : ''} onClick={() => setBaseMap('standard')}><MapIcon size={14}/><span>Mapa</span></button>
-          <button className={baseMap === 'relief' ? 'is-active' : ''} onClick={() => setBaseMap('relief')}><Mountain size={14}/><span>Relieve</span></button>
+      <aside className="fw-display-dock" aria-label={tr('basemap.dock')}>
+        <div className="fw-display-modes" role="group" aria-label={tr('basemap.title')}>
+          <button className={baseMap === 'standard' ? 'is-active' : ''} aria-pressed={baseMap === 'standard'} title={tr('basemap.standard')} onClick={() => setBaseMap('standard')}><MapIcon size={14}/><span>{tr('basemap.standard')}</span></button>
+          <button className={baseMap === 'relief' ? 'is-active' : ''} aria-pressed={baseMap === 'relief'} title={tr('basemap.relief')} onClick={() => setBaseMap('relief')}><Mountain size={14}/><span>{tr('basemap.relief')}</span></button>
         </div>
-        <div className="fw-heat-legend"><header><span>INTENSIDAD TÉRMICA</span><b>FRP</b></header><i/><div><span>Baja</span><span>Media</span><span>Alta</span></div></div>
+        {activeLayer === 'points'
+          ? <div className="fw-heat-legend fc-dock-points"><header><span>{tr('layers.pointsLegend')}</span></header><p><i className="modis"/>MODIS</p><p><i className="viirs"/>VIIRS</p><p><i className="outside"/>{tr('layers.outside')}</p></div>
+          : <div className="fw-heat-legend"><header><span>{tr('layers.scaleDensity')}</span></header><i/><div><span>{tr('scale.low')}</span><span>{tr('scale.mid')}</span><span>{tr('scale.high')}</span></div></div>}
+      </aside>
+      <div className="fw-map-meta"><button onClick={focusRegion}><MapPin size={13}/>{selectedRegion.name}</button><span><Satellite size={13}/>MODIS + VIIRS</span><span><CalendarDays size={13}/>{periodo.label}</span></div>
+      {selectionMode && <div className="fw-draw-hint"><Scan size={20}/><div><b>{tr('draw.title')}</b><span>{tr('draw.hint')}</span></div><button onClick={() => setSelectionMode(false)} title={tr('btn.cancel')}><X size={16}/></button></div>}
+      {selectionBounds && !simpleOpen && <aside className="fw-selection-card">
+        <div className="fw-selection-head"><div><p>{tr('sel.kicker')}</p><h2>{tr('sel.title')}</h2><span>{periodo.label} · {tr('sel.within')}</span></div><button onClick={clearSelection} title={tr('sel.clear')}><Trash2 size={17}/></button></div>
+        <SatelliteSelectionMap bounds={selectionBounds} focos={selection?.focos || EMPTY}/>
+        <div className="fw-selection-source"><span>{tr('sel.source')}</span><b>Esri World Imagery · NASA FIRMS</b></div>
+        {selection?.paused && <p className="fc-notice">{tr('sel.paused')}</p>}
+        {selection?.error ? <div className="fw-error"><ShieldAlert size={16}/>{selection.error}</div> : <div className="fw-selection-grid">
+          <article><span>{tr('metric.hotspots')}</span><b>{selection?.calendar ? fmtFocos(selection.calendar.total_focos_armonizados) : '…'}</b></article>
+          <article><span>{tr('metric.cellDays')}</span><b>{selection?.calendar ? fmt(selection.calendar.celdas.reduce((s, c) => s + (c.celdas_dia || 0), 0)) : '…'}</b></article>
+          <article><span>{tr('metric.modisViirs')}</span><b>{selection?.calendar ? `${fmt(selection.calendar.celdas.reduce((s, c) => s + (c.focos_modis || 0), 0))} / ${fmt(selection.calendar.celdas.reduce((s, c) => s + (c.focos_viirs || 0), 0))}` : '…'}</b></article>
+          <article><span>{tr('sel.onMap')}</span><b>{selection?.focos ? fmt(selection.focos.n_focos) : '…'}</b></article>
+          <article><span>{tr('sel.boxArea')}</span><b>{selectionArea >= 1000 ? tr('sel.thousandKm2', { v: fmt(selectionArea / 1000, 1) }) : `${fmt(selectionArea)} km²`}</b></article>
+          <article><span>{tr('sel.monthAnomaly')}</span><b>{selected.month && selection?.calendar ? (selection.calendar.celdas[0]?.categoria ? catLabel(selection.calendar.celdas[0].categoria) : '–') : tr('sel.pickMonth')}</b></article>
+        </div>}
+        <div className="fw-selection-actions"><button onClick={toggleSelectionMode}><Scan size={15}/>{tr('sel.redraw')}</button><button onClick={() => selection?.bbox && runDownload(selection.bbox, tr('csv.area'))} disabled={!selection?.calendar}><Download size={15}/>CSV</button></div>
       </aside>}
-      <div className="fw-map-meta"><button onClick={focusStudyArea} className={studySelected ? 'is-active' : ''}><MapPin size={13}/>{activeScope === 'peru' ? 'Abrir piloto · Cusco' : 'Volver a Perú'}</button><span><Satellite size={13}/>MODIS + VIIRS</span><span><CloudSun size={13}/>Últimos 5 días</span></div>
-      {selectionMode && <div className="fw-draw-hint"><Scan size={20}/><div><b>Selecciona un área</b><span>Arrastra sobre el mapa para dibujar el cuadro</span></div><button onClick={() => setSelectionMode(false)} title="Cancelar"><X size={16}/></button></div>}
-      {selectionBounds && <aside className="fw-selection-card">
-        <div className="fw-selection-head"><div><p>ANÁLISIS DEL CUADRO</p><h2>Área seleccionada</h2><span>Resultados dentro de {activeScope === 'peru' ? 'Perú' : 'Cusco'}</span></div><button onClick={clearSelection} title="Limpiar selección"><Trash2 size={17}/></button></div>
-        <SatelliteSelectionMap bounds={selectionBounds} hotspots={selectedHotspots}/>
-        <div className="fw-selection-source"><span>Vista satelital de referencia</span><b>Esri World Imagery · NASA FIRMS</b></div>
-        <div className="fw-selection-grid">
-          <article><span>Detecciones</span><b>{selectedHotspots.length}</b></article>
-          <article><span>FRP acumulado</span><b>{selectionStats.frp.toFixed(1)} MW</b></article>
-          <article><span>Confianza</span><b>{selectionStats.confidence}%</b></article>
-          <article><span>MODIS / VIIRS</span><b>{selectionStats.modis} / {selectionStats.viirs}</b></article>
-          <article><span>Superficie del cuadro</span><b>{selectionArea >= 1000 ? `${(selectionArea / 1000).toFixed(1)} mil km²` : `${selectionArea.toFixed(0)} km²`}</b></article>
-          <article><span>Nivel observado</span><b className={`risk-${selectionStats.risk.toLowerCase()}`}>{selectionStats.risk}</b></article>
-        </div>
-        <div className="fw-selection-actions"><button onClick={toggleSelectionMode}><Scan size={15}/>Redibujar</button><button onClick={() => downloadCsv(selectedHotspots, 'area-seleccionada')} disabled={!selectedHotspots.length}><Download size={15}/>CSV</button></div>
-      </aside>}
-      <section className="fw-timeline">
-        <button className="fw-play" onClick={() => setPlaying((value) => !value)} title={playing ? 'Pausar' : 'Reproducir'}>{playing ? <Pause size={19}/> : <Play size={19}/>}</button>
-        <div className="fw-timeline-panel" style={{ '--progress': `${timelineProgress}%` }}>
-          <div className={`fw-time-callout ${timelineIndex === 0 ? 'is-start' : timelineIndex === dates.length - 1 ? 'is-end' : ''}`}><b>{timelineLabel}</b><span>{visibleHotspots.length ? `${visibleHotspots.length} focos` : 'sin detalle'}</span></div>
-          <div className="fw-days">{dates.length ? dates.map((date) => {
-            const count = yearHotspots.filter((point) => point.date === date).length
-            const [weekday, day] = formatDay(date).split(' ')
-            return <button className={selectedDate === date ? 'is-active' : ''} key={date} onClick={() => { setSelectedDate(date); setPlaying(false) }}><span>{weekday} {day}</span><small>{count} focos</small></button>
-          }) : <div className="fw-no-history">Sin focos georreferenciados cargados para {selectedYear === 'all' ? 'este periodo' : selectedYear}</div>}</div>
+      {simpleOpen && <SimplePanel key={lang} aoi={selection?.bbox || aoi} etiqueta={selection?.bbox ? 'area' : 'cusco'} onClose={() => setSimpleOpen(false)}/>}
+      {compareOpen && <ComparisonWorkspace key={lang} calendar={calendar} region={region} regionName={selectedRegion.name} onClose={() => setCompareOpen(false)}/>}
+      {calendarOpen && <CalendarPanel calendar={calendar} mode={calendarMode} setMode={setCalendarMode} selected={selected} onSelect={selectMonth} onClose={() => setCalendarOpen(false)}/>}
+      <section className="fw-timeline fc-timeline">
+        <button className="fw-play" onClick={() => { setCustomPeriod(null); setPlaying((v) => !v) }} title={playing ? tr('timeline.pause') : tr('timeline.play')}>{playing ? <Pause size={19}/> : <Play size={19}/>}</button>
+        <div className="fw-timeline-panel" style={{ '--progress': `${selected.month ? ((selected.month - 1) / 11) * 100 : 100}%` }}>
+          <div className={`fw-time-callout ${selected.month === 1 ? 'is-start' : !selected.month || selected.month === 12 ? 'is-end' : ''}`}><b>{periodo.label}</b><span>{tr('timeline.yearSum', { n: fmtFocos(selected.month ? (month?.focos_armonizados ?? 0) : yearTotal) })}</span></div>
+          <div className="fw-days">
+            {MESES.map((label, idx) => {
+              const c = yearCells.find((x) => x.mes === idx + 1)
+              const noData = !c || c.sin_dato
+              return <button key={label} disabled={noData} className={[selected.month === idx + 1 ? 'is-active' : '', c?.calidad === 'extrapolado' ? 'is-extrap' : ''].join(' ')} onClick={() => selectMonth(selected.year, idx + 1)} title={noData ? tr('noData') : tr('popup.weight', { v: fmt(c.focos_armonizados, 2) })}><span>{label}</span><small>{noData ? '–' : fmtFocos(c.focos_armonizados)}</small><i style={{ width: `${noData ? 0 : Math.round(100 * c.focos_armonizados / yearMax)}%` }}/></button>
+            })}
+          </div>
           <div className="fw-timeline-options">
-            <button className={selectedDate === 'all' ? 'is-active' : ''} onClick={() => { setSelectedDate('all'); setPlaying(false) }}><Layers3 size={13}/><span>Superficie térmica</span></button>
-            <div className="fw-year-scale" aria-label="Periodo histórico"><button className={selectedYear === 'all' ? 'is-active' : ''} onClick={() => { setSelectedYear('all'); setSelectedDate('all'); setPlaying(false) }}>Todos</button>{HISTORICAL_YEARS.map((year) => <button key={year} className={selectedYear === year ? 'is-active' : ''} onClick={() => { setSelectedYear(year); setSelectedDate('all'); setPlaying(false) }}>{year}</button>)}</div>
-            <div className="fw-timeline-source"><span>NASA FIRMS · UTC−5</span><b>{result.mode !== 'api' ? 'DEMO' : selectedYear === 2026 ? 'EN VIVO' : 'HISTÓRICO'}</b></div>
+            <button className={selected.month === null && !customPeriod ? 'is-active' : ''} title={tr('timeline.allYear')} aria-label={tr('timeline.allYear')} onClick={() => { setCustomPeriod(null); setSelected((s) => ({ year: s.year, month: null })); setPlaying(false) }}><Layers3 size={13}/><span>{tr('timeline.allYear')}</span></button>
+            <div className="fw-year-scale" aria-label={tr('timeline.years')}>
+              <button className="fc-year" onClick={() => shiftYear(-1)} title={tr('timeline.prevYear')} disabled={selected.year <= FIRST_YEAR}><ChevronLeft size={13}/></button>
+              <div className="fc-years" ref={yearsRef}>
+                {YEARS.map((y) => <button key={y} aria-label={String(y)} title={String(y)} className={selected.year === y && !customPeriod ? 'is-active' : ''} onClick={() => { setPlaying(false); setCustomPeriod(null); setSelected({ year: y, month: null }) }}>{String(y).slice(2)}</button>)}
+              </div>
+              <button className="fc-year" onClick={() => shiftYear(1)} title={tr('timeline.nextYear')} disabled={selected.year >= LAST_YEAR}><ChevronRight size={13}/></button>
+            </div>
+            <div className="fw-timeline-source"><span>NASA FIRMS · UTC−5</span><b title={latency ? `${latency} ms` : undefined}>{tr('timeline.historic')}</b></div>
           </div>
         </div>
       </section>

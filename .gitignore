@@ -1,17 +1,3 @@
-# Datos crudos y temporales
-data/raw/
-firms_raw/
-clima_out/
-armoniza_out*/
-*.npz
-__pycache__/
-*.pyc
-# Credenciales
-.env
-*credentials*
-*.key
-
-# Frontend React / Vite
 node_modules/
+dist/
 .vite/
-.vercel/
