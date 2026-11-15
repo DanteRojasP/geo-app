@@ -221,3 +221,20 @@
 @media(max-width:1200px){.fw-display-dock{bottom:104px}}
 @media(max-width:950px){.fw-display-dock{bottom:126px}}
 @media(max-width:650px){.fw-display-dock{bottom:118px}}
+
+/* Motion system and synthetic zone mode */
+@keyframes fw-enter{from{opacity:0;transform:translateY(8px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes fw-fade{from{opacity:0}to{opacity:1}}
+@keyframes fw-pulse-blue{0%,100%{box-shadow:0 0 0 0 rgba(49,162,220,.38),0 6px 20px rgba(6,31,48,.25)}50%{box-shadow:0 0 0 8px rgba(49,162,220,0),0 7px 24px rgba(6,31,48,.3)}}
+.fw-summary,.fw-selection-card,.fw-display-dock,.fw-timeline{animation:fw-enter .46s cubic-bezier(.2,.8,.2,1) both}.fw-nubel-brand,.fw-layers,.fw-rail{animation:fw-fade .5s ease both}
+.fw-rail button,.fw-layer-button,.fw-layer-button>span,.fw-basemap-switch button,.fw-display-modes button,.fw-year-scale button,.fw-summary-actions button,.fw-selection-actions button,.fw-play{transition:background-color .22s ease,color .22s ease,border-color .22s ease,box-shadow .22s ease,transform .22s cubic-bezier(.2,.8,.2,1)}
+.fw-rail button:hover,.fw-layer-button:hover{transform:translateY(-1px)}.fw-layer-button:hover>span,.fw-basemap-switch button:hover{transform:scale(1.06)}.fw-summary-actions button:hover,.fw-selection-actions button:hover{transform:translateY(-1px)}
+.fw-display-modes button:active,.fw-year-scale button:active,.fw-play:active{transform:scale(.96)}
+.fw-time-callout{transition:left .55s cubic-bezier(.2,.8,.2,1),background-color .25s ease,transform .35s ease}.fw-timeline-panel .fw-days button{transition:background-color .28s ease,color .28s ease,box-shadow .28s ease}.fw-timeline-panel .fw-days:before{transition:width .55s cubic-bezier(.2,.8,.2,1)}
+.fw-play.is-playing{animation:fw-pulse-blue 1.55s ease-in-out infinite}
+.fw-map .maplibregl-canvas{transition:filter .45s ease,opacity .35s ease}.fw-heat-legend>i{transition:filter .35s ease,transform .35s ease}.fw-heat-legend:hover>i{filter:saturate(1.18) brightness(1.06);transform:scaleY(1.18)}
+.fw-heat-legend.is-synthetic>i{background:linear-gradient(90deg,#dbeafe 0%,#7dd3fc 22%,#fde68a 45%,#fb923c 66%,#ef4444 84%,#7f1d1d 100%)}
+.fw-simulation-badge{position:absolute;z-index:646;top:18px;right:76px;height:29px;padding:0 11px;border:1px solid rgba(132,190,220,.38);border-radius:15px;background:rgba(10,39,59,.91);color:#dcecf5;display:flex;align-items:center;gap:8px;font:500 8px 'IBM Plex Sans',sans-serif;box-shadow:0 6px 18px rgba(4,30,47,.2);backdrop-filter:blur(10px);animation:fw-enter .35s ease both}.fw-simulation-badge i{width:7px;height:7px;border-radius:50%;background:#53b8eb;box-shadow:0 0 0 4px rgba(83,184,235,.15)}
+@media(max-width:950px){.fw-simulation-badge{top:18px;right:64px}}
+@media(max-width:650px){.fw-simulation-badge{top:16px;right:55px;height:26px;padding:0 8px}.fw-simulation-badge{font-size:0}.fw-simulation-badge:after{content:'SIMULACIÓN';font:600 7px 'IBM Plex Mono',monospace}}
+@media(prefers-reduced-motion:reduce){.fw-app *,.fw-app *:before,.fw-app *:after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
