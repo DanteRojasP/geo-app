@@ -11,14 +11,14 @@ Sumar `eq_foco` en cualquier región y fechas reproduce `eq_hotspots` de `harmon
 | `cell_lat`, `cell_lon` | Centro de la celda de 0.01° (~1.1 km) a la que se asigna. |
 | `alt_m` | Altitud SRTM de la celda (m). |
 | `sensor` | `MODIS` o `VIIRS`. |
-| `satelite` | `Terra`, `Aqua` o `Suomi-NPP`. |
+| `satelite` | `Terra`, `Aqua`, `Suomi-NPP` o `NOAA-20` (este último solo en los días sin S-NPP, v1.3). |
 | `frp` | Potencia radiativa del foco (MW), sin armonizar. No comparable entre sensores (VIIRS/MODIS ≈ ×1.2-2.0). |
 | `brillo_k` | Temperatura de brillo (K): banda T21 en MODIS, I4 en VIIRS. |
 | `confianza` | Confianza original de FIRMS (0-100 en MODIS; `n`/`h` en VIIRS). |
 | `diurno_nocturno` | `D` o `N`. |
 | `en_serie` | 1 si el foco lleva peso en la serie armonizada; 0 si se conserva solo como registro. |
 | `eq_foco` | Aporte del foco en celda-días equivalentes a MODIS (0 si `en_serie` = 0). |
-| `fuente_serie` | `MODIS`, `Terra*kT`, `VIIRS*k` o `fuera_de_serie`. |
+| `fuente_serie` | `MODIS`, `Terra*kT`, `VIIRS*k`, `VIIRS-N20*k`, `MODIS-hueco` o `fuera_de_serie`. |
 | `calidad` | `referencia`, `calibrado`, `extrapolado` o vacío (fuera de serie). |
 
 ## Reglas de peso

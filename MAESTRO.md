@@ -1,6 +1,6 @@
 # MAESTRO · Armonización de focos FIRMS (MODIS + VIIRS) — Reto NASA
 
-> Versión 1.2 · 2026-11-14 · Región validada: **Cusco (Perú)** · Datos: 2000-11-04 a 2025-12-31
+> Versión 1.3 · 2026-11-15 · Región validada: **Cusco (Perú)** · Datos: 2000-11-04 a 2025-12-31
 
 **Para el asistente que mantiene este repo:** lee este archivo completo antes de cualquier tarea. Es la fuente de verdad del contexto. Si el repo ya tiene un `CLAUDE.md`, **no lo reemplaces**: añade una línea que diga "Antes de tocar datos o armonización, lee MAESTRO.md". Al terminar cada tarea, añade una línea al registro de cambios (§11).
 
@@ -38,7 +38,7 @@ Desarrollar un **calendario armonizado de actividad de quema** basado en focos a
 |---|---|
 | Región / periodo | Cusco, 2000-11-04 a 2025-12-31 (último día con focos: 2025-12-28) |
 | Unidad de la serie | celda de 0.01° (~1.1 km) × día local; presencia de fuego |
-| Sensores | MODIS Terra y Aqua (2000-) y VIIRS S-NPP (2012-); NOAA-20 no incluido |
+| Sensores | MODIS Terra y Aqua (2000-) y VIIRS S-NPP (2012-); VIIRS NOAA-20 solo en los días sin S-NPP (v1.3) |
 | Filtros | `type = 0` (vegetación); MODIS `confidence ≥ 30`; VIIRS `n` o `h` |
 | Datos de origen | archivos anuales por país de FIRMS, hasta 2025-12-31 |
 | Datos de 2026 | **no incluidos** y no verificada su disponibilidad |
@@ -51,6 +51,7 @@ Desarrollar un **calendario armonizado de actividad de quema** basado en focos a
 5. 2025 sale ×1.50: MODIS cae más que VIIRS (compatible con deriva orbital; no verificado). La serie armonizada no lo sufre porque desde 2013 usa VIIRS.
 6. Terra ve ~5× menos que Aqua (10:30 vs 13:30). `kT` (Terra→Terra+Aqua), 2003-2012: **2.62** / **7.74**.
 7. Serie: antes de 2002-07-04 `Terra*kT`; 2002-07-04 a 2012 `MODIS` (peso 1.0); desde 2013 `VIIRS*k`.
+8. **v1.3 — días sin S-NPP:** si S-NPP no entregó ningún dato de Perú un día (45 días desde 2013, p. ej. 27-jul a 10-ago de 2022), ese día se usa NOAA-20 con `k20` = `k` × (celdas-día S-NPP / NOAA-20) en los días con ambos: **0.324** (≥2500 m), **0.235** (<2500 m), calibrado 2018-2021. Validación 2022-2025: NOAA-20×k20 / S-NPP×k = 0.98–1.05 por año; error mensual mediano 7 %. Script: `harmonizacion/relleno_n20.py`.
 
 ## 4. Mapa de archivos (propuesto; adáptalo a la estructura real del repo)
 ```
@@ -59,6 +60,7 @@ data/harmonized/harmonizado_cusco_celda_dia.csv   36,260 filas, 2.7 MB   -> cale
 data/harmonized/focos_cusco_individuales.csv      58,779 filas, 7.4 MB   -> descarga de focos
 harmonizacion/
   firms_csv.py            genera el CSV de celda-día (calibra k y kT)
+  relleno_n20.py          v1.3: rellena los días sin S-NPP con NOAA-20 (calibra y valida k20)
   focos_individuales.py   genera el CSV de focos con peso por foco
   firms_armoniza.py       SOLO diagnóstico (razones, deriva, error); no escribe CSV
   cusco_referencia.py     límite de Cusco (FAO GAUL) y altitud SRTM (Earth Engine)
@@ -78,7 +80,9 @@ harmonizacion/
 |---|---|---|---|
 | `Terra*kT` | < 2002-07-04 | `extrapolado` | `kT` repartido entre los focos Terra de la celda-día |
 | `MODIS` | 2002-07-04 a 2012-12-31 | `referencia` | 1.0 repartido entre los focos MODIS |
-| `VIIRS*k` | ≥ 2013-01-01 | `calibrado` | `k` repartido entre los focos VIIRS |
+| `VIIRS*k` | ≥ 2013-01-01 | `calibrado` | `k` repartido entre los focos VIIRS S-NPP |
+| `VIIRS-N20*k` | días sin S-NPP (≥ 2013) | `calibrado` | `k20` repartido entre los focos VIIRS NOAA-20 (v1.3) |
+| `MODIS-hueco` | días sin S-NPP ni NOAA-20 | `referencia` | 1.0 repartido entre los focos MODIS (previsto; en Cusco v1.3 no hay filas) |
 | `fuera_de_serie` (solo focos) | focos conservados sin peso | vacío | 0 (`en_serie` = 0) |
 
 Sumar `eq_foco` en cualquier región y fechas reproduce `eq_hotspots` del otro archivo (diferencia máxima por celda-día 0.0006, por redondeo).
@@ -86,8 +90,10 @@ Sumar `eq_foco` en cualquier región y fechas reproduce `eq_hotspots` del otro a
 ## 6. Sumas de control (si no coinciden, algo cambió: investiga antes de seguir)
 | Archivo | Filas | Suma de pesos | SHA-256 |
 |---|---|---|---|
-| `harmonizado_cusco_celda_dia.csv` | 36,260 | `eq_hotspots` = 15,732.03 | `6F33CAEC736AF9718E559DA1143B93CF0886093E0C0DFAB9B5667BAA42A257CC` |
-| `focos_cusco_individuales.csv` | 58,779 (MODIS 15,693; VIIRS 43,086; `en_serie` 47,464) | `eq_foco` = 15,732.01 | `C8D15200BF17DA15807F48972C8A4DCA76D274DE1B872EFF82DE59444DE7F36B` |
+| `harmonizado_cusco_celda_dia.csv` | 36,568 | `eq_hotspots` = 15,818.39 | `D686C8FDA6259392730E416E40139B436311042C5081B9273CAC747778E639B1` |
+| `focos_cusco_individuales.csv` | 59,211 (MODIS 15,693; VIIRS 43,518, de ellos NOAA-20 432; `en_serie` 47,896) | `eq_foco` = 15,818.36 | `934C28D5F5FA8C4EEDD926719292AC08DDAF3BB6A8CFAD824BFFD25F7F334D26` |
+
+v1.2 (antes del relleno): celda-día 36,260 filas y 15,732.03; focos 58,779 y 15,732.01. La v1.3 conserva todas sus filas sin cambios y agrega 308 celdas-día y 432 focos NOAA-20. Los CSV usan fin de línea CRLF: el SHA-256 cambia si se regeneran con LF.
 
 Un cambio **intencional** de datos cambia estos valores: actualízalos aquí y anótalo en §11.
 Comando de verificación (desde la raíz del repo):
@@ -102,7 +108,9 @@ Comando de verificación (desde la raíz del repo):
 - Un par de focos VIIRS (2022-08-25 18:06 UTC) repite posición y hora con FRP distinto: artefacto del propio FIRMS; se conserva.
 - Los archivos terminan el 2025-12-31 UTC: el último día local puede estar incompleto.
 - `kT` es impreciso (error mensual 41–45 %; anual de −32 % a +45 % en el estrato bajo).
-- Solo S-NPP; sin NOAA-20/21 (no estaban en los archivos públicos por país).
+- Solo S-NPP, salvo los días sin S-NPP (v1.3 usa NOAA-20 ahí). NOAA-21 no se usa. FIRMS publica S-NPP en tiempo casi real solo hasta el 2-nov-2026: extender la serie a 2026 requiere un factor NOAA-20 → MODIS para todos los días, no solo los huecos.
+- 4 días sin S-NPP anteriores a NOAA-20 (2014-03-08, 2014-06-12, 2016-02-09, 2017-01-21) no tienen ni NOAA-20 ni focos MODIS en Cusco: valen 0, como debe ser.
+- Un "día sin S-NPP" se define como un día sin ninguna fila S-NPP en todo Perú. Un hueco parcial (S-NPP con datos en otra parte de Perú pero no sobre Cusco) no se detecta.
 - `verificar_datos.py` se caía en Windows con `UnicodeEncodeError` (la consola cp1252 no imprime `Δ`, y `python -I` ignora `PYTHONUTF8`): **corregido** forzando UTF-8 en stdout/stderr. `sequia_fuego/n_efectivo_potencia.py` tiene el mismo problema con `≈` (abierto).
 - Los scripts se probaron solo en Windows con Python 3.11.9 (numpy 2.4.4, pandas 2.3.3, scipy 1.17.1, matplotlib 3.10.8, earthengine-api 1.7.22). No probados en Linux ni en CI, salvo `verificar_datos.py`, que solo necesita numpy y pandas.
 - `sequia_fuego/` es exploratorio: decenas de pruebas sobre los mismos datos, SPI con base 1981-2010 mal calibrado para 2003-25 (quiebre de CHIRPS en 1999-2000). **No citar ningún p-valor de ahí como resultado.**
@@ -114,7 +122,7 @@ Formato de cada orden: **Contexto → Tarea → Entradas → Criterios de acepta
 - **Contexto:** lee §1, §5 y el contrato de celda-día.
 - **Tarea:** haz llegar a la interfaz `harmonizado_cusco_celda_dia.csv` (calendario) y `focos_cusco_individuales.csv` (descarga y detalle) **a través del backend** (decisión del equipo, §12): el backend carga los dos CSV y los sirve filtrados por región y fechas, con las mismas columnas del contrato y los mismos totales. La app no lee CSV estáticos. Antes de dar la tarea por terminada, pasa los casos de prueba de §12.
 - **Entradas:** los dos CSV. Lee `hora_utc` y `confianza` como texto.
-- **Criterios:** la suma de `eq_hotspots` cargada es 15,732.03 y el recuento de filas es 36,260; la pantalla no se congela en móvil.
+- **Criterios:** la suma de `eq_hotspots` cargada es 15,818.39 y el recuento de filas es 36,568 (v1.3); la pantalla no se congela en móvil.
 - **No hacer:** convertir a enteros los pesos; descartar filas `extrapolado`; ocultar el aviso de cobertura.
 
 ### P2 · Calendario con rampa de color
@@ -147,7 +155,7 @@ Formato de cada orden: **Contexto → Tarea → Entradas → Criterios de acepta
 - **No hacer:** recalibrar `k` con datos de validación; borrar el historial de cambios.
 
 ### P7 · Ampliar a otra región o a todo Perú
-- **Contexto:** Cusco es el 4.5 % de los focos de Perú (58,779 de 1,295,299 filtrados). Estimación de tamaño para Perú: focos ≈ 163 MB y celda-día ≈ 62 MB (~833 mil filas), medida por filas × bytes/fila de Cusco.
+- **Contexto:** Cusco es el 4.5 % de los focos de Perú (58,779 de 1,295,299 filtrados, v1.2). Estimación de tamaño para Perú: focos ≈ 163 MB y celda-día ≈ 62 MB (~833 mil filas), medida por filas × bytes/fila de Cusco.
 - **Límites de GitHub** (según su documentación; verifícalos): archivo > 50 MB genera aviso y > 100 MB se bloquea. El hosting del sitio (hoy Vercel, según el equipo) tiene sus propios límites por archivo y por despliegue: verifícalos. Un solo CSV de focos de Perú **no cabe**.
 - **Tarea:** (1) obtener el límite de la región (FAO GAUL) y la altitud SRTM **por teselas** (la lectura de `sampleRectangle` está limitada a 262,144 píxeles por llamada; Perú ≈ 2.3 M de píxeles a 0.01°); (2) recalibrar `k` y `kT` **por región/estrato**, y para todo Perú probablemente por mes: con un factor fijo el error mensual fue 31–33 % en Perú frente a 10–12 % en Cusco, y 14 % con factor por mes; (3) validar con 2020–2025 reservado; (4) dividir la salida por departamento y/o año (cada archivo < 50 MB).
 - **Criterios:** `verificar_datos.py` adaptado y en verde por región; error mensual de validación reportado por región.
@@ -192,6 +200,7 @@ Al terminar: corre verificar_datos.py si tocaste datos o armonización, y añade
 | 2026-11-14 | `verificar_datos.py` corre en Windows (stdout/stderr en UTF-8); datos sin cambios, sumas de control de §6 confirmadas (`TODO OK`) | Julio (rama `julio/actividades`) |
 | 2026-11-14 | Analíticas "en simple" sobre la plataforma de Julio (rama `antonio/analitica`): estacionalidad, ranking de años, curva acumulada, altitud y recurrencia por celda (solo VIIRS, desde 2013), cada una con una frase en lenguaje sencillo; `GET /api/resumen` y `GET /api/analitica/*`; panel con cuatro gráficos descargables (PNG y CSV) en la interfaz. Año típico = mediana de los años completos sin focos extrapolados (2003–2025) | sesión del repo |
 | 2026-11-14 | Revisión de `antonio/analitica` (unido a `julio/actividades`): fecha de cruce de la curva acumulada corregida en años bisiestos (2020: 24 de agosto) y nota de 2025 en curva, ranking y resumen. Datos sin cambios | Julio |
+| 2026-11-15 | v1.3: los 45 días sin VIIRS S-NPP desde 2013 (`revisar_antonio.md`) se rellenan con VIIRS NOAA-20 (`relleno_n20.py`, `k20` 0.324/0.235, calibrado 2018-2021, validado 2022-2025 en 0.98–1.05). +308 celdas-día y +432 focos; total 15,732.03 → 15,818.39; julio 2022 54 → 85 y julio 2024 46 → 74. `verificar_datos.py`, sumas de §6, casos de §12 y backend actualizados | sesión del repo (pedido de Antonio) |
 | | *(añade aquí una línea por cada tarea terminada)* | |
 
 ## 12. Decisiones del equipo y vocabulario (resueltas el 2026-11-14; no reabrir sin el usuario)
@@ -215,12 +224,14 @@ Al terminar: corre verificar_datos.py si tocaste datos o armonización, y añade
 **Casos de prueba del backend (Cusco entero, Σ `eq_hotspots`; tolerancia ±1)**
 | Consulta | Resultado esperado |
 |---|---|
-| Todo el periodo | 15,732 (36,260 celdas-día; 58,779 focos en la descarga) |
+| Todo el periodo | 15,818 (36,568 celdas-día; 59,211 focos en la descarga) |
 | Año 2005 | 1,355 |
 | Año 2012 (último solo MODIS) | 678 |
 | Año 2013 (primero con VIIRS) | 424 |
 | Año 2020 | 1,206 |
-| Año 2025 | 385 |
+| Año 2022 (días sin S-NPP rellenados con NOAA-20) | 850 |
+| Año 2024 (ídem) | 640 |
+| Año 2025 | 387 |
 | Antes de 2000-11-04, o región fuera de Cusco | "sin datos" (no cero) |
 | Σ `eq_foco` de la descarga de cualquier consulta | igual al total mostrado en pantalla |
 

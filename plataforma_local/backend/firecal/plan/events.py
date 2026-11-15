@@ -44,7 +44,7 @@ log = logging.getLogger(__name__)
 PLAN_DIRNAME = "plan"
 META_FILENAME = "plan_meta.json"
 REGION_FILENAME = "cusco_limite.geojson"
-PLAN_VERSION = "cusco-v1.2"            # = versión del MAESTRO de los datos
+PLAN_VERSION = "cusco-v1.3"            # = versión del MAESTRO de los datos
 
 ALTO_M = 2500                          # estrato de altitud de los factores k y kT
 

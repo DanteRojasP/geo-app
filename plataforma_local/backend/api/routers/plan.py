@@ -337,6 +337,12 @@ def metadatos(request: Request) -> dict:
                 {"periodo": t(es="desde 2013-01-01", en="since 2013-01-01"),
                  "fuente_serie": "VIIRS*k", "calidad": "calibrado",
                  "k": {"alto": f.get("VIIRS*k|alto"), "bajo": f.get("VIIRS*k|bajo")}},
+                {"periodo": t(es="días sin datos de VIIRS S-NPP (desde 2013; p. ej. 27-jul a "
+                                 "10-ago de 2022)",
+                              en="days without VIIRS S-NPP data (since 2013; e.g. 27 Jul to "
+                                 "10 Aug 2022)"),
+                 "fuente_serie": "VIIRS-N20*k", "calidad": "calibrado",
+                 "k": {"alto": f.get("VIIRS-N20*k|alto"), "bajo": f.get("VIIRS-N20*k|bajo")}},
             ],
             "estratos": t(es="alto ≥ 2500 m, bajo < 2500 m (altitud SRTM)",
                           en="high ≥ 2500 m, low < 2500 m (SRTM altitude)"),
@@ -344,10 +350,10 @@ def metadatos(request: Request) -> dict:
                                "0.90-1.09 por año",
                             en="k calibrated on 2013-2019; in 2020-2024 VIIRS×k / actual MODIS = "
                                "0.90-1.09 per year"),
-            "filtros": t(es="type = 0 (vegetación); MODIS confidence ≥ 30; VIIRS n o h; solo "
-                            "S-NPP",
-                         en="type = 0 (vegetation); MODIS confidence ≥ 30; VIIRS n or h; S-NPP "
-                            "only"),
+            "filtros": t(es="type = 0 (vegetación); MODIS confidence ≥ 30; VIIRS n o h; "
+                            "S-NPP, y NOAA-20 solo en los días sin S-NPP",
+                         en="type = 0 (vegetation); MODIS confidence ≥ 30; VIIRS n or h; "
+                            "S-NPP, and NOAA-20 only on days without S-NPP"),
             "anomalia": t(es="(valor − mediana del mismo mes) / max(IQR, 1), con los meses "
                              "completos de calidad referencia o calibrado",
                           en="(value − median of the same month) / max(IQR, 1), using complete "

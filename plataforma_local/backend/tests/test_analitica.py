@@ -88,7 +88,7 @@ def test_acumulado(api, celda_dia):
 
 def test_altitud(api, celda_dia):
     d = _get(api, "altitud")
-    assert sum(b["focos_armonizados"] for b in d["bandas"]) == pytest.approx(15732, abs=1)
+    assert sum(b["focos_armonizados"] for b in d["bandas"]) == pytest.approx(15818, abs=1)
     assert sum(b["parte"] for b in d["bandas"]) == pytest.approx(1, abs=0.01)
     alto = celda_dia.loc[celda_dia["alt_m"] >= 3500, "eq_hotspots"].sum()
     assert d["bandas"][3]["focos_armonizados"] == pytest.approx(alto, abs=0.1)

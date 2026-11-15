@@ -153,11 +153,11 @@ El backend sintético anterior (`/api/v1`) se retiró el 14-nov: está en la ram
 
 | Consulta | Esperado | Obtenido |
 | --- | --- | --- |
-| Todo el periodo | 15 732 (36 260 celdas-día; 58 779 focos en la descarga) | 15 732,03 · 36 260 · 58 779 |
-| 2005 / 2012 / 2013 / 2020 / 2025 | 1355 / 678 / 424 / 1206 / 385 | iguales (±1) |
+| Todo el periodo (datos v1.3) | 15 818 (36 568 celdas-día; 59 211 focos en la descarga) | 15 818,39 · 36 568 · 59 211 |
+| 2005 / 2012 / 2013 / 2020 / 2022 / 2024 / 2025 | 1355 / 678 / 424 / 1206 / 850 / 640 / 387 | iguales (±1) |
 | Antes de 2000-11-04, o fuera de Cusco | "sin datos" (no cero) | 404 "Sin datos" |
 | Σ `eq_foco` de la descarga | = total en pantalla | igual para departamento, rectángulo y punto |
-| Margen de agosto de 2001 (ejemplo de Antonio) | 176,02 · rango 98,6–253,4 · "incierta" | igual |
+| Margen de agosto de 2001 (ejemplo de Antonio) | 176,02 · rango 98,6–253,4 · "incierta" (mediana de agosto 156,7 en v1.3) | igual |
 
 ---
 

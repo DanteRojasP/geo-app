@@ -34,7 +34,7 @@ def test_repeated_query_is_served_from_cache(plan_home):
     assert "x-cache" not in a.headers and b.headers["x-cache"] == "HIT"
     assert b.content == a.content                              # la misma respuesta, byte a byte
     assert b.headers["cache-control"] == "public, max-age=3600"
-    assert b.json()["total_focos_armonizados"] == 15732.03     # MAESTRO §12
+    assert b.json()["total_focos_armonizados"] == 15818.39     # MAESTRO §12 (v1.3)
     st = api.get("/health/limits").json()
     assert st["cache_aciertos"] == 1 and st["cache_calculadas"] == 1 and st["cache_respuestas"] == 1
 
@@ -167,4 +167,4 @@ def test_data_is_loaded_in_memory_tables(plan_home):
     n_fo = cur.execute("SELECT count(*) FROM fo").fetchall()[0][0]
     cur.close()
     assert kinds == {"cd": "BASE TABLE", "fo": "BASE TABLE"}
-    assert (n_cd, n_fo) == (36260, 58779)                      # MAESTRO §6
+    assert (n_cd, n_fo) == (36568, 59211)                      # MAESTRO §6 (v1.3)

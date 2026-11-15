@@ -78,15 +78,16 @@ def test_health_and_departamentos(api):
 
 def test_maestro_case_whole_period(api):
     b = _cal(api)
-    assert abs(b["total_focos_armonizados"] - 15732) <= 1
-    assert sum(c.get("celdas_dia", 0) for c in b["celdas"]) == 36260
+    assert abs(b["total_focos_armonizados"] - 15818) <= 1
+    assert sum(c.get("celdas_dia", 0) for c in b["celdas"]) == 36568
     assert b["fecha_inicio"] == "2000-11" and b["fecha_fin"] == "2025-12"
     assert b["unidad"]["nombre"] == "Focos armonizados"
     assert "eq_hotspots" not in b["celdas"][5]          # el campo de la API es focos_armonizados
 
 
 @pytest.mark.parametrize(("year", "expected"), [(2005, 1355), (2012, 678), (2013, 424),
-                                                (2020, 1206), (2025, 385)])
+                                                (2020, 1206), (2022, 850), (2024, 640),
+                                                (2025, 387)])
 def test_maestro_cases_by_year(api, year, expected):
     b = _cal(api, fecha_inicio=f"{year}-01", fecha_fin=f"{year}-12")
     assert abs(b["total_focos_armonizados"] - expected) <= 1
@@ -124,8 +125,8 @@ def test_download_whole_period_contract(api):
     assert r.status_code == 200 and r.content.startswith(b"\xef\xbb\xbf")
     rows = _csv_rows(r)
     assert list(rows[0].keys()) == COLS_FOCOS                        # 18 columnas, mismo orden
-    assert len(rows) == 58779 and r.headers["X-Row-Count"] == "58779"
-    assert abs(sum(float(x["eq_foco"]) for x in rows) - 15732.01) < 0.05
+    assert len(rows) == 59211 and r.headers["X-Row-Count"] == "59211"
+    assert abs(sum(float(x["eq_foco"]) for x in rows) - 15818.36) < 0.05
     assert all(len(x["hora_utc"]) == 4 for x in rows)                # texto con ceros a la izq.
     assert "cusco_2000-11_2025-12" in r.headers["Content-Disposition"]
 
@@ -225,10 +226,11 @@ def test_margin_matches_antonio_example(api):
     c = b["celdas"][0]
     assert c["calidad"] == "extrapolado" and c["fraccion_extrapolada"] == 1
     assert c["focos_armonizados"] == pytest.approx(176.02, abs=0.01)
-    assert c["mediana_hist"] == 151.5 and c["anomalia"] == pytest.approx(0.21, abs=0.01)
+    # Datos v1.3: agosto de 2022 sube con NOAA-20 y la mediana de agosto pasa de 151.5 a 156.73.
+    assert c["mediana_hist"] == 156.73 and c["anomalia"] == pytest.approx(0.16, abs=0.01)
     assert c["incertidumbre"] == pytest.approx(77.4, abs=0.1)
     assert c["rango"] == [pytest.approx(98.6, abs=0.1), pytest.approx(253.4, abs=0.1)]
-    assert c["anomalia_rango"] == [pytest.approx(-0.45, abs=0.01), pytest.approx(0.87, abs=0.01)]
+    assert c["anomalia_rango"] == [pytest.approx(-0.49, abs=0.01), pytest.approx(0.82, abs=0.01)]
     assert c["categoria"] == "incierta"
 
 

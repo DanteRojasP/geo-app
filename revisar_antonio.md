@@ -2,6 +2,12 @@
 
 *Domingo 15-nov-2026 · Julio · detalle en `REVISION_FACTIBILIDAD_REGIONES.md` §2.1*
 
+> **Resuelto en los datos v1.3 (15-nov):** los días sin S-NPP se rellenan con **VIIRS NOAA-20** y su propio
+> factor, `k20` = 0.324 (≥ 2500 m) y 0.235 (< 2500 m), calibrado con 2018–2021 sobre los días en que los dos
+> satélites tienen datos y validado con 2022–2025 (NOAA-20×k20 / S-NPP×k = 0.98–1.05 por año; error mensual mediano
+> 7 %). Julio de 2022 pasa de 54 a 85 y julio de 2024, de 46 a 74. Script: `harmonizacion/relleno_n20.py`; detalle en
+> MAESTRO §3 (punto 8), §5, §6, §7 y §12.
+
 > **También para ti: `PROTOCOLO_PREVENTIVO.md`**, el protocolo de evaluación preventiva con múltiples fuentes:
 > diseño, hipótesis, validación, fuentes con su estado verificado y lo que falta (credenciales, APIs y créditos).
 > Las partes que tocan tus datos son el §6 (calidad y continuidad de la serie) y el §14 (decisión D8). Los scripts

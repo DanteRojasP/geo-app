@@ -1,6 +1,6 @@
 # Contrato de datos: focos FIRMS armonizados MODIS + VIIRS (Cusco, 2000-2025)
 
-Archivo: `harmonizado_cusco_celda_dia.csv` (36 260 filas, una por celda de 0.01° y día local con al menos un foco).
+Archivo: `harmonizado_cusco_celda_dia.csv` (36 568 filas en la v1.3, una por celda de 0.01° y día local con al menos un foco).
 
 ## Columnas
 | Columna | Significado |
@@ -12,7 +12,7 @@ Archivo: `harmonizado_cusco_celda_dia.csv` (36 260 filas, una por celda de 0.01�
 | `n_viirs` | Detecciones VIIRS S-NPP de esa celda-día. 0 si no hubo. |
 | `frp_modis`, `frp_viirs` | FRP total (MW) de cada sensor en la celda-día. **No son comparables entre sí** (VIIRS/MODIS ≈ ×1.2–2.0 según ambiente). |
 | `eq_hotspots` | Aporte de la celda-día a la serie armonizada, en **celda-días equivalentes a MODIS (Terra+Aqua)**. |
-| `fuente_serie` | `MODIS`, `Terra*kT` o `VIIRS*k`: de qué sensor sale `eq_hotspots`. |
+| `fuente_serie` | `MODIS`, `Terra*kT`, `VIIRS*k`, `VIIRS-N20*k` o `MODIS-hueco`: de qué sensor sale `eq_hotspots`. En las filas `VIIRS-N20*k`, `n_viirs` y `frp_viirs` son de NOAA-20. |
 | `calidad` | `referencia`, `calibrado` o `extrapolado` (ver abajo). |
 
 ## Cómo se arma `eq_hotspots` (el sensor de origen deja de importar)
@@ -20,7 +20,9 @@ Archivo: `harmonizado_cusco_celda_dia.csv` (36 260 filas, una por celda de 0.01�
 |---|---|---|---|
 | 2000-11 a 2002-07-03 (solo Terra) | 1 celda-día con Terra → `kT` | `Terra*kT` | `extrapolado` |
 | 2002-07-04 a 2012-12-31 | 1 celda-día con MODIS → 1.0 | `MODIS` | `referencia` |
-| 2013-01-01 en adelante | 1 celda-día con VIIRS → `k` | `VIIRS*k` | `calibrado` |
+| 2013-01-01 en adelante | 1 celda-día con VIIRS S-NPP → `k` | `VIIRS*k` | `calibrado` |
+| Días sin S-NPP en todo Perú (v1.3) | 1 celda-día con VIIRS NOAA-20 → `k20` (0.324 / 0.235) | `VIIRS-N20*k` | `calibrado` |
+| Días sin S-NPP ni NOAA-20 (v1.3) | 1 celda-día con MODIS → 1.0 | `MODIS-hueco` | `referencia` |
 
 Desde 2013 la serie se apoya en VIIRS (continuidad y mayor detalle) y se expresa en la escala de MODIS.
 Factores por estrato de altitud (alto ≥ 2500 m, bajo < 2500 m):
@@ -53,5 +55,6 @@ Fuente: archivos anuales por país de FIRMS (`firms.modaps.eosdis.nasa.gov/data/
 3. `python -I firms_csv.py firms_raw cusco_ref salida` genera el CSV y las validaciones de `kT` y de continuidad.
 4. `firms_armoniza.py` (mismos argumentos) **solo imprime** diagnósticos (razón, deriva Terra/Aqua, error por calibración). No escribe ningún CSV.
 5. `python -I focos_individuales.py firms_raw cusco_ref harmonizado_cusco_celda_dia.csv salida` genera `focos_cusco_individuales.csv`.
+6. **v1.3:** `python -I relleno_n20.py firms_raw cusco_ref <carpeta_v1.2> salida` rellena los días sin S-NPP con NOAA-20. Necesita también los archivos `viirs-jpss1_AAAA_Peru.csv` (NOAA-20) de 2018 en adelante, y como entrada los dos CSV que dejan los pasos 3 y 5. Imprime la calibración y la validación de `k20`. Aborta si la entrada ya está rellenada.
 6. `python -I verificar_datos.py harmonizado_cusco_celda_dia.csv focos_cusco_individuales.csv` valida ambos CSV (código de salida 1 si algo falla).
 Variable de entorno `EE_PROJECT`: proyecto de Earth Engine para los scripts que lo usan.

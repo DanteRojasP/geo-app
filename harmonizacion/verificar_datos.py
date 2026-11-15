@@ -51,17 +51,24 @@ chk(((cd.n_modis >= 0) & (cd.n_viirs >= 0) & ((cd.n_modis + cd.n_viirs) > 0)).al
 chk(((cd.frp_modis >= 0) & (cd.frp_viirs >= 0)).all(), "FRP no negativo")
 chk((cd.eq_hotspots > 0).all() and (cd.eq_hotspots < 10).all(), "eq_hotspots en (0, 10)")
 v = cd.fuente_serie
-chk(set(v.unique()) <= {"MODIS", "Terra*kT", "VIIRS*k"}, "valores de fuente_serie válidos")
-chk(((v == "VIIRS*k") == (f >= pd.Timestamp("2013-01-01"))).all(), "VIIRS*k exactamente desde 2013-01-01")
+VIIRS_SERIE = {"VIIRS*k", "VIIRS-N20*k"}            # v1.3: NOAA-20 en los días sin S-NPP
+DESDE_2013 = VIIRS_SERIE | {"MODIS-hueco"}
+chk(set(v.unique()) <= {"MODIS", "Terra*kT"} | DESDE_2013, "valores de fuente_serie válidos")
+chk((v.isin(DESDE_2013) == (f >= pd.Timestamp("2013-01-01"))).all(),
+    "desde 2013-01-01 la serie es VIIRS*k (o su relleno: VIIRS-N20*k, MODIS-hueco)")
+dias_snpp = set(cd.fecha_local[v == "VIIRS*k"])
+chk(not (set(cd.fecha_local[v.isin({"VIIRS-N20*k", "MODIS-hueco"})]) & dias_snpp),
+    "el relleno (NOAA-20 o MODIS) solo está en días sin ninguna celda-día S-NPP")
 chk(((v == "Terra*kT") == (f < pd.Timestamp("2002-07-04"))).all(), "Terra*kT exactamente antes de 2002-07-04")
-chk((cd.calidad == v.map({"VIIRS*k": "calibrado", "Terra*kT": "extrapolado", "MODIS": "referencia"})).all(),
+chk((cd.calidad == v.map({"VIIRS*k": "calibrado", "VIIRS-N20*k": "calibrado", "Terra*kT": "extrapolado",
+                          "MODIS": "referencia", "MODIS-hueco": "referencia"})).all(),
     "calidad coherente con fuente_serie")
-chk(((v != "VIIRS*k") | (cd.n_viirs > 0)).all() and ((v == "VIIRS*k") | (cd.n_modis > 0)).all(),
+chk(((~v.isin(VIIRS_SERIE)) | (cd.n_viirs > 0)).all() and ((v.isin(VIIRS_SERIE)) | (cd.n_modis > 0)).all(),
     "cada fila tiene focos del sensor que lleva su serie")
 est = np.where(cd.alt_m >= 2500, "alto", "bajo")
 g = cd.assign(est=est).groupby(["fuente_serie", "est"]).eq_hotspots.agg(["nunique", "min", "size"])
 chk((g["nunique"] == 1).all(), "un único factor por (fuente, estrato)")
-chk((cd[v == "MODIS"].eq_hotspots == 1.0).all(), "MODIS pesa exactamente 1.0")
+chk((cd[v.isin({"MODIS", "MODIS-hueco"})].eq_hotspots == 1.0).all(), "MODIS pesa exactamente 1.0")
 print(g.rename(columns={"min": "factor", "size": "filas"}).to_string())
 chk(set(range(2001, 2026)) <= set(f.dt.year), "hay datos en todos los años 2001-2025")
 
@@ -71,7 +78,8 @@ claves = ["fecha_local", "fecha_utc", "hora_utc", "latitude", "longitude", "cell
           "satelite", "frp", "confianza", "en_serie", "eq_foco", "fuente_serie"]
 chk(fo[claves].notna().all().all(), "sin nulos en columnas clave")
 chk(fo.hora_utc.str.fullmatch(r"\d{4}").all(), "hora_utc con 4 dígitos (leer como texto)")
-chk(set(zip(fo.sensor, fo.satelite)) <= {("MODIS", "Terra"), ("MODIS", "Aqua"), ("VIIRS", "Suomi-NPP")},
+chk(set(zip(fo.sensor, fo.satelite)) <= {("MODIS", "Terra"), ("MODIS", "Aqua"), ("VIIRS", "Suomi-NPP"),
+                                           ("VIIRS", "NOAA-20")},
     "combinaciones sensor/satélite válidas")
 chk(not fo.duplicated().any(), "sin filas totalmente idénticas")
 nd = int(fo.duplicated(["fecha_utc", "hora_utc", "latitude", "longitude", "satelite"]).sum())
