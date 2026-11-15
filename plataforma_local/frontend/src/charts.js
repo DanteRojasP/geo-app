@@ -3,8 +3,13 @@
  * Origen: antonio/backend-modelo (plataforma_local/frontend/charts.js), como módulo ES.
  * Colores aptos para daltonismo: azul (habitual), naranja (destacado), gris (rango o referencia). */
 const W = 560, H = 250, M = { l: 46, r: 14, t: 14, b: 34 };
-const AZUL = "#31688e", AZUL_CLARO = "#9ecae1", NARANJA = "#c2410c", GRIS = "#98a2b3", TINTA = "#1d2330", BANDA = "#dbe4ee";
+// Con el diseño Nikal: lo habitual en puna (frío), lo destacado en brasa, papel y tinta cálidos.
+const AZUL = NK ? "#3f6f74" : "#31688e", AZUL_CLARO = NK ? "#a9cfcb" : "#9ecae1", NARANJA = NK ? "#dd513a" : "#c2410c",
+  GRIS = NK ? "#9c968c" : "#98a2b3", TINTA = NK ? "#141210" : "#1d2330", BANDA = NK ? "#e1ddd3" : "#dbe4ee";
+const FONDO = NK ? "#f5f3ee" : "#fff", REJILLA = NK ? "#dcd7cc" : "#e4e7ec", EJE = NK ? "#6b655d" : "#5d6677";
+const FUENTE = NK ? "'Nikal Grotesk', system-ui, sans-serif" : "system-ui, sans-serif";
 import { locale, monthLetters, tr } from "./i18n.js";
+import { NK } from "./diseno.js";
 
 const fmt = (v) => Math.round(v).toLocaleString(locale());
 const esc = (t) => String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
@@ -16,12 +21,12 @@ function niceMax(v) {
   return [1, 2, 2.5, 5, 10].map((k) => k * p).find((k) => k >= v);
 }
 function frame(body, desc) {
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(desc)}" font-family="system-ui, sans-serif" font-size="11"><rect width="${W}" height="${H}" fill="#fff"/>${body}</svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(desc)}" font-family="${FUENTE}" font-size="11"><rect width="${W}" height="${H}" fill="${FONDO}"/>${body}</svg>`;
 }
 function yAxis(max, unidad) {
   const y = (v) => M.t + (H - M.t - M.b) * (1 - v / max);
-  const ticks = [0, max / 2, max].map((v) => `<line x1="${M.l}" x2="${W - M.r}" y1="${y(v)}" y2="${y(v)}" stroke="#e4e7ec"/><text x="${M.l - 6}" y="${y(v) + 4}" text-anchor="end" fill="${TINTA}">${fmt(v)}</text>`).join("");
-  return { y, svg: ticks + `<text x="12" y="${M.t + (H - M.t - M.b) / 2}" transform="rotate(-90 12 ${M.t + (H - M.t - M.b) / 2})" text-anchor="middle" fill="#5d6677">${esc(unidad)}</text>` };
+  const ticks = [0, max / 2, max].map((v) => `<line x1="${M.l}" x2="${W - M.r}" y1="${y(v)}" y2="${y(v)}" stroke="${REJILLA}"/><text x="${M.l - 6}" y="${y(v) + 4}" text-anchor="end" fill="${TINTA}">${fmt(v)}</text>`).join("");
+  return { y, svg: ticks + `<text x="12" y="${M.t + (H - M.t - M.b) / 2}" transform="rotate(-90 12 ${M.t + (H - M.t - M.b) / 2})" text-anchor="middle" fill="${EJE}">${esc(unidad)}</text>` };
 }
 const csv = (rows) => rows.map((r) => r.join(",")).join("\n");
 

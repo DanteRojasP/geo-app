@@ -3,6 +3,8 @@ import ReactDOM from 'react-dom/client'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import './fire-map.css'
 import './firecal.css'
+import './nikal-paleta.css'
+import './nikal.css'
 import App from './FireMapApp.jsx'
 import { getLang, setLang } from './i18n.js'
 

@@ -1,3 +1,4 @@
+import { MAPA } from './diseno.js'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import * as maplibregl from 'maplibre-gl'
 import { ArrowLeftRight, BarChart3, CalendarDays, Layers3, Map as MapIcon, MapPin, Mountain, Scan, ThermometerSun, X } from 'lucide-react'
@@ -122,12 +123,12 @@ function MapPane({ side, region, period, onPeriod, onStats }) {
       map.addSource('region', { type: 'geojson', data: initialRegionRef.current || EMPTY })
       map.addSource('focos', { type: 'geojson', data: initialFocosRef.current })
       map.addSource('selection', { type: 'geojson', data: EMPTY })
-      map.addLayer({ id: 'region-fill', type: 'fill', source: 'region', paint: { 'fill-color': '#178bb9', 'fill-opacity': 0.04 } })
-      map.addLayer({ id: 'region-line', type: 'line', source: 'region', paint: { 'line-color': '#39bce8', 'line-width': 2, 'line-dasharray': [2, 1.5] } })
+      map.addLayer({ id: 'region-fill', type: 'fill', source: 'region', paint: { 'fill-color': MAPA.regionA, 'fill-opacity': 0.04 } })
+      map.addLayer({ id: 'region-line', type: 'line', source: 'region', paint: { 'line-color': MAPA.regionB, 'line-width': 2, 'line-dasharray': [2, 1.5] } })
       map.addLayer({ id: 'heat', type: 'heatmap', source: 'focos', maxzoom: 12, paint: { 'heatmap-weight': ['interpolate', ['linear'], ['get', 'eq_foco'], 0, 0.04, 1, 0.75, 3, 1], 'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 5, 0.55, 9, 1.1], 'heatmap-color': ['interpolate', ['linear'], ['heatmap-density'], 0, 'rgba(245,158,11,0)', .2, 'rgba(245,158,11,0)', .34, '#fde68a', .52, '#f59e0b', .7, '#ea580c', .86, '#dc2626', 1, '#7f1d1d'], 'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 5, 11, 8, 23, 11, 36], 'heatmap-opacity': .86 } })
       map.addLayer({ id: 'points', type: 'circle', source: 'focos', layout: { visibility: 'none' }, paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, 2.4, 10, 5.5], 'circle-color': ['match', ['get', 'sensor'], 'MODIS', '#ff9b3f', '#f33932'], 'circle-opacity': .9, 'circle-stroke-color': '#fff', 'circle-stroke-width': .7 } })
-      map.addLayer({ id: 'selection-fill', type: 'fill', source: 'selection', paint: { 'fill-color': '#50d7ef', 'fill-opacity': .14 } })
-      map.addLayer({ id: 'selection-line', type: 'line', source: 'selection', paint: { 'line-color': '#50d7ef', 'line-width': 2.5, 'line-dasharray': [2, 1.3] } })
+      map.addLayer({ id: 'selection-fill', type: 'fill', source: 'selection', paint: { 'fill-color': MAPA.seleccion, 'fill-opacity': .14 } })
+      map.addLayer({ id: 'selection-line', type: 'line', source: 'selection', paint: { 'line-color': MAPA.seleccion, 'line-width': 2.5, 'line-dasharray': [2, 1.3] } })
       if (initialRegionRef.current?.features?.length) map.fitBounds(geoBounds(initialRegionRef.current), { padding: 55, duration: 0 })
       setReady(true)
     })
