@@ -272,7 +272,7 @@ function FireMapApp() {
   const [notice, setNotice] = useState('')
   const [activeLayer, setActiveLayer] = useState('surface')
   const [showBoundary, setShowBoundary] = useState(false)
-  const [baseMap, setBaseMap] = useState('standard')
+  const [baseMap, setBaseMap] = useState('relief')      // Dante (450cc43): relieve por defecto
   const [calendarMode, setCalendarMode] = useState('valor')
   // ?calendario=0 abre la página sin el calendario (p. ej. para incrustarla en una presentación).
   // Abierto solo en pantallas anchas: en 1440x900 tapaba Cusco (auditoría de Gabriel).
@@ -438,8 +438,8 @@ function FireMapApp() {
     map.on('load', () => {
       map.addSource('relief-imagery', { type: 'raster', tileSize: 256, attribution: 'Esri, Vantor, Earthstar Geographics, and the GIS User Community', tiles: ['https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'] })
       map.addSource('relief-reference', { type: 'raster', tileSize: 256, tiles: ['https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}'] })
-      map.addLayer({ id: 'relief-imagery-layer', type: 'raster', source: 'relief-imagery', layout: { visibility: 'none' }, paint: { 'raster-saturation': -0.12, 'raster-contrast': 0.08, 'raster-brightness-min': 0.08, 'raster-brightness-max': 0.92 } })
-      map.addLayer({ id: 'relief-reference-layer', type: 'raster', source: 'relief-reference', layout: { visibility: 'none' }, paint: { 'raster-opacity': 0.82 } })
+      map.addLayer({ id: 'relief-imagery-layer', type: 'raster', source: 'relief-imagery', layout: { visibility: 'visible' }, paint: { 'raster-saturation': -0.12, 'raster-contrast': 0.08, 'raster-brightness-min': 0.08, 'raster-brightness-max': 0.92 } })
+      map.addLayer({ id: 'relief-reference-layer', type: 'raster', source: 'relief-reference', layout: { visibility: 'visible' }, paint: { 'raster-opacity': 0.82 } })
       map.addSource('cusco-mask', { type: 'geojson', data: EMPTY })
       map.addSource('cusco-area', { type: 'geojson', data: EMPTY })
       map.addSource('focos', { type: 'geojson', data: EMPTY })
@@ -630,20 +630,19 @@ function FireMapApp() {
       </aside>}
       {layersOpen && !selectionBounds && <aside className="fw-layers">
         <div className="fw-layers-title"><span>{tr('layers.title')}</span><SlidersHorizontal size={15}/></div>
-        <div className="fw-basemap-switch" role="group" aria-label={tr('basemap.title')}>
-          <span>{tr('basemap.title')}</span>
-          <div>
-            <button aria-label={tr('basemap.standard')} title={tr('basemap.standard')} className={baseMap === 'standard' ? 'is-active' : ''} onClick={() => setBaseMap('standard')}><MapIcon size={16}/><b>{tr('basemap.standard')}</b></button>
-            <button aria-label={tr('basemap.relief')} title={tr('basemap.relief')} className={baseMap === 'relief' ? 'is-active' : ''} onClick={() => setBaseMap('relief')}><Mountain size={16}/><b>{tr('basemap.relief')}</b></button>
-          </div>
-        </div>
         <LayerButton active={activeLayer === 'surface'} icon={ThermometerSun} label={tr('layers.density')} tone="heat" onClick={() => setActiveLayer('surface')}/>
         <LayerButton active={activeLayer === 'points'} icon={MapPin} label={tr('layers.points')} tone="points" onClick={() => setActiveLayer('points')}/>
         <LayerButton active={showBoundary} icon={Layers3} label={tr('layers.boundary')} tone="boundary" onClick={() => setShowBoundary((v) => !v)}/>
         <LayerButton active={selectionMode} icon={Scan} label={tr('layers.area')} tone="select" onClick={toggleSelectionMode}/>
+      </aside>}
+      {layersOpen && !selectionBounds && <aside className="fw-display-dock" aria-label={tr('basemap.dock')}>
+        <div className="fw-display-modes" role="group" aria-label={tr('basemap.title')}>
+          <button className={baseMap === 'standard' ? 'is-active' : ''} aria-pressed={baseMap === 'standard'} title={tr('basemap.standard')} onClick={() => setBaseMap('standard')}><MapIcon size={14}/><span>{tr('basemap.standard')}</span></button>
+          <button className={baseMap === 'relief' ? 'is-active' : ''} aria-pressed={baseMap === 'relief'} title={tr('basemap.relief')} onClick={() => setBaseMap('relief')}><Mountain size={14}/><span>{tr('basemap.relief')}</span></button>
+        </div>
         {activeLayer === 'points'
-          ? <div className="fc-points-legend"><span>{tr('layers.pointsLegend')}</span><p><i className="modis"/>MODIS</p><p><i className="viirs"/>VIIRS</p><p><i className="outside"/>{tr('layers.outside')}</p></div>
-          : <div className="fw-scale"><span>{tr('layers.scaleDensity')}</span><div/><section><small>{tr('scale.low')}</small><small>{tr('scale.mid')}</small><small>{tr('scale.high')}</small></section></div>}
+          ? <div className="fw-heat-legend fc-dock-points"><header><span>{tr('layers.pointsLegend')}</span></header><p><i className="modis"/>MODIS</p><p><i className="viirs"/>VIIRS</p><p><i className="outside"/>{tr('layers.outside')}</p></div>
+          : <div className="fw-heat-legend"><header><span>{tr('layers.scaleDensity')}</span></header><i/><div><span>{tr('scale.low')}</span><span>{tr('scale.mid')}</span><span>{tr('scale.high')}</span></div></div>}
       </aside>}
       <div className="fw-map-meta"><button onClick={focusCusco}><MapPin size={13}/>Cusco</button><span><Satellite size={13}/>MODIS + VIIRS</span><span><CalendarDays size={13}/>{periodo.label}</span></div>
       {selectionMode && <div className="fw-draw-hint"><Scan size={20}/><div><b>{tr('draw.title')}</b><span>{tr('draw.hint')}</span></div><button onClick={() => setSelectionMode(false)} title={tr('btn.cancel')}><X size={16}/></button></div>}

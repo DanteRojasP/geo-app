@@ -1,6 +1,6 @@
 # Cambios, recomendaciones, seguridad y costos (14-nov-2026)
 
-*Julio · revisión de Cloud Run `firecal-00008` · https://firecal-316891526626.southamerica-east1.run.app*
+*Julio · revisión de Cloud Run `firecal-00009` · https://firecal-316891526626.southamerica-east1.run.app*
 
 ## 1. Qué cambió
 
@@ -29,6 +29,19 @@ Comprobado en la URL pública:
 
 Corregidos los 14 errores de `QA_ERIK.md` (detalle al final de ese archivo) y la escala de años, que se cortaba en
 2021 en pantallas de 1440 px. 90 pruebas en verde.
+
+### Revisión 9: capacidad (Gabriel) y panel de Dante
+
+Con los cambios de Gabriel, la prueba de carga pasa de 89 % de errores con 60 personas a 0 % (también con 200). Esa
+prueba se hizo en local, con 1 núcleo, no en producción. Puntos a vigilar:
+- Los cupos por IP subieron 5 veces (600/min y 60 pesadas/min) para que una sala con wifi compartido no se bloquee.
+  A cambio, una sola IP abusiva puede ocupar el carril de pesadas (4 a la vez, 16 en fila) y otros recibirían 503.
+  Si aparece abuso: bajar `heavy_per_minute` a ~30 o poner Cloud Armor.
+- La caché y los cupos son por instancia: con 2 instancias, el cupo efectivo se duplica.
+- Gabriel propone `--cpu 2 --max-instances 4 --concurrency 60`. Eso duplica el costo en reposo (~US$1,2/día) y
+  cuadruplica el techo. Su propia prueba muestra que 1 núcleo ya aguanta 60 y 200 personas. Recomiendo mantener
+  1 vCPU y subir `--concurrency` a 60-80 (sin costo extra) y `--cpu-boost` (arranque más rápido, costo mínimo).
+  No se aplicó: cambia la configuración del servicio.
 
 ## 2. Recomendaciones (no implementadas)
 

@@ -101,7 +101,7 @@ api:
     queue_timeout_s: 8.0               # antes 2: esperar el turno es mejor que un 503
     max_queue: 16                      # pesadas en espera; con más, 503 inmediato (no agota los hilos)
     trust_proxy_headers: false         # true SOLO detrás de Azure/Cloud Run (FIRECAL_TRUST_PROXY=1)
-    proxy_hops: 1                      # IP real = la proxy_hops-ésima desde la derecha (Cloud Run: 2, con FIRECAL_PROXY_HOPS)
+    proxy_hops: 1                      # IP real = la proxy_hops-ésima desde la derecha (Cloud Run: 1, comprobado en producción)
     max_clients: 10000
   # Caché de respuestas completas de Cusco entero (api/cache.py). Los datos son históricos: la misma
   # consulta devuelve siempre lo mismo, así que se calcula una vez y se repite a los demás visitantes.

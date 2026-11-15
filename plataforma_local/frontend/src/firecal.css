@@ -117,3 +117,15 @@ button:focus-visible,select:focus-visible{outline:2px solid #197bb5;outline-offs
 .fc-timeline .fc-years button{min-width:30px;padding:0 3px}
 @media(max-width:1500px){.fc-timeline .fw-timeline-source span{display:none}}
 @media(max-width:650px){.fc-timeline .fc-years button{min-width:28px}}
+
+/* Panel de fondo y leyenda (Dante, 2dad4eb), adaptado: sin FRP, colores reales de la capa de
+   densidad y leyenda de puntos MODIS/VIIRS. En pantallas anchas la línea de tiempo deja libre la
+   esquina derecha (nuestra línea es más ancha que la de Dante para que quepan los 26 años). */
+.fw-heat-legend>i{background:linear-gradient(90deg,#fde68a 0%,#f59e0b 30%,#ea580c 58%,#dc2626 80%,#7f1d1d 100%)}
+.fw-heat-legend header span{font-size:7px}
+.fc-dock-points p{margin:3px 0;display:flex;align-items:center;gap:7px;font-size:10px;color:#dbe7ee}
+.fc-dock-points i{width:10px;height:10px;border-radius:50%;border:1px solid #fff4df}
+.fc-dock-points i.modis{background:#ff9b3f}.fc-dock-points i.viirs{background:#f33932}
+.fc-dock-points i.outside{background:#f33932;opacity:.35}
+@media(min-width:1201px){.fc-timeline{left:96px;right:244px;width:auto;transform:none}}
+@media(max-width:1200px) and (min-width:951px){.fw-display-dock{bottom:124px}}

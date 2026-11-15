@@ -68,3 +68,29 @@ Para confirmar o descartar el efecto de la sequía previa, el camino es el de `s
 Es un análisis exploratorio sobre datos ya explorados en `INFORME.md`, así que no es un hallazgo confirmado. Los
 datos de Meteomatics no se publican (licencia de prueba): solo los coeficientes y las figuras. No se habla de
 incendios ni de área quemada, sino de focos de calor armonizados.
+
+## Otros datos para un estado preventivo
+
+El resultado orienta la búsqueda. En Cusco el fuego es sobre todo humano y estacional, así que lo que más anticipa
+es **dónde y cuándo se quema siempre**, el **combustible acumulado** y el **contexto humano**, más que el clima de la
+semana. Todas son fuentes públicas; varias están en Google Earth Engine, que el equipo ya usa en
+`sequia_fuego/clima_cusco_ee.py` con la cuenta de Google Cloud.
+
+| Dato | Fuente | Qué aportaría | Prioridad |
+|---|---|---|---|
+| **Recurrencia y calendario propios** | Nuestros focos armonizados (2000-2025) | Celdas que arden casi todos los años y semana típica de inicio por zona. Es lo que más "anticipa" y ya lo tenemos. | **Alta** |
+| **Combustible (verdor)** | NDVI/EVI de MODIS (MOD13A3, 1 km, desde 2000) o VIIRS (VNP13) | Hipótesis H4 del protocolo: más vegetación en mar-abr da más combustible en jul-oct. | Alta |
+| **Sequía meteorológica (SPI)** | CHIRPS (0,05°, desde 1981) y **PISCO** de SENAMHI (lluvia del Perú) | Hipótesis H1 del protocolo (SPI-6 de junio). Series largas y homogéneas, a diferencia de 8 puntos de Meteomatics. | Alta |
+| **Cobertura del suelo** | MapBiomas Perú (anual) y ESA WorldCover (10 m) | Separar pastos, cultivos y bosque: el fuego agrícola y el de pastos responden distinto. | Media |
+| **Calendario agrícola y factores humanos** | MIDAGRI (campañas y siembras), INEI (centros poblados), red vial (MTC u OpenStreetMap) | Las quemas siguen a la preparación de chacras y a la cercanía a pueblos y caminos. | Media |
+| **Área quemada** | MODIS MCD64A1 (500 m, mensual) | Tamaño real de lo que ardió (los focos no son área) y combustible ya consumido. Explicaría la persistencia negativa entre temporadas. | Media |
+| **Índice meteorológico de fuego (FWI)** | Copernicus CEMS / GWIS (histórico ERA5 y pronóstico) | Estándar internacional, con pronóstico gratuito: base para "condiciones del mes" sin licencia comercial. | Media |
+| **El Niño / La Niña** | ONI de NOAA CPC (mensual, desde 1950) | Única señal con meses de anticipación a escala de temporada. Hay que probarla con hipótesis fijada (23 años). | Baja-media |
+| **Humedad del suelo satelital** | SMAP (9 km, desde 2015) o ERA5-Land | Mide la humedad, no la modela. Serie corta (10 temporadas). | Baja |
+| **Registros de emergencias** | INDECI (SINPAD) y SERFOR | Validar contra incendios reportados y no solo focos. Clave para hablar de "prevención" con autoridades. | Media (validación) |
+
+**Orden sugerido:**
+1. Calendario y recurrencia propios: no necesitan datos nuevos.
+2. NDVI + SPI de CHIRPS o PISCO, con la hipótesis fijada del protocolo y en varias regiones.
+3. FWI de Copernicus para "condiciones del mes".
+4. Validar con INDECI y SERFOR.

@@ -1,7 +1,7 @@
 // Cliente de la API de FireCal (backend FastAPI de plataforma_local).
 // Por defecto usa la misma dirección que sirve la página. Para un frontend publicado aparte
 // (p. ej. Vercel), define VITE_API_BASE_URL con la URL del backend.
-import { getLang } from '../i18n.js'
+import { getLang, tr } from '../i18n.js'
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
 
@@ -30,7 +30,7 @@ async function request(path, params, retry = true) {
   try { body = await response.json() } catch { /* respuesta sin JSON */ }
   if (!response.ok) {
     const detail = body?.detail
-    const error = new Error(typeof detail === 'string' ? detail : `La API respondió con estado ${response.status}`)
+    const error = new Error(typeof detail === 'string' ? detail : tr('api.status', { s: response.status }))
     error.status = response.status
     error.retryAfter = response.headers.get('Retry-After')
     throw error
@@ -55,7 +55,7 @@ export async function downloadCsv(aoi, fechaInicio, fechaFin) {
   const response = await fetch(buildUrl('/api/hotspots.csv', { ...aoi, fecha_inicio: fechaInicio, fecha_fin: fechaFin }))
   if (!response.ok) {
     const body = await response.json().catch(() => ({}))
-    throw new Error(body.detail || `La API respondió con estado ${response.status}`)
+    throw new Error(body.detail || tr('api.status', { s: response.status }))
   }
   const blob = await response.blob()
   const name = (response.headers.get('Content-Disposition') || '').match(/filename="(.+)"/)?.[1] || 'focos_cusco.csv'

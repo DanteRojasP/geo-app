@@ -300,6 +300,21 @@ El estado de cada uno de los 14 errores está al final de `QA_ERIK.md`.
 - [x] 90 pruebas en verde (7 nuevas `test_qa_erik_*`).
 - [ ] Probar en un teléfono real y dibujar un área con el dedo.
 
+## Capacidad de Gabriel + panel de Dante (sáb 14 nov 2026, noche)
+
+Revisión **`firecal-00009`** (imagen `firecal-cusco:gabriel-dante-v1`).
+- [x] Rama `gabriel2` unida (AUDITORIA.md §10): datos en tablas en memoria, caché de respuestas de Cusco entero,
+      cupos por IP pensados para una sala con la misma IP y carril de pesadas con fila máxima. Revisado: la caché
+      separa idiomas (`?lang`) y gzip, tiene tope de memoria, y lo que no sale de la caché sigue pasando por los
+      límites. Comprobado en la URL: `X-Cache: HIT` y la IP falsificada se ignora.
+- [x] Dante (450cc43, 2dad4eb): relieve por defecto y panel de fondo y leyenda abajo a la derecha. Adaptado: sin
+      FRP, en inglés y español, con los colores reales de la capa y la leyenda de puntos. La línea de tiempo se
+      acomoda para no chocar con el panel.
+- [x] El error de red ("La API respondió con estado…") sale en el idioma elegido.
+- [x] Análisis preventivo con Meteomatics: el clima no anticipa el fuego
+      (`exploratorio/meteomatics/resultados/PREVENTIVO.md`).
+- [ ] Decidir la configuración de Cloud Run que sugiere Gabriel (ver `CAMBIOS_Y_RECOMENDACIONES.md`).
+
 ## Pendientes que me afectan
 
 - [x] Datos reales de FIRMS (Cusco, de Antonio).
