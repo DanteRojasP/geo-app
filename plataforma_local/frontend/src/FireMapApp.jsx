@@ -328,6 +328,7 @@ function FireMapApp() {
   const changeLang = (l) => { setLang(l); setLangState(l) }
   const markTutorialSeen = () => { try { window.localStorage?.setItem(TUTORIAL_KEY, '1') } catch { /* modo privado */ } }
   const startTutorial = () => {
+    setIntroOpen(false)
     setDetailsOpen(false); setSimpleOpen(false); setCompareOpen(false); setAmbitosOpen(false); setToolsOpen(false)
     setTutorialPrompt(false); setTutorialOpen(true)
   }
