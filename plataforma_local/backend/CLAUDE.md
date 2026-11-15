@@ -19,6 +19,12 @@
   celda-día; bbox/punto → focos por latitude/longitude. Margen de extrapolados (Antonio): 41 %/45 % por estrato.
   Fechas solo `AAAA-MM`.
 - `firecal/plan/analitica.py`: estacionalidad, ranking, acumulado, altitud, recurrencia y resumen (`graficos=1`).
+- `firecal/plan/ambitos.py`: nivel de peligro por focos de calor (formato CENEPRED) por provincia, distrito y
+  cuenca Pfafstetter (`config/ambitos/`, `scripts/build_ambitos.py`), informes HTML; rutas en `api/routers/ambitos.py`;
+  `firecal informes` los genera en lote. Peligro relativo, sin vulnerabilidad: no llamarlo de otra forma.
+- `firecal/plan/informe.py` + `api/routers/informe.py`: `GET /api/informe` (HTML imprimible) para Cusco, bbox, punto
+  o `ambito=nivel:codigo`, con `fecha_inicio`/`fecha_fin`/`mes`; solo usa datos de la plataforma e incluye método,
+  limitaciones, trazabilidad (SHA-256, llamadas a la API) y definiciones.
 - `api/routers/plan.py`: rutas `GET /api/...`; parámetros desconocidos → 422 (`KNOWN_PARAMS`).
 - `api/cache.py`: caché de respuestas completas de Cusco entero (`X-Cache: HIT`); lo repetido no gasta cupo.
 - `api/limits.py`: 600 consultas nuevas/min por IP, 60 pesadas/min, 4 pesadas a la vez (8 s de espera). Detrás de Cloud Run:

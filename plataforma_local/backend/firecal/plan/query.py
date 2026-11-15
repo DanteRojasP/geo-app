@@ -1,8 +1,8 @@
 """Consultas sobre los datos armonizados de Cusco (Parquet + DuckDB).
 
-Unidad (MAESTRO §1.2 y §12): **focos armonizados** = celdas de ~1 km con fuego por día, en escala
-equivalente a MODIS. En la API el campo es ``focos_armonizados`` (decisión del equipo): la suma
-de ``eq_hotspots`` (celda-día) o de ``eq_foco`` (focos); nunca se cuentan filas ni se suma
+Unidad (MAESTRO §1.2 y §12): **focos armonizados** = celdas de ~1 km con focos de calor por día,
+en escala equivalente a MODIS. En la API el campo es ``focos_armonizados`` (decisión del equipo):
+la suma de ``eq_hotspots`` (celda-día) o de ``eq_foco`` (focos); nunca se cuentan filas ni se suma
 ``n_modis + n_viirs``. El FRP no se usa.
 
 AOI:
@@ -50,10 +50,14 @@ def unidad() -> dict:
     return {"nombre": t(es="Focos armonizados", en="Harmonized hotspots"),
             "nombre_en": "Harmonized hotspots",
             "definicion": t(
-                es="Focos armonizados: celdas de ~1 km con fuego por día, en escala equivalente a "
-                   "MODIS. Combina MODIS (2000–2012) y VIIRS (2013 en adelante).",
-                en="Harmonized hotspots: ~1 km cells with fire per day, on a MODIS-equivalent "
-                   "scale. Combines MODIS (2000–2012) and VIIRS (2013 onwards).")}
+                es="Focos de calor armonizados: celdas de ~1 km con al menos un foco de calor por "
+                   "día, en escala equivalente a MODIS. Combina MODIS (2000–2012) y VIIRS (2013 en "
+                   "adelante). Un foco de calor es un píxel con una anomalía térmica detectada por "
+                   "el satélite: no es un incendio ni un área quemada.",
+                en="Harmonized hotspots: ~1 km cells with at least one hotspot per day, on a "
+                   "MODIS-equivalent scale. Combines MODIS (2000–2012) and VIIRS (2013 onwards). A "
+                   "hotspot is a pixel with a thermal anomaly detected by the satellite: not a "
+                   "fire or a burned area.")}
 # Error mensual de kT (MAESTRO §7) por estrato: margen de los focos extrapolados.
 ERROR_EXTRAPOLADO = {"alto": 0.41, "bajo": 0.45}
 CATEGORIA_INCIERTA = "incierta"

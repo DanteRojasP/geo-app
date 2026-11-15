@@ -210,3 +210,38 @@ El backend sintético anterior (`/api/v1`) se retiró el 14-nov: está en la ram
       ya conserva su dibujo para poder exportarlo como imagen.
 - [ ] Reducir el paquete JS de la interfaz (1,26 MB, casi todo MapLibre) con carga diferida, si hace falta.
 - [ ] `harmonizacion/sequia_fuego/n_efectivo_potencia.py` tiene el mismo problema de Windows (`≈`).
+
+## Ámbitos: nivel de peligro por focos de calor (formato CENEPRED) e informes automáticos
+
+Para tomadores de decisión según su jurisdicción (provincia, distrito) o para usos técnicos por cuenca
+(Pfafstetter, niveles 1 a 12 dentro de Cusco).
+
+- **En la app:** botón **Ámbitos** de la barra lateral: mapa pintado por nivel de peligro, lista ordenada,
+  informe imprimible por unidad (Imprimir → PDF) y tabla CSV del nivel.
+- **API:** `GET /api/ambitos`, `/api/ambitos/{nivel}`, `/api/ambitos/{nivel}.geojson`,
+  `/api/ambitos/{nivel}.csv`, `/api/ambitos/{nivel}/{codigo}` y `/api/ambitos/{nivel}/{codigo}/informe`.
+  `nivel` = `provincia`, `distrito` o `pfaf_01` … `pfaf_12`; `codigo` = ubigeo o código Pfafstetter.
+- **Informes en lote:** `firecal informes --nivel distrito --salida informes` genera un HTML por unidad, un
+  `index.html` y la tabla CSV.
+
+**Método** (`backend/firecal/plan/ambitos.py`): tres parámetros por unidad, por 100 km² dentro de Cusco y con
+los años completos 2003–2025: densidad media de focos de calor armonizados, lugares de ~1 km recurrentes
+(4 o más de los 13 años con VIIRS) y año más activo. Pesos por comparación de pares de Saaty (el proceso de
+análisis jerárquico del manual de CENEPRED): 0.54 / 0.297 / 0.163, razón de consistencia 0.008. Cada
+parámetro pasa a su percentil dentro del nivel y el índice se clasifica en muy alto (≥ 0.75), alto (≥ 0.50),
+medio (≥ 0.25) y bajo. Una unidad sin focos es "bajo"; no se clasifican las unidades con menos de 10 km²
+dentro de Cusco ni los niveles con menos de 4 unidades.
+
+**Límites:** es el **peligro relativo** dentro de Cusco; no incluye vulnerabilidad (población, viviendas,
+cobertura, servicios), así que es un insumo para la evaluación de CENEPRED y no la reemplaza. Los pesos son
+una propuesta inicial que deben validar especialistas y CENEPRED. Describe lo observado; no es un pronóstico.
+
+**Datos de los ámbitos** (`backend/config/ambitos/`, generados con `backend/scripts/build_ambitos.py`, que
+necesita `pip install pyshp`):
+- Provincias y distritos: límites de INEI vía https://github.com/juaneladio/peru-geojson (108 distritos de
+  Cusco; puede faltar alguno creado en los últimos años; el repositorio no declara licencia: verificar antes
+  de publicar). No son límites oficiales para fines legales.
+- Cuencas: HydroBASINS v1c (HydroSHEDS; Lehner y Grill, 2013), código Pfafstetter `PFAF_ID`, recortadas al
+  límite de Cusco de la serie (FAO GAUL). No son las unidades hidrográficas oficiales de la ANA.
+- Cobertura: los distritos reúnen el 98.4 % de los focos de calor armonizados de Cusco 2003–2025 (los
+  límites de INEI y de FAO GAUL no coinciden en el borde); las cuencas, el 99.3 %.

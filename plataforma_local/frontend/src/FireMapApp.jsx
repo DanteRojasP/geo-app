@@ -6,15 +6,19 @@ import { createElement, useCallback, useEffect, useMemo, useRef, useState } from
 import * as maplibregl from 'maplibre-gl'
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import {
-  ArrowLeftRight, CalendarDays, ChevronLeft, ChevronRight, Database, Download, Flame, Gauge,
+  ArrowLeftRight, CalendarDays, ChevronLeft, ChevronRight, Database, Download, FileText, Flame, Gauge, Landmark,
   Layers3, Map as MapIcon, MapPin, MessageCircleQuestion, Mountain, Pause, Play, Radio, Satellite, Scan, ShieldAlert,
   SlidersHorizontal,
   ThermometerSun, Trash2, X,
 } from 'lucide-react'
+import AmbitosPanel from './AmbitosPanel.jsx'
 import SimplePanel from './SimplePanel.jsx'
 import ComparisonWorkspace from './ComparisonWorkspace.jsx'
 import { LANGS, getLang, locale, months, setLang, tr } from './i18n.js'
-import { CUSCO, downloadCsv, getCalendar, getDepartments, getFocos, getMonth, getTiempoReal } from './services/api.js'
+import { CUSCO, downloadCsv, getCalendar, getDepartments, getFocos, getMonth, getTiempoReal, informeUrl } from './services/api.js'
+
+// Informe técnico (HTML imprimible) en una pestaña nueva (Antonio, PR #14).
+const openReport = (url) => window.open(url, '_blank', 'noopener')
 
 maplibregl.setWorkerUrl(maplibreWorkerUrl)
 
@@ -201,7 +205,7 @@ function SatelliteSelectionMap({ bounds, focos }) {
   return <div className="fw-satellite-preview"><div ref={containerRef} className="fw-satellite-map"/><span className="fw-satellite-badge"><i/>{tr('sat.badge')}</span><div className="fw-satellite-legend"><span><i className="heat"/>{tr('sat.density')}</span><span><i className="point"/>{tr('sat.point')}</span></div></div>
 }
 
-function CalendarPanel({ calendar, mode, setMode, selected, onSelect, onClose }) {
+function CalendarPanel({ calendar, mode, setMode, selected, onSelect, onClose, reportUrl }) {
   const byKey = useMemo(() => new Map((calendar?.celdas || []).map((c) => [`${c.anio}-${c.mes}`, c])), [calendar])
   if (!calendar) return null
   const MESES = months()
@@ -214,6 +218,7 @@ function CalendarPanel({ calendar, mode, setMode, selected, onSelect, onClose })
         <div className="fc-toggle">
           <button className={mode === 'valor' ? 'is-active' : ''} onClick={() => setMode('valor')}>{tr('cal.hotspots')}</button>
           <button className={mode === 'anomalia' ? 'is-active' : ''} onClick={() => setMode('anomalia')}>{tr('cal.anomaly')}</button>
+          {reportUrl && <button onClick={() => openReport(reportUrl)} title={tr('report.tip')} aria-label={tr('report.tip')}><FileText size={14}/> {tr('report.short')}</button>}
           <button onClick={onClose} title={tr('cal.close')}><X size={15}/></button>
         </div>
       </div>
@@ -302,6 +307,7 @@ function FireMapApp() {
   const liveRef = useRef(EMPTY)
   const [simpleOpen, setSimpleOpen] = useState(false)
   const [compareOpen, setCompareOpen] = useState(false)
+  const [ambitosOpen, setAmbitosOpen] = useState(false)
   const [detailsOpen, setDetailsOpen] = useState(true)
   const [layersOpen, setLayersOpen] = useState(false)
   const [toolsOpen, setToolsOpen] = useState(false)
@@ -320,6 +326,9 @@ function FireMapApp() {
       : { inicio: ym(selected.year, selected.year === FIRST_YEAR ? 11 : 1), fin: ym(selected.year, 12), label: tr('period.year', { y: selected.year }) }
   }, [selected, lang, customPeriod]) // eslint-disable-line react-hooks/exhaustive-deps
   const aoi = { departamento: selectedRegionCode }
+  // Informe técnico: toda la serie; con un mes elegido, ese mes en detalle; con el filtro, ese rango.
+  const reportExtra = customPeriod ? { fecha_inicio: periodo.inicio, fecha_fin: periodo.fin }
+    : selected.month ? { mes: periodo.inicio } : {}
   const yearCells = useMemo(() => (calendar?.celdas || []).filter((c) => c.anio === selected.year), [calendar, selected.year])
   const yearTotal = useMemo(() => yearCells.reduce((s, c) => s + (c.focos_armonizados || 0), 0), [yearCells])
   const yearMax = useMemo(() => Math.max(1, ...yearCells.map((c) => c.focos_armonizados || 0)), [yearCells])
@@ -732,9 +741,10 @@ function FireMapApp() {
           </>
         })()}
       </aside>}
-      <button className={`fc-data-launcher ${detailsOpen ? 'is-active' : ''}`} aria-label={tr('data.open')} aria-expanded={detailsOpen} onClick={() => { setSimpleOpen(false); setCompareOpen(false); setDetailsOpen((v) => !v) }}><Database size={19}/><span>{tr('data.label')}</span></button>
-      <button className={`fc-data-launcher fc-simple-launcher ${simpleOpen ? 'is-active' : ''}`} aria-label={tr('rail.simpleTitle')} aria-expanded={simpleOpen} onClick={() => { setDetailsOpen(false); setCompareOpen(false); setSimpleOpen((v) => !v) }}><MessageCircleQuestion size={19}/><span>{tr('rail.simple')}</span></button>
-      <button className={`fc-data-launcher fc-compare-launcher ${compareOpen ? 'is-active' : ''}`} aria-label={tr('compare.open')} aria-expanded={compareOpen} onClick={() => { setDetailsOpen(false); setSimpleOpen(false); setCompareOpen((v) => !v) }}><ArrowLeftRight size={19}/><span>{tr('compare.button')}</span></button>
+      <button className={`fc-data-launcher ${detailsOpen ? 'is-active' : ''}`} aria-label={tr('data.open')} aria-expanded={detailsOpen} onClick={() => { setAmbitosOpen(false); setSimpleOpen(false); setCompareOpen(false); setDetailsOpen((v) => !v) }}><Database size={19}/><span>{tr('data.label')}</span></button>
+      <button className={`fc-data-launcher fc-simple-launcher ${simpleOpen ? 'is-active' : ''}`} aria-label={tr('rail.simpleTitle')} aria-expanded={simpleOpen} onClick={() => { setAmbitosOpen(false); setDetailsOpen(false); setCompareOpen(false); setSimpleOpen((v) => !v) }}><MessageCircleQuestion size={19}/><span>{tr('rail.simple')}</span></button>
+      <button className={`fc-data-launcher fc-compare-launcher ${compareOpen ? 'is-active' : ''}`} aria-label={tr('compare.open')} aria-expanded={compareOpen} onClick={() => { setAmbitosOpen(false); setDetailsOpen(false); setSimpleOpen(false); setCompareOpen((v) => !v) }}><ArrowLeftRight size={19}/><span>{tr('compare.button')}</span></button>
+      <button className={`fc-data-launcher fc-ambitos-launcher ${ambitosOpen ? 'is-active' : ''}`} aria-label={tr('rail.ambitosTitle')} title={tr('rail.ambitosTitle')} aria-expanded={ambitosOpen} onClick={() => { setDetailsOpen(false); setSimpleOpen(false); setCompareOpen(false); clearSelection(); setAmbitosOpen((v) => !v) }}><Landmark size={19}/><span>{tr('rail.ambitos')}</span></button>
       <div className="fc-map-menu">
         <div className="fc-lang" role="group" aria-label={tr('lang.title')}>{LANGS.map((l) => <button key={l} className={l === lang ? 'is-active' : ''} aria-pressed={l === lang} onClick={() => changeLang(l)}>{l.toUpperCase()}</button>)}</div>
         <button className={`fc-menu-toggle ${toolsOpen ? 'is-open' : ''}`} aria-label={tr('rail.label')} aria-expanded={toolsOpen} onClick={() => setToolsOpen((v) => !v)}><Layers3 size={21}/></button>
@@ -768,7 +778,7 @@ function FireMapApp() {
         </div>
         {!customPeriod && selected.month && month?.incertidumbre > 0 && <p className="fc-margin">{tr('summary.margin', { a: fmt(month.rango[0], 1), b: fmt(month.rango[1], 1) })}</p>}
         <div className="fw-sensor-row"><span><i className="modis"/>MODIS · 1 km</span><span><i className="viirs"/>VIIRS · 375 m</span></div>
-        <div className="fw-summary-actions"><button onClick={() => setCalendarOpen(true)}><CalendarDays size={16}/>{tr('rail.calendar')}</button><button onClick={() => runDownload(aoi, selectedRegion.name)}><Download size={16}/>CSV</button></div>
+        <div className="fw-summary-actions"><button onClick={() => setCalendarOpen(true)}><CalendarDays size={16}/>{tr('rail.calendar')}</button><button onClick={() => runDownload(aoi, selectedRegion.name)}><Download size={16}/>CSV</button><button onClick={() => openReport(informeUrl(aoi, reportExtra))} title={tr('report.tip')}><FileText size={16}/>{tr('report.short')}</button></div>
         {notice && <p className="fc-notice">{notice}</p>}
       </aside>}
       {layersOpen && !selectionBounds && <aside className="fw-layers">
@@ -802,11 +812,12 @@ function FireMapApp() {
           <article><span>{tr('sel.boxArea')}</span><b>{selectionArea >= 1000 ? tr('sel.thousandKm2', { v: fmt(selectionArea / 1000, 1) }) : `${fmt(selectionArea)} km²`}</b></article>
           <article><span>{tr('sel.monthAnomaly')}</span><b>{selected.month && selection?.calendar ? (selection.calendar.celdas[0]?.categoria ? catLabel(selection.calendar.celdas[0].categoria) : '–') : tr('sel.pickMonth')}</b></article>
         </div>}
-        <div className="fw-selection-actions"><button onClick={toggleSelectionMode}><Scan size={15}/>{tr('sel.redraw')}</button><button onClick={() => selection?.bbox && runDownload(selection.bbox, tr('csv.area'))} disabled={!selection?.calendar}><Download size={15}/>CSV</button></div>
+        <div className="fw-selection-actions"><button onClick={toggleSelectionMode}><Scan size={15}/>{tr('sel.redraw')}</button><button onClick={() => selection?.bbox && runDownload(selection.bbox, tr('csv.area'))} disabled={!selection?.calendar}><Download size={15}/>CSV</button><button onClick={() => selection?.bbox && openReport(informeUrl(selection.bbox, reportExtra))} disabled={!selection?.calendar} title={tr('report.tip')}><FileText size={15}/>{tr('report.short')}</button></div>
       </aside>}
       {simpleOpen && <SimplePanel key={lang} aoi={selection?.bbox || aoi} etiqueta={selection?.bbox ? 'area' : 'cusco'} onClose={() => setSimpleOpen(false)}/>}
+      {ambitosOpen && !liveOn && <AmbitosPanel key={lang} map={mapRef.current} onClose={() => setAmbitosOpen(false)}/>}
       {compareOpen && <ComparisonWorkspace key={lang} calendar={calendar} region={region} regionName={selectedRegion.name} onClose={() => setCompareOpen(false)}/>}
-      {calendarOpen && <CalendarPanel calendar={calendar} mode={calendarMode} setMode={setCalendarMode} selected={selected} onSelect={selectMonth} onClose={() => setCalendarOpen(false)}/>}
+      {calendarOpen && <CalendarPanel calendar={calendar} mode={calendarMode} setMode={setCalendarMode} selected={selected} onSelect={selectMonth} onClose={() => setCalendarOpen(false)} reportUrl={informeUrl(aoi, reportExtra)}/>}
       <section className="fw-timeline fc-timeline">
         <button className="fw-play" onClick={() => { setCustomPeriod(null); setPlaying((v) => !v) }} title={playing ? tr('timeline.pause') : tr('timeline.play')}>{playing ? <Pause size={19}/> : <Play size={19}/>}</button>
         <div className="fw-timeline-panel" style={{ '--progress': `${selected.month ? ((selected.month - 1) / 11) * 100 : 100}%` }}>
