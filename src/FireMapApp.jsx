@@ -653,7 +653,7 @@ function FireMapApp() {
   return (
     <div className="fw-app">
       <div ref={mapContainerRef} className="fw-map" aria-label={tr('map.aria')} />
-      {introOpen && <IntroScreen key={lang} lang={lang} mapReady={Boolean(region && !loading)} onLanguage={changeLang} onEnter={() => setIntroOpen(false)}/>} 
+      {introOpen && <IntroScreen key={lang} lang={lang} mapReady={Boolean(region && !loading)} onLanguage={changeLang} onEnter={() => setIntroOpen(false)}/>}
       <div className="fw-nubel-brand" aria-label="Nubel Team · FireCal Cusco"><img src="./nubel-team-logo.png" alt="Nubel Team"/></div>
       <button className={`fc-data-launcher ${detailsOpen ? 'is-active' : ''}`} aria-label={tr('data.open')} aria-expanded={detailsOpen} onClick={() => { setSimpleOpen(false); setCompareOpen(false); setDetailsOpen((v) => !v) }}><Database size={19}/><span>{tr('data.label')}</span></button>
       <button className={`fc-data-launcher fc-simple-launcher ${simpleOpen ? 'is-active' : ''}`} aria-label={tr('rail.simpleTitle')} aria-expanded={simpleOpen} onClick={() => { setDetailsOpen(false); setCompareOpen(false); setSimpleOpen((v) => !v) }}><MessageCircleQuestion size={19}/><span>{tr('rail.simple')}</span></button>
