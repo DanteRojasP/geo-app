@@ -741,7 +741,7 @@ function FireMapApp() {
   return (
     <div className={`fw-app ${liveOn ? 'is-live' : ''}`}>
       <div ref={mapContainerRef} className="fw-map" aria-label={tr('map.aria')} />
-      {introOpen && <IntroScreen key={lang} lang={lang} mapReady={Boolean(region && !loading)} onLanguage={changeLang} onEnter={finishIntro}/>}
+      {introOpen && <IntroScreen key={lang} lang={lang} onLanguage={changeLang} onEnter={finishIntro}/>}
       <div className="fw-nubel-brand" aria-label="Nubel Team · FireCal Cusco"><img src="./nubel-team-logo.png" alt="Nubel Team"/></div>
       <div className="fc-mode" role="group" aria-label={tr('mode.label')}>
         <button className={!liveOn ? 'is-active' : ''} aria-pressed={!liveOn} title={tr('mode.historic')} onClick={goHistoric}><CalendarDays size={14}/><span>{tr('mode.historic')}</span></button>
