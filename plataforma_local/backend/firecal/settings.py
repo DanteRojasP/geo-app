@@ -144,15 +144,27 @@ class RateLimitParams(_Strict):
     """Protocolo de solicitudes (api.limits): cubeta de fichas por cliente + semáforo de pesadas."""
 
     enabled: bool = True
-    requests_per_minute: float = Field(default=120, gt=0)   # recarga de la cubeta general
-    burst: int = Field(default=40, gt=0)                     # tamaño de la cubeta general
-    heavy_per_minute: float = Field(default=10, gt=0)       # CSV y consultas costosas
-    heavy_burst: int = Field(default=5, gt=0)
-    max_concurrent_heavy: int = Field(default=2, gt=0)      # pesadas en paralelo (todo el proceso)
-    queue_timeout_s: float = Field(default=2.0, ge=0)       # espera máxima por un turno
+    # Los cupos son por IP y una sala entera (wifi, oficina) sale por la misma IP pública: están
+    # pensados para ~60 personas detrás de una IP. Las respuestas servidas desde la caché
+    # (api.cache) no gastan cupo; solo cuenta lo que hay que calcular.
+    requests_per_minute: float = Field(default=600, gt=0)   # recarga de la cubeta general
+    burst: int = Field(default=120, gt=0)                    # tamaño de la cubeta general
+    heavy_per_minute: float = Field(default=60, gt=0)       # CSV y consultas costosas
+    heavy_burst: int = Field(default=20, gt=0)
+    max_concurrent_heavy: int = Field(default=4, gt=0)      # pesadas en paralelo (todo el proceso)
+    queue_timeout_s: float = Field(default=8.0, ge=0)       # espera máxima por un turno
+    max_queue: int = Field(default=16, ge=0)                # pesadas en espera; más -> 503 ya
     trust_proxy_headers: bool = False                       # X-Forwarded-For (solo tras proxy)
     proxy_hops: int = Field(default=1, ge=1)                # proxies de confianza delante
     max_clients: int = Field(default=10000, gt=0)           # clientes recordados en memoria
+
+
+class ResponseCacheParams(_Strict):
+    """Caché de respuestas completas de Cusco entero (api.cache)."""
+
+    enabled: bool = True
+    max_items: int = Field(default=3000, gt=0)              # ~1.300 respuestas distintas x idioma
+    max_mb: float = Field(default=64, gt=0)                 # memoria máxima (ya comprimidas)
 
 
 class ApiParams(_Strict):
@@ -166,6 +178,7 @@ class ApiParams(_Strict):
     max_csv_rows: int = Field(default=200000, gt=0)         # filas máximas por descarga CSV
     default_lang: str = Field(default="en", pattern="^(en|es)$")  # idioma si no llega ?lang=
     rate_limit: RateLimitParams = RateLimitParams()
+    response_cache: ResponseCacheParams = ResponseCacheParams()
 
 
 class SynthLandscape(_Strict):

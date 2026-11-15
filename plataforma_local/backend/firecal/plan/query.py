@@ -199,7 +199,8 @@ def color_breaks(values: list[float]) -> list[float]:
 
 
 class PlanStore:
-    """Lectura del Parquet de Cusco: una conexión DuckDB en memoria y un cursor por consulta."""
+    """Datos de Cusco en tablas de DuckDB en memoria (cargadas del Parquet) y un cursor por
+    consulta."""
 
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
@@ -217,6 +218,14 @@ class PlanStore:
     def ready(self) -> bool:
         return meta_path(self.settings).is_file()
 
+    def data_version(self) -> float | None:
+        """Marca de los datos cargados en disco (fecha de ``plan_meta.json``); ``None`` si no hay.
+        La usa la caché de respuestas (api.cache) para no repetir respuestas de datos viejos."""
+        try:
+            return meta_path(self.settings).stat().st_mtime
+        except OSError:
+            return None
+
     def _ensure(self) -> duckdb.DuckDBPyConnection:
         if not self.ready:
             raise PlanNotReady(t(es="Aún no se cargaron los datos de Cusco. Corre: "
@@ -229,9 +238,12 @@ class PlanStore:
                     self._con.close()
                 con = duckdb.connect()
                 base = plan_dir(self.settings)
+                # TABLAS en memoria, no vistas: una vista reabre los ~560 archivos Parquet en cada
+                # consulta (~630 de los ~790 ms de focos.geojson de un año). Son ~95.000 filas:
+                # cargarlas cuesta ~1,6 s una sola vez y ~20 MB (prueba de carga del 14-nov).
                 for name, sub in (("cd", "celda_dia"), ("fo", "focos")):
                     glob = (base / sub / "**" / "*.parquet").as_posix()
-                    con.execute(f"CREATE VIEW {name} AS SELECT * FROM read_parquet('{glob}', "
+                    con.execute(f"CREATE TABLE {name} AS SELECT * FROM read_parquet('{glob}', "
                                 "hive_partitioning = true)")
                 self._con, self._stamp = con, stamp
                 self._monthly_cache.clear()

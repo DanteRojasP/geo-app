@@ -86,6 +86,28 @@ def test_heavy_gate_rejects_after_timeout():
     assert gate.stats()["rechazadas_503"] == 1
 
 
+def test_heavy_gate_rejects_at_once_when_queue_is_full():
+    """Con la fila llena el 503 es inmediato: las pesadas en espera no agotan los hilos."""
+    from fastapi import HTTPException
+
+    gate = HeavyGate(max_concurrent=1, timeout_s=5, max_queue=1)
+    gate.acquire()                                   # turno ocupado
+    waiter = threading.Thread(target=lambda: (gate.acquire(), gate.release()))
+    waiter.start()
+    for _ in range(100):                             # espera a que el hilo entre en la fila
+        if gate.stats()["pesadas_en_espera"] == 1:
+            break
+        time.sleep(0.01)
+    t0 = time.perf_counter()
+    with pytest.raises(HTTPException) as exc:
+        gate.acquire()                               # fila llena: no espera los 5 s
+    assert exc.value.status_code == 503 and time.perf_counter() - t0 < 1
+    gate.release()
+    waiter.join()
+    assert gate.stats() == {"pesadas_activas": 0, "pesadas_en_espera": 0, "max_pesadas": 1,
+                            "rechazadas_503": 1}
+
+
 def test_single_flight_computes_once():
     sf, cache, calls, lock = SingleFlight(), {}, [0], threading.Lock()
 
@@ -109,7 +131,10 @@ def test_single_flight_computes_once():
 
 # ------------------------------------------------------------------ integración con la API
 def _settings_with_limits(base: Settings, **overrides) -> Settings:
+    """Límites activos y caché de respuestas apagada: aquí se prueba el límite solo (con la caché,
+    una consulta repetida no gasta cupo; eso se prueba en test_cache.py)."""
     raw = base.params.model_dump()
+    raw["api"]["response_cache"]["enabled"] = False
     raw["api"]["rate_limit"].update({"enabled": True, **overrides})
     return Settings(env=base.env, params=ScientificParams.model_validate(raw), paths=base.paths)
 
@@ -171,6 +196,36 @@ def test_api_gate_returns_503_when_busy(plan_home):
                                              "fecha_inicio": "2020-01", "fecha_fin": "2020-01"})
     assert r.status_code == 200
     assert app.state.gate.stats()["pesadas_activas"] == 0   # el turno se liberó al terminar el CSV
+
+
+def test_csv_releases_turn_before_sending(plan_home):
+    """El turno cubre la consulta, no el envío: una descarga lenta no retiene el carril."""
+    import asyncio
+
+    s = _settings_with_limits(plan_home.settings, max_concurrent_heavy=1, queue_timeout_s=0.05)
+    app = create_app(s)
+    activas_al_enviar, filas, first = [], [0], [True]
+
+    async def receive():
+        if first[0]:
+            first[0] = False
+            return {"type": "http.request", "body": b"", "more_body": False}
+        await asyncio.Event().wait()                 # el cliente sigue conectado
+
+    async def send(message):
+        if message["type"] == "http.response.body" and message.get("body"):
+            # Mientras el CSV todavía se está enviando, ¿sigue ocupado el turno?
+            activas_al_enviar.append(app.state.gate.stats()["pesadas_activas"])
+            filas[0] += message["body"].count(b"\n")
+
+    scope = {"type": "http", "asgi": {"version": "3.0"}, "http_version": "1.1", "method": "GET",
+             "scheme": "http", "path": "/api/hotspots.csv", "raw_path": b"/api/hotspots.csv",
+             "root_path": "", "headers": [], "client": ("127.0.0.1", 50000),
+             "server": ("testserver", 80),
+             "query_string": b"departamento=PE-CUS&fecha_inicio=2020-01&fecha_fin=2020-12"}
+    asyncio.run(app(scope, receive, send))
+    assert filas[0] - 1 == 7295                      # cabecera + los focos de 2020
+    assert activas_al_enviar and set(activas_al_enviar) == {0}
 
 
 def test_csv_row_cap(plan_home):

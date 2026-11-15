@@ -109,10 +109,11 @@ Parámetros: `config/settings.yaml → api.rate_limit` y `api.max_csv_rows`.
 
 | Barrera | Primitiva | Qué hace | Respuesta |
 | --- | --- | --- | --- |
-| Cubeta general por cliente | `threading.Lock` + diccionario de cubetas | 40 solicitudes de golpe y luego 120/min por IP en `/api/*` (`/health` y la web no cuentan) | **429** + `Retry-After` |
-| Cubeta de pesadas por cliente | ídem | CSV, celdas H3 y AOI dibujados: 5 de golpe y luego 10/min | **429** + `Retry-After` |
-| Turnos de pesadas (todo el proceso) | `threading.BoundedSemaphore(2)` | Como mucho 2 pesadas a la vez; las demás esperan 2 s su turno. En el CSV el turno se libera al terminar de enviarlo (o si el cliente corta) | **503** + `Retry-After` |
+| Cubeta general por cliente | `threading.Lock` + diccionario de cubetas | 120 consultas nuevas de golpe y luego 600/min por IP en `/api/*` (`/health`, la web y las respuestas servidas desde la caché no cuentan) | **429** + `Retry-After` |
+| Cubeta de pesadas por cliente | ídem | CSV y AOI dibujados: 20 de golpe y luego 60/min | **429** + `Retry-After` |
+| Turnos de pesadas (todo el proceso) | `threading.BoundedSemaphore(4)` | Como mucho 4 pesadas a la vez; las demás esperan hasta 8 s su turno (con más de 16 en espera, 503 inmediato). En el CSV el turno cubre la consulta y se libera antes de enviarlo | **503** + `Retry-After` |
 | Candado por clave | un `threading.Lock` por AOI (`SingleFlight`) | N solicitudes iguales sin caché: calcula una y las demás reutilizan | — |
+| Caché de respuestas | `api/cache.py` (un `asyncio.Lock` por consulta) | Consultas de Cusco entero: se calculan una vez y se repiten a los demás (`X-Cache: HIT`); 60 iguales a la vez = 1 cálculo | — |
 | Tope de filas | conteo previo en DuckDB | CSV de más de 200 000 filas | **422** con el motivo |
 
 - Estado en vivo: `GET /health/limits` (clientes, rechazos 429/503, pesadas en curso).
