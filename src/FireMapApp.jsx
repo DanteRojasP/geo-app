@@ -654,7 +654,7 @@ function FireMapApp() {
         <LayerButton active={activeLayer === 'points'} icon={MapPin} label={tr('layers.points')} tone="points" onClick={() => setActiveLayer('points')}/>
         <LayerButton active={showBoundary} icon={Layers3} label={tr('layers.boundary')} tone="boundary" onClick={() => setShowBoundary((v) => !v)}/>
       </aside>}
-      {!selectionBounds && <aside className="fw-display-dock" aria-label={tr('basemap.dock')}>
+      <aside className="fw-display-dock" aria-label={tr('basemap.dock')}>
         <div className="fw-display-modes" role="group" aria-label={tr('basemap.title')}>
           <button className={baseMap === 'standard' ? 'is-active' : ''} aria-pressed={baseMap === 'standard'} title={tr('basemap.standard')} onClick={() => setBaseMap('standard')}><MapIcon size={14}/><span>{tr('basemap.standard')}</span></button>
           <button className={baseMap === 'relief' ? 'is-active' : ''} aria-pressed={baseMap === 'relief'} title={tr('basemap.relief')} onClick={() => setBaseMap('relief')}><Mountain size={14}/><span>{tr('basemap.relief')}</span></button>
@@ -662,7 +662,7 @@ function FireMapApp() {
         {activeLayer === 'points'
           ? <div className="fw-heat-legend fc-dock-points"><header><span>{tr('layers.pointsLegend')}</span></header><p><i className="modis"/>MODIS</p><p><i className="viirs"/>VIIRS</p><p><i className="outside"/>{tr('layers.outside')}</p></div>
           : <div className="fw-heat-legend"><header><span>{tr('layers.scaleDensity')}</span></header><i/><div><span>{tr('scale.low')}</span><span>{tr('scale.mid')}</span><span>{tr('scale.high')}</span></div></div>}
-      </aside>}
+      </aside>
       <div className="fw-map-meta"><button onClick={focusRegion}><MapPin size={13}/>{selectedRegion.name}</button><span><Satellite size={13}/>MODIS + VIIRS</span><span><CalendarDays size={13}/>{periodo.label}</span></div>
       {selectionMode && <div className="fw-draw-hint"><Scan size={20}/><div><b>{tr('draw.title')}</b><span>{tr('draw.hint')}</span></div><button onClick={() => setSelectionMode(false)} title={tr('btn.cancel')}><X size={16}/></button></div>}
       {selectionBounds && !simpleOpen && <aside className="fw-selection-card">
