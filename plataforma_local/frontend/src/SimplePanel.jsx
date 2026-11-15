@@ -65,7 +65,6 @@ function SimplePanel({ aoi, etiqueta, onClose }) {
         {error && <p className="fs-error">{error}</p>}
         {resumen && <dl className="fs-frases">{resumen.frases.map((f) => <div key={f.pregunta}><dt>{f.pregunta}</dt><dd>{f.respuesta}</dd></div>)}</dl>}
         {graficos && <div className="fs-charts">{GRAFICOS.map(([tipo, slug], i) => <Grafico key={tipo} tipo={tipo} slug={slug} datos={graficos[i]} etiqueta={etiqueta} anios={anios} onAnio={cambiarAnio}/>)}</div>}
-        {resumen && resumen.notes.map((n) => <p key={n} className="fs-how">{n}</p>)}
       </div>
     </aside>
   )

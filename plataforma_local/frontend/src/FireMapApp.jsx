@@ -727,7 +727,6 @@ function FireMapApp() {
             <h3>{m.detecciones === 1 ? tr('liveLayer.count1') : tr('liveLayer.count', { n: fmt(m.detecciones) })}</h3>
             <p className="fc-live-msg">{m.ultima_deteccion_local ? tr('liveLayer.last', { t: m.ultima_deteccion_local }) : tr('liveLayer.none')}</p>
             {m.desactualizado && <p className="fc-live-msg is-error">{tr('liveLayer.stale')}</p>}
-            <ul>{m.notes.slice(0, 2).map((n) => <li key={n}>{n}</li>)}</ul>
             <small>{tr('liveLayer.updated', { t: upd })} · {m.fuentes.join(', ')}</small>
             <button className="fc-live-back" onClick={goHistoric}><CalendarDays size={14}/>{tr('mode.backHistoric')}</button>
           </>

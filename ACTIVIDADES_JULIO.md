@@ -372,6 +372,15 @@ Revisión **`firecal-00020`** (imagen `firecal-cusco:v13-dante`).
 - [ ] Reemplaza decisiones de interfaz anteriores (Info cerrado al inicio, barra izquierda de 5 botones, Layers a la
       derecha). Revisar con el equipo si alguna se mantiene.
 
+## Sin avisos en los paneles y Meteomatics por zonas (dom 15 nov 2026)
+
+Revisión **`firecal-00021`**.
+- [x] La web ya no muestra los avisos de los paneles (decisión de Julio): las notas de "En simple" ("no es un
+      pronóstico…", "2025: el valor es el que registró VIIRS…"), las del panel En vivo ("sin armonizar…") y la nota de
+      alcance de la comparación. **La API las sigue entregando** (`notes`) para quien la consulte directamente.
+- [x] Meteomatics en 99 zonas agrupadas con DEM: `exploratorio/meteomatics/resultados/ZONAS_CLUSTERS.md`.
+- [ ] MAESTRO P2 pide que 2025 lleve su nota en pantalla: confirmar con el equipo que se acepta quitarla.
+
 ## Pendientes que me afectan
 
 - [x] Datos reales de FIRMS (Cusco, de Antonio).
