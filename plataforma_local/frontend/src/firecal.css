@@ -168,5 +168,22 @@ button:focus-visible,select:focus-visible{outline:2px solid #197bb5;outline-offs
 @media(min-width:951px){.fw-selection-card{top:76px;bottom:220px}}
 @media(max-width:950px){.fw-selection-card{top:122px;bottom:112px}.fs-panel{top:122px}.fc-calendar{top:auto;max-height:calc(100dvh - 240px)}}
 @media(min-width:951px){.fc-calendar{bottom:230px}.fs-panel{right:96px;bottom:230px}}
-@media(max-width:950px){.fw-app.has-panel .fw-display-dock,.fw-app.has-panel .fw-layers{display:none}.fc-calendar,.fs-panel{bottom:118px}}
+@media(max-width:950px){.fc-calendar,.fs-panel{bottom:118px}}
 @media(min-width:951px){.fc-calendar{top:76px;bottom:230px;left:96px;right:96px;max-height:none}}
+
+/* Columna derecha: "Layers" despliega densidad, puntos y contorno. La tarjeta del área deja libre
+   esa columna; en el celular la columna empieza debajo de la barra lateral horizontal. */
+.fc-layers-toggle>span{background:#197eb7!important;color:#fff!important}
+@media(min-width:951px){.fw-selection-card{right:72px}}
+@media(max-width:950px){.fw-layers{top:124px}}
+/* El panel de abajo (fondo + leyenda) se ve siempre: en el celular los paneles terminan encima de él y
+   dejan libre la columna de capas; el aviso de dibujo va debajo de las barras. */
+@media(min-width:951px){.fw-draw-hint{top:76px}}
+@media(max-width:950px){
+  .fw-draw-hint{top:124px}
+  .fw-summary{right:56px;max-height:calc(100dvh - 350px)}
+  .fc-calendar{right:56px;bottom:216px;max-height:calc(100dvh - 350px)}
+  .fs-panel{right:56px;bottom:216px}
+  .fw-selection-card{right:56px;bottom:216px}
+}
+@media(max-width:950px){.fw-draw-hint{right:56px}}

@@ -346,6 +346,18 @@ Revisión **`firecal-00016`**.
 - [x] Sin superposiciones: auditoría automática en la URL pública (7 pasos × 3 anchos: 1440, 1100 y celular) sin
       ningún choque entre paneles, barra lateral, barra superior, selector de modo, línea de tiempo, fondo y capas.
 
+## Barra lateral y capas (dom 15 nov 2026)
+
+Revisión **`firecal-00019`**.
+- [x] Sin botón "Live" en la barra izquierda: el modo se cambia con el selector "Serie histórica | En vivo".
+- [x] "En simple" sin botón de cerrar: se sale eligiendo otra opción de la barra.
+- [x] "Layers" pasa a la columna derecha: un botón que despliega densidad, puntos y contorno. El fondo y la leyenda
+      de abajo se ven siempre (también en el celular).
+- [x] Un solo botón resaltado en la barra izquierda (antes "Hotspots" quedaba marcado junto con Calendario o En
+      simple). "Hotspots" vuelve a la vista de todo Cusco: cierra los paneles y el área dibujada.
+- [x] Prueba automática en la URL (9 pasos en 1440, 1100 y celular): siempre un solo botón activo y ninguna
+      superposición.
+
 ## Pendientes que me afectan
 
 - [x] Datos reales de FIRMS (Cusco, de Antonio).

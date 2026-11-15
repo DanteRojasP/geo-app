@@ -7,8 +7,8 @@ import * as maplibregl from 'maplibre-gl'
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import {
   CalendarDays, ChevronLeft, ChevronRight, CircleHelp, Download, Flame, Gauge, Info,
-  Layers3, Map as MapIcon, MapPin, MessageCircleQuestion, Mountain, Pause, Play, Radio, Satellite, Scan, ShieldAlert,
-  SlidersHorizontal,
+  Hexagon, Layers3, Map as MapIcon, MapPin, MessageCircleQuestion, Mountain, Pause, Play, Radio, Satellite, Scan, ShieldAlert,
+
   ThermometerSun, Trash2, X,
 } from 'lucide-react'
 import SimplePanel from './SimplePanel.jsx'
@@ -297,10 +297,9 @@ function FireMapApp() {
   const liveRef = useRef(EMPTY)
   const yearsRef = useRef(null)
   const simpleOpen = panel === 'simple'
-  const setSimpleOpen = panelSetter('simple')
   const detailsOpen = panel === 'info'
   const setDetailsOpen = panelSetter('info')
-  const [layersOpen, setLayersOpen] = useState(true)
+  const [layersOpen, setLayersOpen] = useState(false)    // columna derecha: se despliega con "Layers"
   const [selectionMode, setSelectionMode] = useState(false)
   const [selectionBounds, setSelectionBounds] = useState(null)
   const [selection, setSelection] = useState(null)
@@ -640,6 +639,10 @@ function FireMapApp() {
   // Cambiar de modo: el área dibujada y lo abierto del histórico se conservan para cuando se vuelva.
   const goLive = () => { setPlaying(false); setSelectionMode(false); setLiveOn(true) }
   const goHistoric = () => setLiveOn(false)
+  // Un solo botón resaltado en la barra izquierda (antes "Hotspots" quedaba marcado junto con otro).
+  const railActive = liveOn ? null
+    : selectionMode ? 'area'
+      : panel ?? (selectionBounds ? 'area' : 'hotspots')
   const focusCusco = (pad) => { if (mapReadyRef.current && region) fitTo(mapRef.current, boundsOf(region), pad) }
 
   const runDownload = async (aoiParams, label) => {
@@ -676,13 +679,11 @@ function FireMapApp() {
         <button className={liveOn ? 'is-active live' : ''} aria-pressed={liveOn} onClick={goLive}><Radio size={14}/>{tr('mode.live')}</button>
       </div>
       <nav className="fw-rail" aria-label={tr('rail.label')}>
-        <button className={!liveOn ? 'is-active' : ''} title={tr('rail.hotspotsTitle')} onClick={() => { goHistoric(); focusCusco(); setActiveLayer('surface') }}><Flame size={20}/><span>{tr('rail.hotspots')}</span></button>
-        <button className={liveOn ? 'is-active live' : ''} title={tr('rail.liveTitle')} aria-pressed={liveOn} onClick={() => (liveOn ? goHistoric() : goLive())}><Radio size={20}/><span>{tr('rail.live')}</span></button>
-        <button className={calendarOpen && !liveOn ? 'is-active' : ''} title={tr('rail.calendar')} onClick={() => { if (liveOn) { goHistoric(); setCalendarOpen(true) } else setCalendarOpen((v) => !v) }}><CalendarDays size={20}/><span>{tr('rail.calendar')}</span></button>
-        <button className={selectionMode && !liveOn ? 'is-active select' : ''} title={tr('rail.areaTitle')} onClick={() => { goHistoric(); if (!selectionMode) { setPanel(null); focusCusco({ bottom: 40 }) } toggleSelectionMode() }}><Scan size={20}/><span>{tr('rail.area')}</span></button>
-        <button className={simpleOpen && !liveOn ? 'is-active' : ''} title={tr('rail.simpleTitle')} onClick={() => { if (liveOn) { goHistoric(); setSimpleOpen(true) } else setSimpleOpen((v) => !v) }}><MessageCircleQuestion size={20}/><span>{tr('rail.simple')}</span></button>
-        <button title={tr('rail.layers')} onClick={() => setLayersOpen((v) => !v)}><Layers3 size={20}/><span>{tr('rail.layers')}</span></button>
-        <button title={tr('rail.infoTitle')} onClick={() => setDetailsOpen((v) => !v)}><Info size={20}/><span>{tr('rail.info')}</span></button>
+        <button className={railActive === 'hotspots' ? 'is-active' : ''} aria-pressed={railActive === 'hotspots'} title={tr('rail.hotspotsTitle')} onClick={() => { goHistoric(); setPanel(null); clearSelection(); focusCusco(); setActiveLayer('surface') }}><Flame size={20}/><span>{tr('rail.hotspots')}</span></button>
+        <button className={railActive === 'calendar' ? 'is-active' : ''} aria-pressed={railActive === 'calendar'} title={tr('rail.calendar')} onClick={() => { goHistoric(); setSelectionMode(false); setPanel((p) => (p === 'calendar' && !liveOn ? null : 'calendar')) }}><CalendarDays size={20}/><span>{tr('rail.calendar')}</span></button>
+        <button className={railActive === 'area' ? 'is-active select' : ''} aria-pressed={railActive === 'area'} title={tr('rail.areaTitle')} onClick={() => { goHistoric(); if (!selectionMode) { setPanel(null); focusCusco({ bottom: 40 }) } toggleSelectionMode() }}><Scan size={20}/><span>{tr('rail.area')}</span></button>
+        <button className={railActive === 'simple' ? 'is-active' : ''} aria-pressed={railActive === 'simple'} title={tr('rail.simpleTitle')} onClick={() => { goHistoric(); setSelectionMode(false); setPanel('simple') }}><MessageCircleQuestion size={20}/><span>{tr('rail.simple')}</span></button>
+        <button className={railActive === 'info' ? 'is-active' : ''} aria-pressed={railActive === 'info'} title={tr('rail.infoTitle')} onClick={() => { goHistoric(); setSelectionMode(false); setPanel((p) => (p === 'info' && !liveOn ? null : 'info')) }}><Info size={20}/><span>{tr('rail.info')}</span></button>
       </nav>
       {liveOn && <aside className="fc-live-panel" aria-label={tr('rail.liveTitle')}>
         <header><p><i/>{tr('liveLayer.kicker')}</p><button onClick={goHistoric} title={tr('mode.backHistoric')} aria-label={tr('mode.backHistoric')}><X size={15}/></button></header>
@@ -722,14 +723,15 @@ function FireMapApp() {
         {notes.length > 0 && <ul className="fc-notes">{notes.map((n) => <li key={n}>{n}</li>)}</ul>}
         {metadata && <p className="fc-credits">{metadata.creditos?.[0]}</p>}
       </aside>}
-      {layersOpen && !selectionBounds && !liveOn && <aside className="fw-layers">
-        <div className="fw-layers-title"><span>{tr('layers.title')}</span><SlidersHorizontal size={15}/></div>
-        <LayerButton active={activeLayer === 'surface'} icon={ThermometerSun} label={tr('layers.density')} tone="heat" onClick={() => setActiveLayer('surface')}/>
-        <LayerButton active={activeLayer === 'points'} icon={MapPin} label={tr('layers.points')} tone="points" onClick={() => setActiveLayer('points')}/>
-        <LayerButton active={showBoundary} icon={Layers3} label={tr('layers.boundary')} tone="boundary" onClick={() => setShowBoundary((v) => !v)}/>
-        <LayerButton active={selectionMode} icon={Scan} label={tr('layers.area')} tone="select" onClick={toggleSelectionMode}/>
+      {!liveOn && <aside className={`fw-layers fc-layers ${layersOpen ? 'is-open' : ''}`} aria-label={tr('layers.title')}>
+        <button className={`fw-layer-button fc-layers-toggle ${layersOpen ? 'is-active' : ''}`} title={tr('rail.layers')} aria-expanded={layersOpen} onClick={() => setLayersOpen((v) => !v)}><span className="boundary"><Layers3 size={18}/></span><b>{tr('rail.layers')}</b></button>
+        {layersOpen && <>
+          <LayerButton active={activeLayer === 'surface'} icon={ThermometerSun} label={tr('layers.density')} tone="heat" onClick={() => setActiveLayer('surface')}/>
+          <LayerButton active={activeLayer === 'points'} icon={MapPin} label={tr('layers.points')} tone="points" onClick={() => setActiveLayer('points')}/>
+          <LayerButton active={showBoundary} icon={Hexagon} label={tr('layers.boundary')} tone="boundary" onClick={() => setShowBoundary((v) => !v)}/>
+        </>}
       </aside>}
-      {layersOpen && (liveOn || !selectionBounds) && <aside className="fw-display-dock" aria-label={tr('basemap.dock')}>
+      {<aside className="fw-display-dock" aria-label={tr('basemap.dock')}>
         <div className="fw-display-modes" role="group" aria-label={tr('basemap.title')}>
           <button className={baseMap === 'standard' ? 'is-active' : ''} aria-pressed={baseMap === 'standard'} title={tr('basemap.standard')} onClick={() => setBaseMap('standard')}><MapIcon size={14}/><span>{tr('basemap.standard')}</span></button>
           <button className={baseMap === 'relief' ? 'is-active' : ''} aria-pressed={baseMap === 'relief'} title={tr('basemap.relief')} onClick={() => setBaseMap('relief')}><Mountain size={14}/><span>{tr('basemap.relief')}</span></button>
@@ -756,7 +758,7 @@ function FireMapApp() {
         </div>}
         <div className="fw-selection-actions"><button onClick={toggleSelectionMode}><Scan size={15}/>{tr('sel.redraw')}</button><button onClick={() => selection?.bbox && runDownload(selection.bbox, tr('csv.area'))} disabled={!selection?.calendar}><Download size={15}/>CSV</button></div>
       </aside>}
-      {simpleOpen && !liveOn && <SimplePanel key={lang} aoi={selection?.bbox || aoi} etiqueta={selection?.bbox ? 'area' : 'cusco'} onClose={() => setSimpleOpen(false)}/>}
+      {simpleOpen && !liveOn && <SimplePanel key={lang} aoi={selection?.bbox || aoi} etiqueta={selection?.bbox ? 'area' : 'cusco'}/>}
       {calendarOpen && !liveOn && <CalendarPanel calendar={calendar} mode={calendarMode} setMode={setCalendarMode} selected={selected} onSelect={selectMonth} onClose={() => setCalendarOpen(false)}/>}
       {!liveOn && !selectionMode && <section className="fw-timeline fc-timeline">
         <button className="fw-play" onClick={() => setPlaying((v) => !v)} title={playing ? tr('timeline.pause') : tr('timeline.play')}>{playing ? <Pause size={19}/> : <Play size={19}/>}</button>

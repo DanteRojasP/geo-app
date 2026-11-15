@@ -1,7 +1,7 @@
 // Panel "En simple": cinco preguntas con su respuesta en una frase y cuatro gráficos
 // descargables (PNG y CSV). Datos: /api/resumen y /api/analitica/* del backend.
 import { useEffect, useState } from 'react'
-import { Download, X } from 'lucide-react'
+import { Download } from 'lucide-react'
 import * as Charts from './charts.js'
 import { getAnalitica, getResumen } from './services/api.js'
 import { tr } from './i18n.js'
@@ -31,7 +31,7 @@ function Grafico({ tipo, slug, datos, etiqueta, anios, onAnio }) {
   )
 }
 
-function SimplePanel({ aoi, etiqueta, onClose }) {
+function SimplePanel({ aoi, etiqueta }) {
   const [estado, setEstado] = useState({ cargando: true })
   const clave = JSON.stringify(aoi)
 
@@ -58,7 +58,6 @@ function SimplePanel({ aoi, etiqueta, onClose }) {
     <aside className="fs-panel" aria-label="El fuego en simple">
       <div className="fs-head">
         <div><p>{tr('simple.kicker')}</p><h2>{resumen?.titulo || tr('simple.title')}</h2></div>
-        <button onClick={onClose} title={tr('btn.close')}><X size={16}/></button>
       </div>
       <div className="fs-body">
         {cargando && <p className="fs-how">{tr('simple.loading')}</p>}
