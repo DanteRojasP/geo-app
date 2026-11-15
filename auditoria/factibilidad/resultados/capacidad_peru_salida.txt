@@ -1,0 +1,11 @@
+filas: focos 1,295,299 | celda-dia 1,262,658  (Cusco hoy: 58,779 y 36,260)
+Parquet en disco: 70 MB en 606 archivos (Cusco: 3.6 MB en 562)
+cargar tablas al arrancar: 3.6 s (Cusco: 1.6 s) | memoria de DuckDB 448 MB (Cusco: 20 MB)
+count focos de 1 depto, 1 mes: 13 ms (5,406 filas)
+SELECT focos de 1 depto, 1 anio: 99 ms (16,713 filas)  (Cusco hoy: 43 ms para 7,295)
+serie mensual de 1 depto (cd): 16 ms
+serie mensual de TODO Peru (cd): 13 ms
+area dibujada (bbox) sobre todo Peru, conteo: 6 ms (la app hoy filtra solo por bbox, sin departamento)
+SELECT focos de TODO Peru, 1 mes: 148 ms (27,870 filas)
+SELECT * de TODO Peru, 1 anio (CSV de un anio): 898 ms (110,571 filas; el tope actual es 200,000)
+
