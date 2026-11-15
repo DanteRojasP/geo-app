@@ -250,8 +250,15 @@ button:focus-visible,select:focus-visible{outline:2px solid #197bb5;outline-offs
 .fa-period .fa-period-error{color:#b42318}
 .fa-report-primary{width:100%;margin-top:9px;justify-content:center;border-color:#2c86ad!important;background:#2c86ad!important;color:#fff!important}
 .fa-report-primary:hover{background:#247697!important}
+.fa-report-buttons{display:grid!important;grid-template-columns:1fr 1fr!important;gap:8px;margin-top:9px}
+.fa-report-buttons .fa-btn{width:auto;margin:0;justify-content:center;background:#fff;color:#40525c}
+.fa-report-buttons .fa-report-primary{width:auto;margin:0}
+.fa-report-buttons button:disabled,.fa-list button:disabled{opacity:.58;cursor:wait}
+.fa-report-loading{margin-top:8px;padding:8px 10px;border-radius:3px;background:#eaf4f8;color:#286f90;display:flex;align-items:center;justify-content:center;gap:7px;font-size:10px;font-weight:600}
+.fa-report-loading svg{animation:fa-spin .8s linear infinite}
+@keyframes fa-spin{to{transform:rotate(360deg)}}
 .fa-list li{cursor:pointer}
 .fa-list li:hover{background:#f3f7f9}
 .fa-actions{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .fa-actions>span{overflow:hidden;color:#6e7d85;font-size:9px;text-align:right;text-overflow:ellipsis;white-space:nowrap}
-@media(max-width:650px){.fa-panel{width:auto}.fa-period>div{grid-template-columns:1fr}}
+@media(max-width:650px){.fa-panel{width:auto}.fa-period>div,.fa-report-buttons{grid-template-columns:1fr!important}}

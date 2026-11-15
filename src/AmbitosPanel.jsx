@@ -2,7 +2,7 @@
 // o cuenca Pfafstetter, con el mapa pintado por nivel, la lista ordenada, el informe de cada unidad
 // y la tabla CSV del nivel. Datos: /api/ambitos/* del backend.
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { CalendarDays, Download, FileText, X } from 'lucide-react'
+import { CalendarDays, Download, Eye, FileText, LoaderCircle, X } from 'lucide-react'
 import { ambitoUrl, getAmbitoGeojson, getAmbitoNivel, getAmbitos, informeUrl } from './services/api.js'
 import { tr } from './i18n.js'
 
@@ -40,8 +40,9 @@ function AmbitosPanel({ map, onClose }) {
   const [error, setError] = useState('')
   const [filtro, setFiltro] = useState('')
   const [elegido, setElegido] = useState(null)
-  const [fechaInicio, setFechaInicio] = useState('2000-11')
-  const [fechaFin, setFechaFin] = useState('2025-12')
+  const [fechaInicio, setFechaInicio] = useState('2000-11-01')
+  const [fechaFin, setFechaFin] = useState('2025-12-31')
+  const [reportLoading, setReportLoading] = useState('')
   const listRef = useRef(null)
 
   useEffect(() => {
@@ -101,11 +102,40 @@ function AmbitosPanel({ map, onClose }) {
   const politicos = niveles.filter((n) => n.grupo === 'politico')
   const hidro = niveles.filter((n) => n.grupo === 'hidrografico')
   const conteo = datos?.conteo || {}
-  const periodoValido = fechaInicio <= fechaFin
+  const periodoValido = Boolean(fechaInicio && fechaFin && fechaInicio <= fechaFin)
+  const inicioMes = fechaInicio.slice(0, 7)
+  const finMes = fechaFin.slice(0, 7)
   const unidadElegida = datos?.unidades?.find((u) => u.codigo === elegido)
-  const urlInforme = elegido && periodoValido
-    ? informeUrl({ ambito: `${nivel}:${elegido}` }, { fecha_inicio: fechaInicio, fecha_fin: fechaFin })
+  const reportUrl = (codigo = elegido) => codigo && periodoValido
+    ? informeUrl({ ambito: `${nivel}:${codigo}` }, { fecha_inicio: inicioMes, fecha_fin: finMes })
     : ''
+
+  const openGeneratedReport = async (mode, codigo = elegido) => {
+    const url = reportUrl(codigo)
+    if (!url || reportLoading) return
+    const popup = window.open('', '_blank')
+    if (!popup) { setError(tr('amb.popupBlocked')); return }
+    const loadingText = tr(mode === 'pdf' ? 'amb.preparingPdf' : 'amb.preparingReport')
+    setReportLoading(mode)
+    popup.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${loadingText}</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#f5f8fa;color:#29404d;font:14px system-ui}.loader{text-align:center}.spin{width:34px;height:34px;margin:0 auto 16px;border:3px solid #d5e2e9;border-top-color:#2c86ad;border-radius:50%;animation:s .8s linear infinite}@keyframes s{to{transform:rotate(360deg)}}small{display:block;margin-top:7px;color:#71838d}</style></head><body><div class="loader"><div class="spin"></div><b>${loadingText}</b><small>${tr('amb.loadingWait')}</small></div></body></html>`)
+    popup.document.close()
+    try {
+      const response = await fetch(url)
+      if (!response.ok) throw new Error(`${response.status} ${response.statusText}`)
+      let html = await response.text()
+      html = html.replace('<head>', `<head><base href="${window.location.origin}/">`)
+      if (mode === 'pdf') html = html.replace('</body>', `<script>window.addEventListener('load',()=>setTimeout(()=>window.print(),450))</script></body>`)
+      popup.document.open()
+      popup.document.write(html)
+      popup.document.close()
+    } catch (e) {
+      popup.document.open()
+      popup.document.write(`<p style="font:14px system-ui;padding:24px;color:#9f2424">${tr('amb.reportError')}: ${e.message}</p>`)
+      popup.document.close()
+    } finally {
+      setReportLoading('')
+    }
+  }
 
   return (
     <aside className="fa-panel" aria-label={tr('amb.title')}>
@@ -129,13 +159,18 @@ function AmbitosPanel({ map, onClose }) {
         <div className="fa-period">
           <strong><CalendarDays size={14}/>{tr('amb.reportPeriod')}</strong>
           <div>
-            <label>{tr('filter.from')}<input type="month" min="2000-11" max="2025-12" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)}/></label>
-            <label>{tr('filter.to')}<input type="month" min="2000-11" max="2025-12" value={fechaFin} onChange={(e) => setFechaFin(e.target.value)}/></label>
+            <label>{tr('filter.from')}<input type="date" min="2000-11-01" max="2025-12-31" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)}/></label>
+            <label>{tr('filter.to')}<input type="date" min="2000-11-01" max="2025-12-31" value={fechaFin} onChange={(e) => setFechaFin(e.target.value)}/></label>
           </div>
           {!periodoValido && <small className="fa-period-error">{tr('filter.invalid')}</small>}
-          {urlInforme
-            ? <a className="fa-btn fa-report-primary" href={urlInforme} target="_blank" rel="noreferrer"><FileText size={15}/>{tr('amb.generateReport')}</a>
+          <small>{tr('amb.monthResolution')}</small>
+          {reportUrl()
+            ? <div className="fa-report-buttons">
+              <button type="button" className="fa-btn" disabled={Boolean(reportLoading)} onClick={() => openGeneratedReport('view')}><Eye size={15}/>{tr('amb.viewReport')}</button>
+              <button type="button" className="fa-btn fa-report-primary" disabled={Boolean(reportLoading)} onClick={() => openGeneratedReport('pdf')}><Download size={15}/>{tr('amb.downloadPdf')}</button>
+            </div>
             : <small>{tr('amb.chooseReportUnit')}</small>}
+          {reportLoading && <div className="fa-report-loading" role="status" aria-live="polite"><LoaderCircle size={16}/><span>{tr(reportLoading === 'pdf' ? 'amb.preparingPdf' : 'amb.preparingReport')}</span></div>}
         </div>
         <input type="search" value={filtro} onChange={(e) => setFiltro(e.target.value)} placeholder={tr('amb.filter')} aria-label={tr('amb.filter')}/>
       </div>
@@ -154,14 +189,14 @@ function AmbitosPanel({ map, onClose }) {
               <span className="fa-rank">{u.puesto ?? '–'}</span>
               <span className="fa-badge" style={{ background: u.color }}>{u.etiqueta}</span>
               <span className="fa-name"><b>{u.nombre}</b><small>{u.provincia ? `${u.provincia} · ` : ''}{u.codigo} · {tr('amb.density', { v: u.densidad ?? 0 })}</small></span>
-              <a className="fa-btn" href={informeUrl({ ambito: `${nivel}:${u.codigo}` }, { fecha_inicio: fechaInicio, fecha_fin: fechaFin })} target="_blank" rel="noreferrer" title={tr('amb.reportRange', { a: fechaInicio, b: fechaFin })} onClick={(e) => e.stopPropagation()}><FileText size={14}/>{tr('amb.reportShort')}</a>
+              <button type="button" className="fa-btn" disabled={Boolean(reportLoading)} title={tr('amb.reportRange', { a: fechaInicio, b: fechaFin })} onClick={(e) => { e.stopPropagation(); setElegido(u.codigo); openGeneratedReport('view', u.codigo) }}><FileText size={14}/>{tr('amb.reportShort')}</button>
             </li>
           ))}
         </ol>
         {(datos.unidades.length > filas.length) && <p className="fa-note">{tr('amb.more', { n: datos.unidades.length - filas.length })}</p>}
         <div className="fa-actions">
           <a className="fa-btn" href={ambitoUrl(`/api/ambitos/${nivel}.csv`)}><Download size={14}/>{tr('amb.csv')}</a>
-          {unidadElegida && <span>{unidadElegida.nombre} · {fechaInicio}–{fechaFin}</span>}
+          {unidadElegida && <span>{unidadElegida.nombre} · {inicioMes}–{finMes}</span>}
         </div>
         <p className="fa-note">{datos.metodo.notas[0]} {datos.metodo.notas[1]}</p>
         <p className="fa-note">{datos.fuente}</p>
