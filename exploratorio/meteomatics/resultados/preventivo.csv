@@ -1,0 +1,41 @@
+escala,variable,rho,rho_parcial,p,n,acierto_tercil,p_ajustado,etiqueta
+semana siguiente,persistencia,0.168,,0.001,4600,,0.02,Persistencia (fuego del periodo previo)
+semana siguiente,fosberg,0.013,-0.021,0.356,4600,,0.749,Índice de Fosberg
+semana siguiente,aviso_incendio,-0.001,-0.015,0.656,4600,,0.772,Aviso de incendio forestal (Meteomatics)
+semana siguiente,indice_sequia,0.023,0.03,0.302,4600,,0.733,Índice de sequía
+semana siguiente,deficit_suelo,-0.017,-0.02,0.523,4600,,0.767,Déficit de humedad del suelo
+semana siguiente,humedad_suelo,0.013,0.027,0.445,4600,,0.759,Humedad del suelo a 15 cm
+semana siguiente,vpd,0.005,-0.049,0.03,4600,,0.24,Déficit de presión de vapor
+semana siguiente,evapotranspiracion,-0.026,-0.087,0.005,4600,,0.06,Evapotranspiración
+semana siguiente,rachas,0.002,0.004,0.916,4600,,0.94,Racha máxima
+semana siguiente,lluvia,-0.026,0.025,0.248,4600,,0.708,Lluvia
+semana siguiente,t_max,-0.043,-0.077,0.006,4600,,0.06,Temperatura máxima
+mes siguiente,persistencia,0.228,,0.001,736,,0.02,Persistencia (fuego del periodo previo)
+mes siguiente,fosberg,-0.018,-0.029,0.578,736,,0.767,Índice de Fosberg
+mes siguiente,aviso_incendio,0.107,0.079,0.239,736,,0.708,Aviso de incendio forestal (Meteomatics)
+mes siguiente,indice_sequia,-0.053,-0.034,0.563,736,,0.767,Índice de sequía
+mes siguiente,deficit_suelo,0.065,0.051,0.442,736,,0.759,Déficit de humedad del suelo
+mes siguiente,humedad_suelo,-0.079,-0.049,0.456,736,,0.759,Humedad del suelo a 15 cm
+mes siguiente,vpd,0.061,0.027,0.59,736,,0.767,Déficit de presión de vapor
+mes siguiente,evapotranspiracion,-0.05,-0.093,0.115,736,,0.511,Evapotranspiración
+mes siguiente,rachas,0.026,0.022,0.75,736,,0.811,Racha máxima
+mes siguiente,lluvia,-0.104,-0.049,0.33,736,,0.733,Lluvia
+mes siguiente,t_max,0.039,0.022,0.696,736,,0.774,Temperatura máxima
+"temporada (Cusco, 1 serie)",lluvia_nov_mar,-0.093,,0.692,22,0.318,0.774,lluvia nov mar
+temporada (8 puntos),lluvia_nov_mar,-0.141,,0.151,184,,0.563,lluvia nov mar
+"temporada (Cusco, 1 serie)",lluvia_abr_jun,-0.136,,0.534,22,0.273,0.767,lluvia abr jun
+temporada (8 puntos),lluvia_abr_jun,-0.163,,0.107,176,,0.511,lluvia abr jun
+"temporada (Cusco, 1 serie)",humedad_suelo_jun,-0.129,,0.584,22,0.318,0.767,humedad suelo jun
+temporada (8 puntos),humedad_suelo_jun,-0.168,,0.214,176,,0.708,humedad suelo jun
+"temporada (Cusco, 1 serie)",deficit_suelo_jun,0.113,,0.613,22,0.182,0.767,deficit suelo jun
+temporada (8 puntos),deficit_suelo_jun,0.12,,0.391,176,,0.759,deficit suelo jun
+"temporada (Cusco, 1 serie)",indice_sequia_jun,-0.237,,0.312,22,0.182,0.733,indice sequia jun
+temporada (8 puntos),indice_sequia_jun,-0.133,,0.281,176,,0.733,indice sequia jun
+"temporada (Cusco, 1 serie)",vpd_may_jun,0.053,,0.836,22,0.318,0.88,vpd may jun
+temporada (8 puntos),vpd_may_jun,0.155,,0.155,176,,0.563,vpd may jun
+"temporada (Cusco, 1 serie)",aviso_incendio_may_jun,0.181,,0.437,22,0.273,0.759,aviso incendio may jun
+temporada (8 puntos),aviso_incendio_may_jun,0.195,,0.115,176,,0.511,aviso incendio may jun
+"temporada (Cusco, 1 serie)",fosberg_may_jun,0.004,,0.987,22,0.273,0.987,fosberg may jun
+temporada (8 puntos),fosberg_may_jun,0.047,,0.641,176,,0.772,fosberg may jun
+"temporada (Cusco, 1 serie)",fuego_prev,-0.396,,0.076,22,0.409,0.506,fuego prev
+temporada (8 puntos),fuego_prev,-0.068,,0.608,176,,0.767,fuego prev
