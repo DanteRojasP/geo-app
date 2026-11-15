@@ -331,6 +331,10 @@ Revisión **`firecal-00009`** (imagen `firecal-cusco:gabriel-dante-v1`).
       (`roles/secretmanager.secretAccessor` sobre ese secreto). Comprobado en la URL: 11 detecciones en 24 h y 23 en
       5 días en Cusco, las 4 fuentes responden, y la clave no aparece en las respuestas ni en los logs.
 - Para cambiar la clave: `gcloud secrets versions add firms-map-key --data-file=<archivo>` y volver a desplegar.
+- [x] Revisión **`firecal-00011`**: el histórico y el tiempo real son **dos modos separados** (selector "Serie
+      histórica | En vivo" arriba a la izquierda). En vivo se ocultan la densidad, los puntos, el resumen, el
+      calendario, la línea de tiempo, "En simple" y el área dibujada; la leyenda muestra la antigüedad. Al volver, el
+      histórico queda como estaba.
 
 ## Pendientes que me afectan
 

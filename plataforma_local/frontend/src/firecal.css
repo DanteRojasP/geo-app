@@ -152,3 +152,14 @@ button:focus-visible,select:focus-visible{outline:2px solid #197bb5;outline-offs
 .fc-live-panel ul{margin:6px 0;padding-left:16px;font-size:10px;line-height:1.35;color:#c6d6df}
 .fc-live-panel small{display:block;font-size:9px;color:#8fa9b8}
 @media(max-width:950px){.fc-live-panel{top:122px;left:10px;right:10px;width:auto}}
+
+/* Dos modos separados: serie histórica | en vivo */
+.fc-mode{position:absolute;z-index:680;top:18px;left:220px;display:flex;gap:3px;padding:3px;border-radius:18px;background:rgba(12,36,56,.94);border:1px solid rgba(180,210,226,.25);box-shadow:0 6px 16px rgba(5,27,42,.25)}
+.fc-mode button{display:flex;align-items:center;gap:6px;border:0;border-radius:15px;padding:6px 14px;background:transparent;color:#b5cad7;font:600 11px 'IBM Plex Sans',sans-serif;cursor:pointer}
+.fc-mode button:hover{color:#fff;background:rgba(255,255,255,.08)}
+.fc-mode button.is-active{background:#197eb7;color:#fff}
+.fc-mode button.is-active.live{background:#d61f45}
+.fc-live-panel{left:88px;right:auto;top:80px;width:320px}
+.fc-live-back{margin-top:10px;width:100%;display:flex;align-items:center;justify-content:center;gap:7px;border:1px solid rgba(180,210,226,.3);border-radius:6px;padding:7px;background:transparent;color:#dbe8ef;font-size:11px;cursor:pointer}
+.fc-live-back:hover{background:rgba(255,255,255,.08)}
+@media(max-width:950px){.fc-mode{display:none}.fc-live-panel{left:10px;right:10px;top:122px;width:auto}}
