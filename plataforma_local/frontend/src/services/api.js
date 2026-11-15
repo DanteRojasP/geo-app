@@ -4,7 +4,8 @@
 import { getLang, tr } from '../i18n.js'
 
 const configuredApiUrl = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
-// Dante (3a132de): en Vercel se usa /api del mismo dominio y vercel.json reenvía a Cloud Run (sin CORS).
+// En Vercel usamos /api en el mismo dominio y vercel.json reenvía la petición a Cloud Run.
+// Esto evita depender de CORS y mantiene VITE_API_BASE_URL disponible para otros hosts.
 const API_BASE_URL = window.location.hostname.endsWith('.vercel.app') ? '' : configuredApiUrl
 
 export const CUSCO = 'PE-CUS'
@@ -42,6 +43,7 @@ async function request(path, params, retry = true) {
 
 // AOI: { departamento: 'PE-CUS' } o { bbox: 'oeste,sur,este,norte' }
 export const getRegion = () => request('/api/departamentos.geojson')
+export const getDepartments = () => request('/api/departamentos')
 export const getMetadata = () => request('/api/metadatos')
 export const getCalendar = (aoi, fechaInicio, fechaFin) =>
   request('/api/calendario', { ...aoi, fecha_inicio: fechaInicio, fecha_fin: fechaFin })
