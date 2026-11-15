@@ -6,7 +6,7 @@ import { createElement, useCallback, useEffect, useMemo, useRef, useState } from
 import * as maplibregl from 'maplibre-gl'
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import {
-  ArrowLeftRight, CalendarDays, ChevronLeft, ChevronRight, Database, Download, FileText, Flame, Gauge, Landmark,
+  ArrowLeftRight, CalendarDays, ChevronLeft, ChevronRight, CircleHelp, Database, Download, FileText, Flame, Gauge, Landmark,
   Layers3, Map as MapIcon, MapPin, MessageCircleQuestion, Mountain, Pause, Play, Radio, Satellite, Scan, ShieldAlert,
   SlidersHorizontal,
   ThermometerSun, Trash2, X,
@@ -15,6 +15,7 @@ import AmbitosPanel from './AmbitosPanel.jsx'
 import SimplePanel from './SimplePanel.jsx'
 import ComparisonWorkspace from './ComparisonWorkspace.jsx'
 import IntroScreen from './IntroScreen.jsx'
+import TutorialGuide from './TutorialGuide.jsx'
 import { LANGS, getLang, locale, months, setLang, tr } from './i18n.js'
 import { CUSCO, downloadCsv, getCalendar, getDepartments, getFocos, getMonth, getTiempoReal, informeUrl } from './services/api.js'
 
@@ -22,6 +23,8 @@ import { CUSCO, downloadCsv, getCalendar, getDepartments, getFocos, getMonth, ge
 const openReport = (url) => window.open(url, '_blank', 'noopener')
 
 maplibregl.setWorkerUrl(maplibreWorkerUrl)
+
+const TUTORIAL_KEY = 'firecal.tutorial.seen.v1'
 
 const MAP_STYLE = 'https://tiles.openfreemap.org/styles/positron'
 const SATELLITE_STYLE = {
@@ -309,7 +312,12 @@ function FireMapApp() {
   const [simpleOpen, setSimpleOpen] = useState(false)
   const [compareOpen, setCompareOpen] = useState(false)
   const [ambitosOpen, setAmbitosOpen] = useState(false)
-  const [introOpen, setIntroOpen] = useState(() => new URLSearchParams(window.location.search).get('intro') !== '0')
+  const [introOpen, setIntroOpen] = useState(() => {
+    const params = new URLSearchParams(window.location.search)
+    return params.get('intro') !== '0' && params.get('tutorial') !== '1'
+  })
+  const [tutorialPrompt, setTutorialPrompt] = useState(false)
+  const [tutorialOpen, setTutorialOpen] = useState(() => new URLSearchParams(window.location.search).get('tutorial') === '1')
   const [detailsOpen, setDetailsOpen] = useState(true)
   const [layersOpen, setLayersOpen] = useState(false)
   const [toolsOpen, setToolsOpen] = useState(false)
@@ -318,6 +326,19 @@ function FireMapApp() {
   const [selection, setSelection] = useState(null)
   const [lang, setLangState] = useState(getLang())
   const changeLang = (l) => { setLang(l); setLangState(l) }
+  const markTutorialSeen = () => { try { window.localStorage?.setItem(TUTORIAL_KEY, '1') } catch { /* modo privado */ } }
+  const startTutorial = () => {
+    setDetailsOpen(false); setSimpleOpen(false); setCompareOpen(false); setAmbitosOpen(false); setToolsOpen(false)
+    setTutorialPrompt(false); setTutorialOpen(true)
+  }
+  const finishIntro = () => {
+    setIntroOpen(false)
+    let seen = false
+    try { seen = window.localStorage?.getItem(TUTORIAL_KEY) === '1' } catch { /* modo privado */ }
+    if (!seen) setTutorialPrompt(true)
+  }
+  const skipTutorial = () => { markTutorialSeen(); setTutorialPrompt(false) }
+  const closeTutorial = () => { markTutorialSeen(); setTutorialOpen(false) }
   const MESES = months()
   const selectedRegion = departments.find((d) => d.code === selectedRegionCode) || { code: CUSCO, name: 'Cusco', datos: 'armonizados' }
 
@@ -719,7 +740,7 @@ function FireMapApp() {
   return (
     <div className={`fw-app ${liveOn ? 'is-live' : ''}`}>
       <div ref={mapContainerRef} className="fw-map" aria-label={tr('map.aria')} />
-      {introOpen && <IntroScreen key={lang} lang={lang} mapReady={Boolean(region && !loading)} onLanguage={changeLang} onEnter={() => setIntroOpen(false)}/>}
+      {introOpen && <IntroScreen key={lang} lang={lang} mapReady={Boolean(region && !loading)} onLanguage={changeLang} onEnter={finishIntro}/>}
       <div className="fw-nubel-brand" aria-label="Nubel Team · FireCal Cusco"><img src="./nubel-team-logo.png" alt="Nubel Team"/></div>
       <div className="fc-mode" role="group" aria-label={tr('mode.label')}>
         <button className={!liveOn ? 'is-active' : ''} aria-pressed={!liveOn} title={tr('mode.historic')} onClick={goHistoric}><CalendarDays size={14}/><span>{tr('mode.historic')}</span></button>
@@ -748,6 +769,7 @@ function FireMapApp() {
       <button className={`fc-data-launcher fc-simple-launcher ${simpleOpen ? 'is-active' : ''}`} aria-label={tr('rail.simpleTitle')} aria-expanded={simpleOpen} onClick={() => { setAmbitosOpen(false); setDetailsOpen(false); setCompareOpen(false); setSimpleOpen((v) => !v) }}><MessageCircleQuestion size={19}/><span>{tr('rail.simple')}</span></button>
       <button className={`fc-data-launcher fc-compare-launcher ${compareOpen ? 'is-active' : ''}`} aria-label={tr('compare.open')} aria-expanded={compareOpen} onClick={() => { setAmbitosOpen(false); setDetailsOpen(false); setSimpleOpen(false); setCompareOpen((v) => !v) }}><ArrowLeftRight size={19}/><span>{tr('compare.button')}</span></button>
       <button className={`fc-data-launcher fc-ambitos-launcher ${ambitosOpen ? 'is-active' : ''}`} aria-label={tr('rail.ambitosTitle')} title={tr('rail.ambitosTitle')} aria-expanded={ambitosOpen} onClick={() => { setDetailsOpen(false); setSimpleOpen(false); setCompareOpen(false); clearSelection(); setAmbitosOpen((v) => !v) }}><Landmark size={19}/><span>{tr('rail.ambitos')}</span></button>
+      <button className={`fc-data-launcher fc-tutorial-launcher ${tutorialOpen ? 'is-active' : ''}`} aria-label={tr('tutorial.open')} title={tr('tutorial.open')} onClick={startTutorial}><CircleHelp size={19}/><span>{tr('tutorial.button')}</span></button>
       <div className="fc-map-menu">
         <div className="fc-lang" role="group" aria-label={tr('lang.title')}>{LANGS.map((l) => <button key={l} className={l === lang ? 'is-active' : ''} aria-pressed={l === lang} onClick={() => changeLang(l)}>{l.toUpperCase()}</button>)}</div>
         <button className={`fc-menu-toggle ${toolsOpen ? 'is-open' : ''}`} aria-label={tr('rail.label')} aria-expanded={toolsOpen} onClick={() => setToolsOpen((v) => !v)}><Layers3 size={21}/></button>
@@ -821,6 +843,7 @@ function FireMapApp() {
       {ambitosOpen && !liveOn && <AmbitosPanel key={lang} map={mapRef.current} onClose={() => setAmbitosOpen(false)}/>}
       {compareOpen && <ComparisonWorkspace key={lang} calendar={calendar} region={region} regionName={selectedRegion.name} onClose={() => setCompareOpen(false)}/>}
       {calendarOpen && <CalendarPanel calendar={calendar} mode={calendarMode} setMode={setCalendarMode} selected={selected} onSelect={selectMonth} onClose={() => setCalendarOpen(false)} reportUrl={informeUrl(aoi, reportExtra)}/>}
+      <TutorialGuide key={lang} prompt={tutorialPrompt} open={tutorialOpen} onStart={startTutorial} onSkip={skipTutorial} onClose={closeTutorial}/>
       <section className="fw-timeline fc-timeline">
         <button className="fw-play" onClick={() => { setCustomPeriod(null); setPlaying((v) => !v) }} title={playing ? tr('timeline.pause') : tr('timeline.play')}>{playing ? <Pause size={19}/> : <Play size={19}/>}</button>
         <div className="fw-timeline-panel" style={{ '--progress': `${selected.month ? ((selected.month - 1) / 11) * 100 : 100}%` }}>
