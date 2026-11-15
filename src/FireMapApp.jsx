@@ -259,7 +259,7 @@ function FireMapApp() {
   const [result, setResult] = useState({ hotspots: [], mode: 'demo', metadata: {} })
   const [departments, setDepartments] = useState(EMPTY_FEATURE_COLLECTION)
   const [activeScope, setActiveScope] = useState('peru')
-  const [baseMap, setBaseMap] = useState('standard')
+  const [baseMap, setBaseMap] = useState('relief')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [activeLayer, setActiveLayer] = useState('surface')
@@ -438,12 +438,12 @@ function FireMapApp() {
 
       map.addLayer({
         id: 'relief-imagery-layer', type: 'raster', source: 'relief-imagery',
-        layout: { visibility: 'none' },
+        layout: { visibility: 'visible' },
         paint: { 'raster-saturation': -0.12, 'raster-contrast': 0.08, 'raster-brightness-min': 0.08, 'raster-brightness-max': 0.92 },
       })
       map.addLayer({
         id: 'relief-reference-layer', type: 'raster', source: 'relief-reference',
-        layout: { visibility: 'none' },
+        layout: { visibility: 'visible' },
         paint: { 'raster-opacity': 0.82 },
       })
       map.addLayer({
