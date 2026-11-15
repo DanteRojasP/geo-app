@@ -50,6 +50,11 @@ export const getAnalitica = (nombre, aoi, extra = {}) => request(`/api/analitica
 // Detecciones casi en tiempo real (NASA FIRMS, sin armonizar). Sin reintento: si el servidor no
 // tiene MAP_KEY responde 503 y se muestra el mensaje enseguida.
 export const getTiempoReal = (horas) => request('/api/tiempo-real', { horas }, false)
+// Ámbitos: nivel de peligro por focos de calor (formato CENEPRED) e informes.
+export const getAmbitos = () => request('/api/ambitos')
+export const getAmbitoNivel = (nivel) => request(`/api/ambitos/${nivel}`)
+export const getAmbitoGeojson = (nivel) => request(`/api/ambitos/${nivel}.geojson`)
+export const ambitoUrl = (path) => buildUrl(path).toString()
 export const getFocos = (aoi, fechaInicio, fechaFin) =>
   request('/api/focos.geojson', { ...aoi, fecha_inicio: fechaInicio, fecha_fin: fechaFin })
 

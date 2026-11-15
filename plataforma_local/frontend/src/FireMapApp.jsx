@@ -7,10 +7,11 @@ import * as maplibregl from 'maplibre-gl'
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import {
   CalendarDays, ChevronLeft, ChevronRight, CircleHelp, Download, Flame, Gauge, Info,
-  Hexagon, Layers3, Map as MapIcon, MapPin, MessageCircleQuestion, Mountain, Pause, Play, Radio, Satellite, Scan, ShieldAlert,
+  Hexagon, Landmark, Layers3, Map as MapIcon, MapPin, MessageCircleQuestion, Mountain, Pause, Play, Radio, Satellite, Scan, ShieldAlert,
 
   ThermometerSun, Trash2, X,
 } from 'lucide-react'
+import AmbitosPanel from './AmbitosPanel.jsx'
 import SimplePanel from './SimplePanel.jsx'
 import { LANGS, getLang, locale, months, setLang, tr } from './i18n.js'
 import { CUSCO, downloadCsv, getCalendar, getFocos, getMetadata, getMonth, getRegion, getTiempoReal } from './services/api.js'
@@ -683,6 +684,7 @@ function FireMapApp() {
         <button className={railActive === 'calendar' ? 'is-active' : ''} aria-pressed={railActive === 'calendar'} title={tr('rail.calendar')} onClick={() => { goHistoric(); setSelectionMode(false); setPanel((p) => (p === 'calendar' && !liveOn ? null : 'calendar')) }}><CalendarDays size={20}/><span>{tr('rail.calendar')}</span></button>
         <button className={railActive === 'area' ? 'is-active select' : ''} aria-pressed={railActive === 'area'} title={tr('rail.areaTitle')} onClick={() => { goHistoric(); if (!selectionMode) { setPanel(null); focusCusco({ bottom: 40 }) } toggleSelectionMode() }}><Scan size={20}/><span>{tr('rail.area')}</span></button>
         <button className={railActive === 'simple' ? 'is-active' : ''} aria-pressed={railActive === 'simple'} title={tr('rail.simpleTitle')} onClick={() => { goHistoric(); setSelectionMode(false); setPanel('simple') }}><MessageCircleQuestion size={20}/><span>{tr('rail.simple')}</span></button>
+        <button className={railActive === 'ambitos' ? 'is-active' : ''} aria-pressed={railActive === 'ambitos'} title={tr('rail.ambitosTitle')} onClick={() => { goHistoric(); setSelectionMode(false); clearSelection(); setPanel((p) => (p === 'ambitos' && !liveOn ? null : 'ambitos')); focusCusco() }}><Landmark size={20}/><span>{tr('rail.ambitos')}</span></button>
         <button className={railActive === 'info' ? 'is-active' : ''} aria-pressed={railActive === 'info'} title={tr('rail.infoTitle')} onClick={() => { goHistoric(); setSelectionMode(false); setPanel((p) => (p === 'info' && !liveOn ? null : 'info')) }}><Info size={20}/><span>{tr('rail.info')}</span></button>
       </nav>
       {liveOn && <aside className="fc-live-panel" aria-label={tr('rail.liveTitle')}>
@@ -758,6 +760,7 @@ function FireMapApp() {
         </div>}
         <div className="fw-selection-actions"><button onClick={toggleSelectionMode}><Scan size={15}/>{tr('sel.redraw')}</button><button onClick={() => selection?.bbox && runDownload(selection.bbox, tr('csv.area'))} disabled={!selection?.calendar}><Download size={15}/>CSV</button></div>
       </aside>}
+      {panel === 'ambitos' && !liveOn && <AmbitosPanel key={lang} map={mapRef.current} onClose={() => setPanel(null)}/>}
       {simpleOpen && !liveOn && <SimplePanel key={lang} aoi={selection?.bbox || aoi} etiqueta={selection?.bbox ? 'area' : 'cusco'}/>}
       {calendarOpen && !liveOn && <CalendarPanel calendar={calendar} mode={calendarMode} setMode={setCalendarMode} selected={selected} onSelect={selectMonth} onClose={() => setCalendarOpen(false)}/>}
       {!liveOn && !selectionMode && <section className="fw-timeline fc-timeline">
