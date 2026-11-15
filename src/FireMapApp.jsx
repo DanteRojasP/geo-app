@@ -6,7 +6,7 @@ import { createElement, useCallback, useEffect, useMemo, useRef, useState } from
 import * as maplibregl from 'maplibre-gl'
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import {
-  CalendarDays, ChevronLeft, ChevronRight, CircleHelp, Download, Flame, Gauge, Info,
+  CalendarDays, ChevronLeft, ChevronRight, Download, Flame, Gauge, Info,
   Layers3, Map as MapIcon, MapPin, MessageCircleQuestion, Mountain, Pause, Play, Satellite, Scan, ShieldAlert,
   SlidersHorizontal,
   ThermometerSun, Trash2, X,
@@ -284,6 +284,7 @@ function FireMapApp() {
   const [simpleOpen, setSimpleOpen] = useState(false)
   const [detailsOpen, setDetailsOpen] = useState(true)
   const [layersOpen, setLayersOpen] = useState(true)
+  const [toolsOpen, setToolsOpen] = useState(false)
   const [selectionMode, setSelectionMode] = useState(false)
   const [selectionBounds, setSelectionBounds] = useState(null)
   const [selection, setSelection] = useState(null)
@@ -596,20 +597,18 @@ function FireMapApp() {
     <div className="fw-app">
       <div ref={mapContainerRef} className="fw-map" aria-label={tr('map.aria')} />
       <div className="fw-nubel-brand" aria-label="Nubel Team · FireCal Cusco"><img src="./nubel-team-logo.png" alt="Nubel Team"/></div>
-      <div className="fc-topright">
-        <div className="fc-app-name"><b>FireCal Cusco</b><small>{tr('brand.subtitle')}</small></div>
-        <span className="fc-live"><i/>{metadata ? tr('live.ok') : tr('live.connecting')}</span>
+      <div className="fc-map-menu">
         <div className="fc-lang" role="group" aria-label={tr('lang.title')}>{LANGS.map((l) => <button key={l} className={l === lang ? 'is-active' : ''} aria-pressed={l === lang} onClick={() => changeLang(l)}>{l.toUpperCase()}</button>)}</div>
-        <button className="fc-help" title={tr('btn.method')} onClick={() => setDetailsOpen(true)}><CircleHelp size={18}/></button>
+        <button className={`fc-menu-toggle ${toolsOpen ? 'is-open' : ''}`} aria-label={tr('rail.label')} aria-expanded={toolsOpen} onClick={() => setToolsOpen((v) => !v)}><Layers3 size={21}/></button>
+        {toolsOpen && <nav className="fw-rail" aria-label={tr('rail.label')}>
+          <button className="is-active" title={tr('rail.hotspotsTitle')} onClick={() => { focusCusco(); setDetailsOpen(true); setActiveLayer('surface') }}><Flame size={19}/><span>{tr('rail.hotspots')}</span></button>
+          <button className={calendarOpen ? 'is-active' : ''} title={tr('rail.calendar')} onClick={() => setCalendarOpen((v) => !v)}><CalendarDays size={19}/><span>{tr('rail.calendar')}</span></button>
+          <button className={selectionMode ? 'is-active select' : ''} title={tr('rail.areaTitle')} onClick={toggleSelectionMode}><Scan size={19}/><span>{tr('rail.area')}</span></button>
+          <button className={simpleOpen ? 'is-active' : ''} title={tr('rail.simpleTitle')} onClick={() => setSimpleOpen((v) => !v)}><MessageCircleQuestion size={19}/><span>{tr('rail.simple')}</span></button>
+          <button className={layersOpen ? 'is-active' : ''} title={tr('rail.layers')} onClick={() => setLayersOpen((v) => !v)}><SlidersHorizontal size={19}/><span>{tr('rail.layers')}</span></button>
+          <button className={detailsOpen ? 'is-active' : ''} title={tr('rail.infoTitle')} onClick={() => setDetailsOpen((v) => !v)}><Info size={19}/><span>{tr('rail.info')}</span></button>
+        </nav>}
       </div>
-      <nav className="fw-rail" aria-label={tr('rail.label')}>
-        <button className="is-active" title={tr('rail.hotspotsTitle')} onClick={() => { focusCusco(); setDetailsOpen(true); setActiveLayer('surface') }}><Flame size={20}/><span>{tr('rail.hotspots')}</span></button>
-        <button className={calendarOpen ? 'is-active' : ''} title={tr('rail.calendar')} onClick={() => setCalendarOpen((v) => !v)}><CalendarDays size={20}/><span>{tr('rail.calendar')}</span></button>
-        <button className={selectionMode ? 'is-active select' : ''} title={tr('rail.areaTitle')} onClick={toggleSelectionMode}><Scan size={20}/><span>{tr('rail.area')}</span></button>
-        <button className={simpleOpen ? 'is-active' : ''} title={tr('rail.simpleTitle')} onClick={() => setSimpleOpen((v) => !v)}><MessageCircleQuestion size={20}/><span>{tr('rail.simple')}</span></button>
-        <button title={tr('rail.layers')} onClick={() => setLayersOpen((v) => !v)}><Layers3 size={20}/><span>{tr('rail.layers')}</span></button>
-        <button title={tr('rail.infoTitle')} onClick={() => setDetailsOpen((v) => !v)}><Info size={20}/><span>{tr('rail.info')}</span></button>
-      </nav>
       {detailsOpen && <aside className="fw-summary">
         <div className="fw-summary-head"><div><p>{tr('summary.kicker')}</p><h1>{unidad?.nombre || tr('unit.name')}</h1><span>{periodo.label}{month?.calidad ? ` · ${calidadLabel(month.calidad)}` : ''}</span></div><button onClick={() => setDetailsOpen(false)} title={tr('btn.close')} aria-label={tr('btn.close')}><X size={17}/></button></div>
         <div className="fw-summary-status">{selected.month ? <CategoryBadge categoria={month?.categoria}/> : <span className="fw-risk fw-risk--bajo"><i/>{tr('summary.yearTotal')}</span>}<span>{loading ? tr('summary.loading') : tr('summary.onMap', { n: fmt(focos.n_focos || 0) })}</span></div>
