@@ -25,11 +25,6 @@ function bboxParam(bounds) {
   return { bbox: [bounds.west, bounds.south, bounds.east, bounds.north].map((number) => number.toFixed(4)).join(',') }
 }
 
-function dateRange(period) {
-  const [year, month] = period.to.split('-').map(Number)
-  return { from: `${period.from}-01`, to: `${period.to}-${String(new Date(year, month, 0).getDate()).padStart(2, '0')}` }
-}
-
 function MapPane({ side, region, period, onPeriod, onStats }) {
   const containerRef = useRef(null)
   const mapRef = useRef(null)
@@ -51,8 +46,7 @@ function MapPane({ side, region, period, onPeriod, onStats }) {
     if (period.from > period.to) { onStats({ loading: false, error: tr('filter.invalid'), total: 0, detections: 0, selection }); return undefined }
     onStats((previous) => ({ ...previous, loading: true, error: '' }))
     const aoi = selection ? bboxParam(selection) : { departamento: CUSCO }
-    const range = dateRange(period)
-    Promise.all([getFocos(aoi, range.from, range.to), getCalendar(aoi, range.from, range.to)])
+    Promise.all([getFocos(aoi, period.from, period.to), getCalendar(aoi, period.from, period.to)])
       .then(([focosResponse, calendarResponse]) => {
         if (!active) return
         const body = focosResponse.body
