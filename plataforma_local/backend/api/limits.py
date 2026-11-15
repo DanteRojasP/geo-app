@@ -34,8 +34,9 @@ from firecal.i18n import t
 from firecal.settings import RateLimitParams
 
 # Rutas pesadas siempre; /calendario y /anomalias solo si el AOI es dibujado (bbox o punto).
-HEAVY_PATHS = {"/api/hotspots.csv", "/api/v1/hotspots", "/api/v1/map/cells"}
-HEAVY_IF_CUSTOM_AOI = {"/api/calendario", "/api/anomalias"}
+HEAVY_PATHS = {"/api/hotspots.csv"}
+HEAVY_IF_CUSTOM_AOI = {"/api/calendario", "/api/anomalias", "/api/focos.geojson", "/api/resumen"}
+HEAVY_PREFIX_IF_CUSTOM_AOI = "/api/analitica/"
 IDLE_FORGET_S = 600.0
 
 
@@ -154,7 +155,8 @@ def is_heavy(request: Request) -> bool:
     if path in HEAVY_PATHS:
         return True
     q = request.query_params
-    return path in HEAVY_IF_CUSTOM_AOI and ("bbox" in q or "lat" in q)
+    custom = "bbox" in q or "lat" in q
+    return custom and (path in HEAVY_IF_CUSTOM_AOI or path.startswith(HEAVY_PREFIX_IF_CUSTOM_AOI))
 
 
 class RateLimiter:

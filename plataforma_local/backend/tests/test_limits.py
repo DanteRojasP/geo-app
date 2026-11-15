@@ -212,3 +212,18 @@ def test_gzip_and_cache_headers(plan_home):
     assert api.get("/health").headers["cache-control"] == "no-store"
     err = api.get("/api/calendario", params={"departamento": "PE-PUN"})
     assert err.status_code == 404 and err.headers["cache-control"] == "no-store"
+
+
+def test_custom_aoi_analytics_count_as_heavy():
+    """Auditoría: focos.geojson, resumen y analíticas con área dibujada son pesadas."""
+    from starlette.requests import Request
+
+    from api.limits import is_heavy
+
+    def req(path, qs):
+        return Request({"type": "http", "path": path, "query_string": qs.encode(), "headers": []})
+
+    assert is_heavy(req("/api/focos.geojson", "bbox=1,2,3,4"))
+    assert is_heavy(req("/api/analitica/ranking", "lat=1&lon=2&radio_km=3"))
+    assert is_heavy(req("/api/resumen", "bbox=1,2,3,4"))
+    assert not is_heavy(req("/api/resumen", "departamento=PE-CUS"))

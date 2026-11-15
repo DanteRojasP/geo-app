@@ -170,7 +170,7 @@ def test_calendario_errors(api, params, status, text):
     assert text in r.json()["detail"]
 
 
-def test_legacy_v1_disabled_by_default(api):
+def test_legacy_v1_retired(api):
     assert api.post("/api/v1/calendar", json={}).status_code in (404, 405)
     assert "/api/v1/calendar" not in api.get("/openapi.json").json()["paths"]
 
@@ -250,3 +250,28 @@ def test_focos_geojson_for_map(api):
     big = api.get("/api/focos.geojson", params={"departamento": "PE-CUS",
                                                 "fecha_inicio": "2000-11", "fecha_fin": "2025-12"})
     assert big.status_code == 422 and "máximo" in big.json()["detail"]
+
+
+# ------------------------------------------------------------------ mejoras de la auditoría
+@pytest.mark.parametrize("mes", ["2020-01-15", "2020-8", "20-08", "2020/08"])
+def test_strict_month_format(api, mes):
+    r = api.get("/api/calendario", params={"departamento": "PE-CUS", "fecha_inicio": mes})
+    assert r.status_code == 422 and "AAAA-MM" in r.json()["detail"]
+
+
+def test_unknown_parameter_is_reported(api):
+    r = api.get("/api/calendario", params={"departmento": "PE-CUS"})
+    assert r.status_code == 422 and "departmento" in r.json()["detail"]
+
+
+def test_bbox_label_is_readable(api):
+    b = api.get("/api/calendario", params={"bbox": "-72.6,-13.8,-71.8,-13.2"}).json()
+    assert b["aoi"]["descripcion"] == "el área seleccionada"
+    assert b["aoi"]["bbox"] == [-72.6, -13.8, -71.8, -13.2]
+
+
+def test_resumen_with_charts_in_one_call(api):
+    b = api.get("/api/resumen", params={"departamento": "PE-CUS", "graficos": "true"}).json()
+    assert len(b["frases"]) == 5
+    assert set(b["graficos"]) == {"estacionalidad", "ranking", "acumulado", "altitud"}
+    assert "graficos" not in api.get("/api/resumen", params={"departamento": "PE-CUS"}).json()

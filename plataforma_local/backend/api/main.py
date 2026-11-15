@@ -1,4 +1,4 @@
-"""Aplicación FastAPI de FireCal: CORS, salud, routers v1 y manejo de errores."""
+"""Aplicación FastAPI de FireCal Cusco: idioma, límites, caché, rutas /api y la interfaz."""
 
 from __future__ import annotations
 
@@ -12,18 +12,20 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
-from api.db import Repository
 from api.limits import HeavyGate, RateLimiter
-from api.routers import anomaly, calendar, forecast, hotspots, map, meta, plan, regions
-from api.schemas import HealthResponse
-from api.services.common import AOIError
+from api.routers import plan
 from firecal import __version__
 from firecal.i18n import reset_lang, set_lang, t
 from firecal.plan.query import PlanStore
 from firecal.settings import PROJECT_ROOT, Settings, get_settings
 
-API_PREFIX = "/api/v1"
+
+class HealthResponse(BaseModel):
+    status: str
+    data_mode: str
+    data_ready: bool
 # Frontend (React + MapLibre, base de Dante) ya compilado con `npm run build` en frontend/dist.
 # FIRECAL_FRONTEND_DIR lo cambia (p. ej. en Docker); vacío = no servir.
 DEFAULT_FRONTEND = PROJECT_ROOT.parent / "frontend" / "dist"
@@ -55,7 +57,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app = FastAPI(
         default_response_class=UTF8JSONResponse,
-        title="FireCal Perú API",
+        title="FireCal Cusco API",
         version=__version__,
         description=(
             "Calendario armonizado de focos de calor MODIS + VIIRS para **Cusco** (2000-11 a "
@@ -64,7 +66,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         ),
     )
     app.state.settings = settings
-    app.state.repo = Repository(settings)
     app.state.plan = PlanStore(settings)
     rl = settings.params.api.rate_limit
     app.state.limiter = RateLimiter(rl)
@@ -97,15 +98,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         CORSMiddleware,
         allow_origins=[*settings.params.api.cors_origins,
                        *(o.strip() for o in settings.env.cors_origins.split(",") if o.strip())],
-        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_methods=["GET", "OPTIONS"],
         allow_headers=["*"],
         expose_headers=["Content-Disposition", "X-Data-Mode", "X-Row-Count",
                         "X-Process-Time-ms", "X-RateLimit-Remaining", "Retry-After"],
     )
-
-    @app.exception_handler(AOIError)
-    def _aoi_error(_: Request, exc: AOIError) -> JSONResponse:
-        return UTF8JSONResponse(status_code=422, content={"detail": str(exc)})
 
     @app.exception_handler(RequestValidationError)
     def _validation_error(_: Request, exc: RequestValidationError) -> JSONResponse:
@@ -116,17 +113,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                         en="Invalid request: check the fields listed in 'errors'."),
             "errors": errors})
 
-    legacy = settings.params.api.legacy_v1
-
     @app.get("/health", response_model=HealthResponse, tags=["meta"])
     def health() -> HealthResponse:
-        """Estado del servicio: si los datos de Cusco están cargados (o la base sintética, en
-        modo legacy_v1)."""
-        if legacy:
-            repo: Repository = app.state.repo
-            ready = repo.ready
-            mode = repo.data_mode if ready else settings.data_mode
-            return HealthResponse(status="ok", data_mode=mode, data_ready=ready)
+        """Estado del servicio: si los datos de Cusco están cargados."""
         plan_store: PlanStore = app.state.plan
         return HealthResponse(status="ok", data_mode="real", data_ready=plan_store.ready)
 
@@ -135,11 +124,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         """Estado del protocolo de solicitudes: clientes, rechazos 429/503 y pesadas en curso."""
         return {**app.state.limiter.stats(), **app.state.gate.stats()}
 
-    # Backend anterior (alternativa B, datos SINTÉTICOS de 5 departamentos): apagado por defecto
-    # porque el prototipo usa solo los datos reales de Cusco (MAESTRO §12).
-    if legacy:
-        for module in (regions, calendar, anomaly, hotspots, map, forecast, meta):
-            app.include_router(module.router, prefix=API_PREFIX)
     app.include_router(plan.router)
 
     frontend = Path(os.environ.get("FIRECAL_FRONTEND_DIR", DEFAULT_FRONTEND))

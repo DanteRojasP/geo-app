@@ -39,8 +39,9 @@ function SimplePanel({ aoi, etiqueta, onClose }) {
     let activo = true
     setEstado({ cargando: true })                 // al cambiar de área, no mostrar la anterior
     const area = JSON.parse(clave)
-    Promise.all([getResumen(area), ...GRAFICOS.map(([tipo]) => getAnalitica(tipo, area))])
-      .then(([resumen, ...graficos]) => activo && setEstado({ resumen: resumen.body, graficos: graficos.map((g) => g.body) }))
+    // Una sola llamada: frases + datos de los 4 gráficos (antes 5 llamadas y cálculos repetidos).
+    getResumen(area, { graficos: 'true' })
+      .then(({ body }) => activo && setEstado({ resumen: body, graficos: GRAFICOS.map(([tipo]) => body.graficos[tipo]) }))
       .catch((e) => activo && setEstado({ error: e.message }))
     return () => { activo = false }
   }, [clave])

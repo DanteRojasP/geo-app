@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 import threading
 from dataclasses import dataclass
 
@@ -100,21 +101,27 @@ class AOI:
     params: tuple
     label: str
     area_km2: float | None = None
+    bbox: tuple[float, float, float, float] | None = None
 
     @property
     def whole_region(self) -> bool:
         return self.kind == "departamento"
 
     def info(self) -> dict:
-        return {"tipo": self.kind, "descripcion": self.label,
-                "area_km2": None if self.area_km2 is None else round(self.area_km2, 1)}
+        out = {"tipo": self.kind, "descripcion": self.label,
+               "area_km2": None if self.area_km2 is None else round(self.area_km2, 1)}
+        if self.bbox is not None:
+            out["bbox"] = [round(v, 4) for v in self.bbox]
+        return out
 
 
 def parse_month(value: str | None, name: str) -> tuple[int, int] | None:
     if value in (None, ""):
         return None
     try:
-        y, m = (int(v) for v in value.split("-")[:2])
+        if not re.fullmatch(r"\d{4}-\d{2}", value.strip()):
+            raise ValueError
+        y, m = (int(v) for v in value.strip().split("-"))
         if not 1 <= m <= 12:
             raise ValueError
     except ValueError as exc:
@@ -292,7 +299,8 @@ class PlanStore:
                        f"{api.max_aoi_km2:,.0f} km². Use the department or a smaller area."))
             self._require_inside(geom)
             return AOI("bbox", "longitude BETWEEN ? AND ? AND latitude BETWEEN ? AND ?",
-                       (w, e, s, n), f"bbox [{w}, {s}, {e}, {n}]", area)
+                       (w, e, s, n), t(es="el área seleccionada", en="the selected area"), area,
+                       bbox=(w, s, e, n))
         if lat is None or lon is None or radio_km is None:
             raise PlanError(t(es="Para un punto indica 'lat', 'lon' y 'radio_km'.",
                               en="For a point give 'lat', 'lon' and 'radio_km'."))

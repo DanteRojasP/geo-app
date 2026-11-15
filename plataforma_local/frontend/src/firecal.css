@@ -59,3 +59,53 @@
 .fc-lang{display:flex;gap:2px;margin-right:6px;border:1px solid var(--line);border-radius:8px;padding:2px}
 .fc-lang button{border:0;background:transparent;color:#c8d6cf;font:600 10px var(--mono);padding:4px 7px;border-radius:6px;cursor:pointer}
 .fc-lang button.is-active{background:#223f35;color:#fff}
+
+/* ---- Integración con el diseño de Dante (rama dante, b4dbf8c): cabecera, línea de tiempo, capas ---- */
+.fc-topright{position:absolute;z-index:720;top:16px;right:16px;display:flex;align-items:center;gap:8px}
+.fc-app-name{display:flex;flex-direction:column;align-items:flex-end;padding:0 4px;color:#0f172a;text-shadow:0 1px 2px rgba(255,255,255,.8)}
+.fc-app-name b{font-size:13px;font-weight:700}
+.fc-app-name small{font-size:10.5px;color:#334155}
+.fc-live{height:32px;padding:0 10px;display:flex;align-items:center;gap:7px;border:1px solid #cbd5e1;border-radius:4px;background:rgba(255,255,255,.96);color:#0f172a;font-size:11px;font-weight:600}
+.fc-live i{width:7px;height:7px;border-radius:50%;background:#16a34a}
+.fc-lang{display:flex;gap:2px;border:1px solid #cbd5e1;border-radius:4px;padding:2px;background:rgba(255,255,255,.96)}
+.fc-lang button{border:0;background:transparent;color:#334155;font:600 11px var(--mono);padding:5px 8px;border-radius:3px;cursor:pointer}
+.fc-lang button.is-active{background:#197bb5;color:#fff}
+.fc-help{width:32px;height:32px;border:1px solid #cbd5e1;border-radius:4px;background:rgba(255,255,255,.96);color:#334155;display:grid;place-items:center;cursor:pointer}
+.fc-timeline .fw-timeline-panel .fw-days{grid-template-columns:repeat(12,1fr)}
+.fc-timeline .fw-days button{position:relative;flex-direction:column;gap:0}
+.fc-timeline .fw-days button small{font-size:9px}
+.fc-timeline .fw-days button i{position:absolute;bottom:0;left:0;height:2px;background:#31a2dc}
+.fc-timeline .fw-days button:disabled{opacity:.35;cursor:default}
+.fc-timeline .fw-year-scale .fc-year{min-width:26px;padding:0;display:grid;place-items:center;color:#d8e7ef}
+.fc-points-legend{margin-top:6px;padding:8px 4px 2px;border-top:1px solid #e2e8f0;font-size:11px;color:#334155}
+.fc-points-legend>span{display:block;font:500 8px var(--mono);letter-spacing:.09em;color:#475569;margin-bottom:4px}
+.fc-points-legend p{margin:3px 0;display:flex;align-items:center;gap:7px}
+.fc-points-legend i{width:10px;height:10px;border-radius:50%;border:1px solid #fff4df;box-shadow:0 0 0 1px rgba(0,0,0,.15)}
+.fc-points-legend i.modis{background:#ff9b3f}
+.fc-points-legend i.viirs{background:#f33932}
+.fc-points-legend i.outside{background:#f33932;opacity:.35}
+.fc-calendar{left:426px;right:196px;bottom:110px}
+/* Teclado: foco visible (auditoría: ninguna celda era alcanzable). */
+.fc-calendar td:focus-visible{outline:3px solid #197bb5;outline-offset:-2px}
+button:focus-visible,select:focus-visible{outline:2px solid #197bb5;outline-offset:2px}
+/* Celular: el menú lateral pasa a una barra horizontal bajo el logo (antes desaparecía). */
+@media(max-width:950px){
+  .fw-rail{display:flex!important;flex-direction:row;top:64px;left:10px;right:10px;bottom:auto;width:auto;height:auto;padding:4px;gap:2px;border-radius:6px;overflow-x:auto}
+  .fw-rail button{flex:1 0 54px;height:44px}
+  .fw-summary{top:120px}
+  .fc-app-name{display:none}
+  .fc-calendar{left:10px;right:10px;bottom:100px}
+}
+@media(max-width:650px){.fc-live{display:none}.fc-topright{top:12px;right:10px}}
+/* Línea de tiempo: 12 meses + 26 años (Dante la diseñó para 5 días y 820 px). */
+.fc-timeline{width:min(1180px,calc(100vw - 130px))}
+.fc-timeline .fw-timeline-panel{min-width:0}
+.fc-timeline .fw-timeline-options{min-width:0}
+.fc-timeline .fw-year-scale{flex:1 1 auto;min-width:0}
+.fc-timeline .fw-timeline-source{flex:0 0 auto}
+/* Controles de arriba a la derecha: a la izquierda de la columna de capas de Dante. */
+.fc-topright{right:72px}
+@media(max-width:950px){.fc-timeline{width:calc(100vw - 20px)}}
+/* Las etiquetas de Dante (Cusco · MODIS + VIIRS · periodo) repiten el recuadro de la línea de tiempo
+   y quedaban detrás de los controles de idioma. */
+.fw-map-meta{display:none}

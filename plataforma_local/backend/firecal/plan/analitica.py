@@ -375,8 +375,13 @@ def recurrencia(store: PlanStore, aoi: AOI, limite: int = 5000) -> dict:
 
 
 # ------------------------------------------------------------------ resumen
-def resumen(store: PlanStore, aoi: AOI) -> dict:
-    """Las cinco frases juntas: la respuesta corta para quien no va a mirar gráficos."""
+def resumen(store: PlanStore, aoi: AOI, graficos: bool = False) -> dict:
+    """Las cinco frases juntas: la respuesta corta para quien no va a mirar gráficos.
+
+    Con ``graficos=True`` incluye también las respuestas completas de estacionalidad, ranking,
+    acumulado y altitud: el panel "En simple" se arma con UNA llamada (antes eran 5, y
+    /api/resumen recalculaba las mismas analíticas).
+    """
     partes = [estacionalidad(store, aoi), ranking(store, aoi), acumulado(store, aoi, None),
               altitud(store, aoi), recurrencia(store, aoi, limite=0)]
     notes = [_no_es_pronostico()]
@@ -387,4 +392,6 @@ def resumen(store: PlanStore, aoi: AOI) -> dict:
                         en=f"Fire in {aoi.label}, in plain words"),
             "unidad": unidad(),
             "frases": [{"pregunta": p["titulo"], "respuesta": p["en_simple"]} for p in partes],
+            **({"graficos": dict(zip(["estacionalidad", "ranking", "acumulado", "altitud"],
+                                     partes[:4], strict=True))} if graficos else {}),
             "notes": notes}

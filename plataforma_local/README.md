@@ -86,7 +86,7 @@ Sin compose, desde la **raíz** del repositorio:
 `docker build -f plataforma_local/Dockerfile -t firecal-cusco .` y `docker run --rm -p 8000:8000 firecal-cusco`.
 
 La imagen compila la interfaz (Node), instala la API y **valida los CSV contra MAESTRO §6**: si los datos cambiaron,
-la construcción falla. Pesa 1,33 GB y el contenedor usa ~130 MB de RAM.
+la construcción falla. Pesa 917 MB (antes 1,33 GB, sin las dependencias del backend sintético) y el contenedor usa ~130 MB de RAM.
 
 ### Opción B: desarrollo (Python + Node)
 
@@ -106,7 +106,7 @@ la construcción falla. Pesa 1,33 GB y el contenedor usa ~130 MB de RAM.
    npm run dev            # alternativa: modo desarrollo con recarga en http://localhost:5173
    ```
    En `npm run dev`, Vite reenvía `/api` al puerto 8000.
-3. **Pruebas:** `ruff check .` y `pytest -q` en `backend/` (142 pruebas); `npx eslint .` en `frontend/`.
+3. **Pruebas:** `ruff check .` y `pytest -q` en `backend/` (83 pruebas, ~25 s); `npx eslint .` en `frontend/`.
 
 Opciones de la página: `?calendario=0` abre sin el calendario (útil para presentar el mapa).
 Interfaz publicada en otro dominio (p. ej. Vercel): compilar con `VITE_API_BASE_URL=https://<api>` y, en la API,
@@ -144,7 +144,7 @@ Celda del calendario:
 
 Errores: **404 "Sin datos"**; **422** con el motivo (AOI vacío, rango invertido, fecha mal escrita, área demasiado
 grande, demasiados focos para el mapa); **429/503** del protocolo de solicitudes, con `Retry-After`.
-El backend sintético anterior (`/api/v1`) está desactivado (`api.legacy_v1: false`).
+El backend sintético anterior (`/api/v1`) se retiró el 14-nov: está en la rama `archivo/backend-sintetico`.
 
 ---
 

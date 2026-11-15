@@ -23,7 +23,7 @@ from collections.abc import Iterator
 from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 
 from firecal.i18n import t
@@ -41,7 +41,22 @@ from firecal.plan.query import (
 )
 from firecal.plan.sources import COLS_FOCOS
 
-router = APIRouter(prefix="/api", tags=["plan (MVP)"])
+KNOWN_PARAMS = {"departamento", "bbox", "lat", "lon", "radio_km", "fecha_inicio", "fecha_fin",
+                "mes", "anio", "limite", "graficos", "lang"}
+
+
+def _known_params(request: Request) -> None:
+    """422 con un mensaje claro si llega un parámetro que no existe (p. ej. 'departmento')."""
+    unknown = sorted(set(request.query_params) - KNOWN_PARAMS)
+    if unknown:
+        raise HTTPException(status_code=422, detail=t(
+            es=f"Parámetro(s) desconocido(s): {', '.join(unknown)}. Válidos: "
+               f"{', '.join(sorted(KNOWN_PARAMS))}.",
+            en=f"Unknown parameter(s): {', '.join(unknown)}. Valid: "
+               f"{', '.join(sorted(KNOWN_PARAMS))}."))
+
+
+router = APIRouter(prefix="/api", tags=["plan (MVP)"], dependencies=[Depends(_known_params)])
 
 FIRMS_CREDIT = ("We acknowledge the use of data and/or imagery from NASA's FIRMS "
                 "(https://earthdata.nasa.gov/firms).")
@@ -211,9 +226,12 @@ def _analitica(request: Request, nombre: str, departamento, bbox, lat, lon, radi
 
 @router.get("/resumen")
 def resumen(request: Request, departamento: Dep = None, bbox: BBox = None, lat: Lat = None,
-            lon: Lon = None, radio_km: Radio = None) -> dict:
-    """Cinco frases en lenguaje sencillo sobre el fuego del AOI."""
-    return _analitica(request, "resumen", departamento, bbox, lat, lon, radio_km)
+            lon: Lon = None, radio_km: Radio = None,
+            graficos: Annotated[bool, Query(description="Incluir los datos de los 4 gráficos "
+                                            "(una sola llamada para el panel)")] = False) -> dict:
+    """Cinco frases en lenguaje sencillo sobre el fuego del AOI (y, si se pide, los gráficos)."""
+    return _analitica(request, "resumen", departamento, bbox, lat, lon, radio_km,
+                      graficos=graficos)
 
 
 @router.get("/analitica/estacionalidad")

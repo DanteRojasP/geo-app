@@ -18,7 +18,7 @@ def test_health_returns_ok_and_data_mode(client):
     resp = client.get("/health")
     assert resp.status_code == 200
     body = resp.json()
-    # El prototipo sirve los datos reales de Cusco (el modo sintético es legacy_v1).
+    # El prototipo sirve los datos reales de Cusco.
     assert body["status"] == "ok" and body["data_mode"] == "real"
     assert isinstance(body["data_ready"], bool)
 
@@ -83,5 +83,5 @@ def test_log_filter_redacts_literal_key(caplog):
 def test_cli_help_lists_commands():
     result = CliRunner().invoke(cli_app, ["--help"])
     assert result.exit_code == 0
-    for cmd in ("synth", "ingest", "build", "validate", "train", "precompute", "serve", "all"):
+    for cmd in ("plan-events", "serve"):
         assert cmd in result.output

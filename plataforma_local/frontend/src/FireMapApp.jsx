@@ -7,7 +7,8 @@ import * as maplibregl from 'maplibre-gl'
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import {
   CalendarDays, ChevronLeft, ChevronRight, CircleHelp, Download, Flame, Gauge, Info,
-  Layers3, MapPin, MessageCircleQuestion, Pause, Play, Radar, Satellite, Scan, ShieldAlert, SlidersHorizontal,
+  Layers3, Map as MapIcon, MapPin, MessageCircleQuestion, Mountain, Pause, Play, Satellite, Scan, ShieldAlert,
+  SlidersHorizontal,
   ThermometerSun, Trash2, X,
 } from 'lucide-react'
 import SimplePanel from './SimplePanel.jsx'
@@ -32,6 +33,7 @@ const SATELLITE_STYLE = {
 const EMPTY = { type: 'FeatureCollection', features: [] }
 const FIRST_YEAR = 2000
 const LAST_YEAR = 2025
+const YEARS = Array.from({ length: LAST_YEAR - FIRST_YEAR + 1 }, (_, i) => FIRST_YEAR + i)
 // YlOrRd (ColorBrewer, apta para daltonismo) para los tramos con fuego; el 0 va en gris neutro.
 const YLORRD = ['#ffffb2', '#fecc5c', '#fd8d3c', '#f03b20', '#bd0026']
 const ZERO = '#e4e7ec'               // 0 focos: gris claro (no debe resaltar)
@@ -208,7 +210,7 @@ function CalendarPanel({ calendar, mode, setMode, selected, onSelect, onClose })
         <table>
           <thead><tr><th/>{MESES.map((m) => <th key={m}>{m}</th>)}</tr></thead>
           <tbody>
-            {calendar.anios.map((y) => (
+            {[...calendar.anios].reverse().map((y) => (
               <tr key={y}>
                 <th>{y}</th>
                 {MESES.map((_, idx) => {
@@ -223,7 +225,8 @@ function CalendarPanel({ calendar, mode, setMode, selected, onSelect, onClose })
                   const rango = c.incertidumbre ? tr('cal.range', { a: fmt(c.rango[0], 1), b: fmt(c.rango[1], 1) }) : ''
                   const tip = tr('cal.tip', { m: MESES[idx], y, v: fmt(c.focos_armonizados, 2), range: rango, q: calidadLabel(c.calidad), med: fmt(c.mediana_hist, 1), a: c.anomalia ?? '–', cat: catLabel(c.categoria) })
                   return (
-                    <td key={m} title={tip} onClick={() => onSelect(y, m)}
+                    <td key={m} title={tip} aria-label={tip} role="button" tabIndex={0} onClick={() => onSelect(y, m)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(y, m) } }}
                       className={[extrap ? 'is-extrap' : '', c.categoria === 'incierta' ? 'is-uncertain' : '', isSel ? 'is-selected' : '', y === 2013 && m === 1 ? 'is-viirs' : ''].join(' ')}
                       style={{ background: bg, color: inkFor(bg) }}>
                       {mode === 'anomalia' ? (c.anomalia === null ? '–' : `${c.anomalia > 0 ? '+' : ''}${c.anomalia.toFixed(1)}`) : fmtFocos(c.focos_armonizados)}
@@ -269,9 +272,11 @@ function FireMapApp() {
   const [notice, setNotice] = useState('')
   const [activeLayer, setActiveLayer] = useState('surface')
   const [showBoundary, setShowBoundary] = useState(false)
+  const [baseMap, setBaseMap] = useState('standard')
   const [calendarMode, setCalendarMode] = useState('valor')
   // ?calendario=0 abre la página sin el calendario (p. ej. para incrustarla en una presentación).
-  const [calendarOpen, setCalendarOpen] = useState(window.innerWidth >= 650
+  // Abierto solo en pantallas anchas: en 1440x900 tapaba Cusco (auditoría de Gabriel).
+  const [calendarOpen, setCalendarOpen] = useState(window.innerWidth >= 1600
     && new URLSearchParams(window.location.search).get('calendario') !== '0')
   const [playing, setPlaying] = useState(false)
   const [simpleOpen, setSimpleOpen] = useState(false)
@@ -410,6 +415,10 @@ function FireMapApp() {
     canvas.addEventListener('pointercancel', removeDrawBox, true)
 
     map.on('load', () => {
+      map.addSource('relief-imagery', { type: 'raster', tileSize: 256, attribution: 'Esri, Vantor, Earthstar Geographics, and the GIS User Community', tiles: ['https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'] })
+      map.addSource('relief-reference', { type: 'raster', tileSize: 256, tiles: ['https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}'] })
+      map.addLayer({ id: 'relief-imagery-layer', type: 'raster', source: 'relief-imagery', layout: { visibility: 'none' }, paint: { 'raster-saturation': -0.12, 'raster-contrast': 0.08, 'raster-brightness-min': 0.08, 'raster-brightness-max': 0.92 } })
+      map.addLayer({ id: 'relief-reference-layer', type: 'raster', source: 'relief-reference', layout: { visibility: 'none' }, paint: { 'raster-opacity': 0.82 } })
       map.addSource('cusco-mask', { type: 'geojson', data: EMPTY })
       map.addSource('cusco-area', { type: 'geojson', data: EMPTY })
       map.addSource('focos', { type: 'geojson', data: EMPTY })
@@ -518,6 +527,14 @@ function FireMapApp() {
     map.setLayoutProperty('fire-points', 'visibility', activeLayer === 'points' ? 'visible' : 'none')
   }, [activeLayer])
 
+  useEffect(() => {
+    const map = mapRef.current
+    if (!mapReadyRef.current || !map?.getLayer('relief-imagery-layer')) return
+    const visibility = baseMap === 'relief' ? 'visible' : 'none'
+    map.setLayoutProperty('relief-imagery-layer', 'visibility', visibility)
+    map.setLayoutProperty('relief-reference-layer', 'visibility', visibility)
+  }, [baseMap])
+
   // "Límite" resalta Cusco sin apagar la densidad ni los puntos.
   useEffect(() => {
     const map = mapRef.current
@@ -556,13 +573,15 @@ function FireMapApp() {
   return (
     <div className="fw-app">
       <div ref={mapContainerRef} className="fw-map" aria-label={tr('map.aria')} />
-      <header className="fw-topbar">
-        <div className="fw-brand"><span><Radar size={19}/></span><div><b>FireCal Cusco</b><small>{tr('brand.subtitle')}</small></div></div>
-        <button className="fw-search" onClick={focusCusco}><MapPin size={17}/><div><small>{tr('search.small')}</small><b>{tr('search.title')}</b></div><span className="fw-scope-action">{tr('search.action')}</span></button>
-        <div className="fw-top-actions"><span className="fw-live"><i/>{metadata ? tr('live.ok') : tr('live.connecting')}</span><div className="fc-lang" role="group" aria-label={tr('lang.title')}>{LANGS.map((l) => <button key={l} className={l === lang ? 'is-active' : ''} aria-pressed={l === lang} onClick={() => changeLang(l)}>{l.toUpperCase()}</button>)}</div><button title={tr('btn.method')} onClick={() => setDetailsOpen(true)}><CircleHelp size={18}/></button></div>
-      </header>
+      <div className="fw-nubel-brand" aria-label="Nubel Team · FireCal Cusco"><img src="./nubel-team-logo.png" alt="Nubel Team"/></div>
+      <div className="fc-topright">
+        <div className="fc-app-name"><b>FireCal Cusco</b><small>{tr('brand.subtitle')}</small></div>
+        <span className="fc-live"><i/>{metadata ? tr('live.ok') : tr('live.connecting')}</span>
+        <div className="fc-lang" role="group" aria-label={tr('lang.title')}>{LANGS.map((l) => <button key={l} className={l === lang ? 'is-active' : ''} aria-pressed={l === lang} onClick={() => changeLang(l)}>{l.toUpperCase()}</button>)}</div>
+        <button className="fc-help" title={tr('btn.method')} onClick={() => setDetailsOpen(true)}><CircleHelp size={18}/></button>
+      </div>
       <nav className="fw-rail" aria-label={tr('rail.label')}>
-        <button className="is-active" title={tr('rail.hotspots')}><Flame size={20}/><span>{tr('rail.hotspots')}</span></button>
+        <button className="is-active" title={tr('rail.hotspotsTitle')} onClick={() => { focusCusco(); setDetailsOpen(true); setActiveLayer('surface') }}><Flame size={20}/><span>{tr('rail.hotspots')}</span></button>
         <button className={calendarOpen ? 'is-active' : ''} title={tr('rail.calendar')} onClick={() => setCalendarOpen((v) => !v)}><CalendarDays size={20}/><span>{tr('rail.calendar')}</span></button>
         <button className={selectionMode ? 'is-active select' : ''} title={tr('rail.areaTitle')} onClick={toggleSelectionMode}><Scan size={20}/><span>{tr('rail.area')}</span></button>
         <button className={simpleOpen ? 'is-active' : ''} title={tr('rail.simpleTitle')} onClick={() => setSimpleOpen((v) => !v)}><MessageCircleQuestion size={20}/><span>{tr('rail.simple')}</span></button>
@@ -589,15 +608,24 @@ function FireMapApp() {
       </aside>}
       {layersOpen && !selectionBounds && <aside className="fw-layers">
         <div className="fw-layers-title"><span>{tr('layers.title')}</span><SlidersHorizontal size={15}/></div>
+        <div className="fw-basemap-switch" role="group" aria-label={tr('basemap.title')}>
+          <span>{tr('basemap.title')}</span>
+          <div>
+            <button aria-label={tr('basemap.standard')} title={tr('basemap.standard')} className={baseMap === 'standard' ? 'is-active' : ''} onClick={() => setBaseMap('standard')}><MapIcon size={16}/><b>{tr('basemap.standard')}</b></button>
+            <button aria-label={tr('basemap.relief')} title={tr('basemap.relief')} className={baseMap === 'relief' ? 'is-active' : ''} onClick={() => setBaseMap('relief')}><Mountain size={16}/><b>{tr('basemap.relief')}</b></button>
+          </div>
+        </div>
         <LayerButton active={activeLayer === 'surface'} icon={ThermometerSun} label={tr('layers.density')} tone="heat" onClick={() => setActiveLayer('surface')}/>
         <LayerButton active={activeLayer === 'points'} icon={MapPin} label={tr('layers.points')} tone="points" onClick={() => setActiveLayer('points')}/>
         <LayerButton active={showBoundary} icon={Layers3} label={tr('layers.boundary')} tone="boundary" onClick={() => setShowBoundary((v) => !v)}/>
         <LayerButton active={selectionMode} icon={Scan} label={tr('layers.area')} tone="select" onClick={toggleSelectionMode}/>
-        <div className="fw-scale"><span>{activeLayer === 'points' ? 'MODIS · VIIRS' : tr('layers.scaleDensity')}</span><div/><section><small>{tr('scale.low')}</small><small>{tr('scale.mid')}</small><small>{tr('scale.high')}</small></section></div>
+        {activeLayer === 'points'
+          ? <div className="fc-points-legend"><span>{tr('layers.pointsLegend')}</span><p><i className="modis"/>MODIS</p><p><i className="viirs"/>VIIRS</p><p><i className="outside"/>{tr('layers.outside')}</p></div>
+          : <div className="fw-scale"><span>{tr('layers.scaleDensity')}</span><div/><section><small>{tr('scale.low')}</small><small>{tr('scale.mid')}</small><small>{tr('scale.high')}</small></section></div>}
       </aside>}
       <div className="fw-map-meta"><button onClick={focusCusco}><MapPin size={13}/>Cusco</button><span><Satellite size={13}/>MODIS + VIIRS</span><span><CalendarDays size={13}/>{periodo.label}</span></div>
       {selectionMode && <div className="fw-draw-hint"><Scan size={20}/><div><b>{tr('draw.title')}</b><span>{tr('draw.hint')}</span></div><button onClick={() => setSelectionMode(false)} title={tr('btn.cancel')}><X size={16}/></button></div>}
-      {selectionBounds && <aside className="fw-selection-card">
+      {selectionBounds && !simpleOpen && <aside className="fw-selection-card">
         <div className="fw-selection-head"><div><p>{tr('sel.kicker')}</p><h2>{tr('sel.title')}</h2><span>{periodo.label} · {tr('sel.within')}</span></div><button onClick={clearSelection} title={tr('sel.clear')}><Trash2 size={17}/></button></div>
         <SatelliteSelectionMap bounds={selectionBounds} focos={selection?.focos || EMPTY}/>
         <div className="fw-selection-source"><span>{tr('sel.source')}</span><b>Esri World Imagery · NASA FIRMS</b></div>
@@ -614,18 +642,27 @@ function FireMapApp() {
       </aside>}
       {simpleOpen && <SimplePanel key={lang} aoi={selection?.bbox || aoi} etiqueta={selection?.bbox ? 'area' : 'cusco'} onClose={() => setSimpleOpen(false)}/>}
       {calendarOpen && <CalendarPanel calendar={calendar} mode={calendarMode} setMode={setCalendarMode} selected={selected} onSelect={selectMonth} onClose={() => setCalendarOpen(false)}/>}
-      <section className="fw-timeline">
-        <button className="fw-play" onClick={() => setPlaying((v) => !v)} title={playing ? tr('timeline.pause') : tr('timeline.play')}>{playing ? <Pause size={20}/> : <Play size={20}/>}</button>
-        <div className="fw-time-info"><button className="fc-year" onClick={() => shiftYear(-1)} title={tr('timeline.prevYear')} disabled={selected.year <= FIRST_YEAR}><ChevronLeft size={15}/></button><div><b>{selected.year}</b><small>{tr('timeline.yearSum', { n: fmtFocos(yearTotal) })}</small></div><button className="fc-year" onClick={() => shiftYear(1)} title={tr('timeline.nextYear')} disabled={selected.year >= LAST_YEAR}><ChevronRight size={15}/></button></div>
-        <div className="fw-days">
-          <button className={selected.month === null ? 'is-active' : ''} onClick={() => { setSelected((s) => ({ year: s.year, month: null })); setPlaying(false) }}><span>{tr('timeline.all')}</span><b>{selected.year}</b></button>
-          {MESES.map((label, idx) => {
-            const c = yearCells.find((x) => x.mes === idx + 1)
-            const noData = !c || c.sin_dato
-            return <button key={label} disabled={noData} className={[selected.month === idx + 1 ? 'is-active' : '', c?.calidad === 'extrapolado' ? 'is-extrap' : ''].join(' ')} onClick={() => selectMonth(selected.year, idx + 1)} title={noData ? tr('noData') : tr('popup.weight', { v: fmt(c.focos_armonizados, 2) })}><span>{label}</span><b>{noData ? '–' : fmtFocos(c.focos_armonizados)}</b><i style={{ '--events': noData ? 0 : Math.round(100 * c.focos_armonizados / yearMax) }}/></button>
-          })}
+      <section className="fw-timeline fc-timeline">
+        <button className="fw-play" onClick={() => setPlaying((v) => !v)} title={playing ? tr('timeline.pause') : tr('timeline.play')}>{playing ? <Pause size={19}/> : <Play size={19}/>}</button>
+        <div className="fw-timeline-panel" style={{ '--progress': `${selected.month ? ((selected.month - 1) / 11) * 100 : 100}%` }}>
+          <div className={`fw-time-callout ${selected.month === 1 ? 'is-start' : !selected.month || selected.month === 12 ? 'is-end' : ''}`}><b>{periodo.label}</b><span>{tr('timeline.yearSum', { n: fmtFocos(selected.month ? (month?.focos_armonizados ?? 0) : yearTotal) })}</span></div>
+          <div className="fw-days">
+            {MESES.map((label, idx) => {
+              const c = yearCells.find((x) => x.mes === idx + 1)
+              const noData = !c || c.sin_dato
+              return <button key={label} disabled={noData} className={[selected.month === idx + 1 ? 'is-active' : '', c?.calidad === 'extrapolado' ? 'is-extrap' : ''].join(' ')} onClick={() => selectMonth(selected.year, idx + 1)} title={noData ? tr('noData') : tr('popup.weight', { v: fmt(c.focos_armonizados, 2) })}><span>{label}</span><small>{noData ? '–' : fmtFocos(c.focos_armonizados)}</small><i style={{ width: `${noData ? 0 : Math.round(100 * c.focos_armonizados / yearMax)}%` }}/></button>
+            })}
+          </div>
+          <div className="fw-timeline-options">
+            <button className={selected.month === null ? 'is-active' : ''} onClick={() => { setSelected((s) => ({ year: s.year, month: null })); setPlaying(false) }}><Layers3 size={13}/><span>{tr('timeline.allYear')}</span></button>
+            <div className="fw-year-scale" aria-label={tr('timeline.years')}>
+              <button className="fc-year" onClick={() => shiftYear(-1)} title={tr('timeline.prevYear')} disabled={selected.year <= FIRST_YEAR}><ChevronLeft size={13}/></button>
+              {YEARS.map((y) => <button key={y} className={selected.year === y ? 'is-active' : ''} onClick={() => { setPlaying(false); setSelected({ year: y, month: null }) }}>{String(y).slice(2)}</button>)}
+              <button className="fc-year" onClick={() => shiftYear(1)} title={tr('timeline.nextYear')} disabled={selected.year >= LAST_YEAR}><ChevronRight size={13}/></button>
+            </div>
+            <div className="fw-timeline-source"><span>NASA FIRMS · UTC−5</span><b>{latency ? `${latency} ms` : tr('timeline.historic')}</b></div>
+          </div>
         </div>
-        <div className="fw-timeline-note"><span>{tr('timeline.local')}</span><b>{latency ? `${latency} ms` : tr('timeline.historic')}</b></div>
       </section>
     </div>
   )

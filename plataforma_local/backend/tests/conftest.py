@@ -40,45 +40,6 @@ def client(settings: Settings) -> TestClient:
 
 
 @pytest.fixture(scope="session")
-def pipeline_home(tmp_path_factory):
-    """Pipeline sintético completo (synth -> ... -> validate) en una carpeta aislada.
-
-    Se construye una sola vez por sesión y lo comparten los tests de armonización y de la API.
-    """
-    import shutil
-    from datetime import date
-    from types import SimpleNamespace
-
-    from firecal.pipeline import (
-        run_aggregate,
-        run_clean,
-        run_harmonize,
-        run_ingest,
-        run_validate,
-    )
-    from firecal.settings import PROJECT_ROOT, Paths, ScientificParams, load_params
-    from firecal.synth.generator import generate
-
-    home = tmp_path_factory.mktemp("pipeline_home")
-    shutil.copytree(PROJECT_ROOT / "config", home / "config")
-    raw = load_params(home / "config" / "settings.yaml").model_dump()
-    raw["harmonization"]["bootstrap_reps"] = 200  # suficiente para probar la lógica
-    raw["api"]["rate_limit"]["enabled"] = False  # se prueba aparte en test_limits.py
-    raw["api"]["legacy_v1"] = True                # estos tests ejercitan /api/v1 (sintético)
-    raw["api"]["default_lang"] = "es"             # las aserciones de texto están en español
-    env = EnvSettings(_env_file=None, FIRECAL_DATA_MODE="synthetic")
-    settings = Settings(env=env, params=ScientificParams.model_validate(raw),
-                        paths=Paths(home=home))
-    generate(settings, scale=0.25, start=date(2000, 11, 1), end=date(2026, 11, 12))
-    run_ingest(settings)
-    run_clean(settings)
-    run_aggregate(settings)
-    summary = run_harmonize(settings)
-    metrics = run_validate(settings)
-    return SimpleNamespace(settings=settings, summary=summary, metrics=metrics)
-
-
-@pytest.fixture(scope="session")
 def plan_home(tmp_path_factory):
     """Datos reales de Cusco (CSV de Antonio, data/harmonized/) cargados en una carpeta aislada.
 
