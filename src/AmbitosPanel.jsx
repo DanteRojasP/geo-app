@@ -2,7 +2,7 @@
 // o cuenca Pfafstetter, con el mapa pintado por nivel, la lista ordenada, el informe de cada unidad
 // y la tabla CSV del nivel. Datos: /api/ambitos/* del backend.
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Download, FileText, X } from 'lucide-react'
+import { CalendarDays, Download, FileText, X } from 'lucide-react'
 import { ambitoUrl, getAmbitoGeojson, getAmbitoNivel, getAmbitos, informeUrl } from './services/api.js'
 import { tr } from './i18n.js'
 
@@ -40,6 +40,8 @@ function AmbitosPanel({ map, onClose }) {
   const [error, setError] = useState('')
   const [filtro, setFiltro] = useState('')
   const [elegido, setElegido] = useState(null)
+  const [fechaInicio, setFechaInicio] = useState('2000-11')
+  const [fechaFin, setFechaFin] = useState('2025-12')
   const listRef = useRef(null)
 
   useEffect(() => {
@@ -99,6 +101,11 @@ function AmbitosPanel({ map, onClose }) {
   const politicos = niveles.filter((n) => n.grupo === 'politico')
   const hidro = niveles.filter((n) => n.grupo === 'hidrografico')
   const conteo = datos?.conteo || {}
+  const periodoValido = fechaInicio <= fechaFin
+  const unidadElegida = datos?.unidades?.find((u) => u.codigo === elegido)
+  const urlInforme = elegido && periodoValido
+    ? informeUrl({ ambito: `${nivel}:${elegido}` }, { fecha_inicio: fechaInicio, fecha_fin: fechaFin })
+    : ''
 
   return (
     <aside className="fa-panel" aria-label={tr('amb.title')}>
@@ -113,6 +120,23 @@ function AmbitosPanel({ map, onClose }) {
             <optgroup label={tr('amb.hydro')}>{hidro.map((n) => <option key={n.nivel} value={n.nivel}>{n.titulo} ({n.n_unidades})</option>)}</optgroup>
           </select>
         </label>
+        <label>{tr('amb.unit')}
+          <select value={elegido || ''} disabled={!datos} onChange={(e) => setElegido(e.target.value || null)}>
+            <option value="">{tr('amb.chooseUnit')}</option>
+            {(datos?.unidades || []).map((u) => <option key={u.codigo} value={u.codigo}>{u.nombre} · {u.codigo}</option>)}
+          </select>
+        </label>
+        <div className="fa-period">
+          <strong><CalendarDays size={14}/>{tr('amb.reportPeriod')}</strong>
+          <div>
+            <label>{tr('filter.from')}<input type="month" min="2000-11" max="2025-12" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)}/></label>
+            <label>{tr('filter.to')}<input type="month" min="2000-11" max="2025-12" value={fechaFin} onChange={(e) => setFechaFin(e.target.value)}/></label>
+          </div>
+          {!periodoValido && <small className="fa-period-error">{tr('filter.invalid')}</small>}
+          {urlInforme
+            ? <a className="fa-btn fa-report-primary" href={urlInforme} target="_blank" rel="noreferrer"><FileText size={15}/>{tr('amb.generateReport')}</a>
+            : <small>{tr('amb.chooseReportUnit')}</small>}
+        </div>
         <input type="search" value={filtro} onChange={(e) => setFiltro(e.target.value)} placeholder={tr('amb.filter')} aria-label={tr('amb.filter')}/>
       </div>
       {error && <p className="fa-error">{error}</p>}
@@ -126,18 +150,18 @@ function AmbitosPanel({ map, onClose }) {
         <p className="fa-note">{tr('amb.coverage', { p: Math.round((datos.cobertura || 0) * 1000) / 10 })}</p>
         <ol className="fa-list" ref={listRef}>
           {filas.map((u) => (
-            <li key={u.codigo} data-codigo={u.codigo} className={u.codigo === elegido ? 'is-picked' : ''}>
+            <li key={u.codigo} data-codigo={u.codigo} className={u.codigo === elegido ? 'is-picked' : ''} onClick={() => setElegido(u.codigo)} aria-current={u.codigo === elegido ? 'true' : undefined}>
               <span className="fa-rank">{u.puesto ?? '–'}</span>
               <span className="fa-badge" style={{ background: u.color }}>{u.etiqueta}</span>
               <span className="fa-name"><b>{u.nombre}</b><small>{u.provincia ? `${u.provincia} · ` : ''}{u.codigo} · {tr('amb.density', { v: u.densidad ?? 0 })}</small></span>
-              <a className="fa-btn" href={ambitoUrl(`/api/ambitos/${nivel}/${u.codigo}/informe`)} target="_blank" rel="noreferrer" title={tr('amb.report')}><FileText size={14}/>{tr('amb.reportShort')}</a>
-              <a className="fa-btn" href={informeUrl({ ambito: `${nivel}:${u.codigo}` })} target="_blank" rel="noreferrer" title={tr('report.tip')}>{tr('amb.technical')}</a>
+              <a className="fa-btn" href={informeUrl({ ambito: `${nivel}:${u.codigo}` }, { fecha_inicio: fechaInicio, fecha_fin: fechaFin })} target="_blank" rel="noreferrer" title={tr('amb.reportRange', { a: fechaInicio, b: fechaFin })} onClick={(e) => e.stopPropagation()}><FileText size={14}/>{tr('amb.reportShort')}</a>
             </li>
           ))}
         </ol>
         {(datos.unidades.length > filas.length) && <p className="fa-note">{tr('amb.more', { n: datos.unidades.length - filas.length })}</p>}
         <div className="fa-actions">
           <a className="fa-btn" href={ambitoUrl(`/api/ambitos/${nivel}.csv`)}><Download size={14}/>{tr('amb.csv')}</a>
+          {unidadElegida && <span>{unidadElegida.nombre} · {fechaInicio}–{fechaFin}</span>}
         </div>
         <p className="fa-note">{datos.metodo.notas[0]} {datos.metodo.notas[1]}</p>
         <p className="fa-note">{datos.fuente}</p>

@@ -236,3 +236,22 @@ button:focus-visible,select:focus-visible{outline:2px solid #197bb5;outline-offs
 .fc-intro:not(.is-loading){background:rgba(6,20,29,.28);backdrop-filter:none}
 .fc-intro-map{background-image:linear-gradient(180deg,rgba(6,24,34,.04),rgba(6,24,34,.18)),url('/cusco-hero.png');background-position:center;background-size:cover}
 .fc-intro-map:after{background:linear-gradient(90deg,rgba(6,22,32,.18),transparent 36%),linear-gradient(0deg,rgba(6,22,32,.58),transparent 52%)}
+
+/* Date-aware reports and direct unit selection in Scopes. */
+.fa-panel{width:440px}
+.fa-controls{gap:9px}
+.fa-controls select:disabled{opacity:.55;cursor:not-allowed}
+.fa-period{padding:10px;border:1px solid #dce5ea;border-radius:4px;background:#f6f9fa}
+.fa-period>strong{display:flex;align-items:center;gap:6px;margin-bottom:8px;color:#40525c;font-size:9px;letter-spacing:.04em;text-transform:uppercase}
+.fa-period>strong svg{color:#2c86ad}
+.fa-period>div{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.fa-period input{color-scheme:light}
+.fa-period>small{display:block;margin-top:7px;color:#74838b;font-size:9px;line-height:1.35}
+.fa-period .fa-period-error{color:#b42318}
+.fa-report-primary{width:100%;margin-top:9px;justify-content:center;border-color:#2c86ad!important;background:#2c86ad!important;color:#fff!important}
+.fa-report-primary:hover{background:#247697!important}
+.fa-list li{cursor:pointer}
+.fa-list li:hover{background:#f3f7f9}
+.fa-actions{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.fa-actions>span{overflow:hidden;color:#6e7d85;font-size:9px;text-align:right;text-overflow:ellipsis;white-space:nowrap}
+@media(max-width:650px){.fa-panel{width:auto}.fa-period>div{grid-template-columns:1fr}}
