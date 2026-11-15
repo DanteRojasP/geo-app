@@ -255,8 +255,9 @@ Correcciones aplicadas en la revisión:
 - **URL pública:** https://firecal-316891526626.southamerica-east1.run.app (API en `/api/*`, documentación en `/docs`).
 - Proyecto `sonic-mile-514718-r5`, región São Paulo, 1 GB, 1 instancia mínima y 2 como máximo, imagen
   `firecal-cusco:8fc1f2b` en Artifact Registry. Casos de MAESTRO §12 comprobados contra la URL pública.
-- Variables: `FIRECAL_TRUST_PROXY=1` y `FIRECAL_PROXY_HOPS=2`. Con 1 salto, todos los visitantes compartían el cupo
-  de 120/min, porque Cloud Run agrega la IP de su proxy al final de `X-Forwarded-For`. Corregido en 8fc1f2b.
+- Variables: `FIRECAL_TRUST_PROXY=1` y `FIRECAL_PROXY_HOPS=1`. Comprobado en producción: Cloud Run agrega al final de
+  `X-Forwarded-For` solo la IP real del visitante. Las revisiones 2 y 3 quedaron mal configuradas (2 saltos y, luego, una
+  variable mal guardada por la coma en PowerShell); la revisión 5 lo corrige.
 - PR #8 unido a `main` (b5768dd).
 - [ ] Probar el límite con dos personas en redes distintas.
 - [ ] Al terminar la evaluación: `--min-instances 0` o borrar el servicio.

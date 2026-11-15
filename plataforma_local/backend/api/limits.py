@@ -165,9 +165,9 @@ class RateLimiter:
         self.enabled = params.enabled
         env_trust = os.environ.get("FIRECAL_TRUST_PROXY") == "1"
         self.trust_proxy = params.trust_proxy_headers or env_trust
-        # Cuántos proxies agregan IP al final de X-Forwarded-For. En Cloud Run son 2 (el visitante
-        # queda penúltimo): con 1, todos los visitantes compartían el cupo del proxy de Google
-        # (comprobado en producción el 14-nov). FIRECAL_PROXY_HOPS lo fija sin reconstruir.
+        # Cuántos proxies agregan IP al final de X-Forwarded-For. En Cloud Run es 1: llega
+        # "<lo que mandó el cliente>, <IP real>" (comprobado en producción el 14-nov: con 2, las IP
+        # inventadas creaban clientes nuevos). FIRECAL_PROXY_HOPS lo cambia sin reconstruir.
         self.proxy_hops = int(os.environ.get("FIRECAL_PROXY_HOPS") or params.proxy_hops)
         self.general = TokenBuckets(params.requests_per_minute, params.burst, params.max_clients)
         self.heavy = TokenBuckets(params.heavy_per_minute, params.heavy_burst, params.max_clients)
