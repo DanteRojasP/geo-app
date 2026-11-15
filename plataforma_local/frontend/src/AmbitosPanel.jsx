@@ -1,14 +1,13 @@
 // Panel "Ámbitos": nivel de peligro por focos de calor (formato CENEPRED) por provincia, distrito
 // o cuenca Pfafstetter, con el mapa pintado por nivel, la lista ordenada, el informe de cada unidad
 // y la tabla CSV del nivel. Datos: /api/ambitos/* del backend.
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { CalendarDays, Download, Eye, FileText, LoaderCircle, X } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { CalendarDays, Download, Eye, LoaderCircle, X } from 'lucide-react'
 import { ambitoUrl, getAmbitoGeojson, getAmbitoNivel, getAmbitos, informeUrl } from './services/api.js'
 import { tr } from './i18n.js'
 
 const LEVELS = ['muy_alto', 'alto', 'medio', 'bajo', 'sin_clasificar']
 const COLORS = { muy_alto: '#c0392b', alto: '#e67e22', medio: '#f1c40f', bajo: '#27ae60', sin_clasificar: '#98a2b3' }
-const MAX_ROWS = 80
 
 function paint(map, geojson) {
   if (!map) return
@@ -114,12 +113,10 @@ function AmbitosPanel({ map, onClose }) {
   const [nivel, setNivel] = useState('provincia')
   const [datos, setDatos] = useState(null)
   const [error, setError] = useState('')
-  const [filtro, setFiltro] = useState('')
   const [elegido, setElegido] = useState(null)
   const [fechaInicio, setFechaInicio] = useState('2000-11-01')
   const [fechaFin, setFechaFin] = useState('2025-12-31')
   const [reportLoading, setReportLoading] = useState('')
-  const listRef = useRef(null)
 
   useEffect(() => {
     getAmbitos().then(({ body }) => setNiveles(body.niveles)).catch((e) => setError(e.message))
@@ -159,21 +156,6 @@ function AmbitosPanel({ map, onClose }) {
       hide(map)
     }
   }, [map])
-
-  useEffect(() => {
-    if (elegido) listRef.current?.querySelector(`[data-codigo="${elegido}"]`)?.scrollIntoView({ block: 'nearest' })
-  }, [elegido])
-
-  const filas = useMemo(() => {
-    const us = datos?.unidades || []
-    const q = filtro.trim().toLowerCase()
-    const sel = q ? us.filter((u) => u.nombre.toLowerCase().includes(q) || u.codigo.includes(q)) : us
-    if (elegido && !sel.slice(0, MAX_ROWS).some((u) => u.codigo === elegido)) {
-      const u = us.find((x) => x.codigo === elegido)
-      if (u) return [u, ...sel.slice(0, MAX_ROWS - 1)]
-    }
-    return sel.slice(0, MAX_ROWS)
-  }, [datos, filtro, elegido])
 
   const politicos = niveles.filter((n) => n.grupo === 'politico')
   const hidro = niveles.filter((n) => n.grupo === 'hidrografico')
@@ -258,7 +240,6 @@ function AmbitosPanel({ map, onClose }) {
             : <small>{tr('amb.chooseReportUnit')}</small>}
           {reportLoading && <div className="fa-report-loading" role="status" aria-live="polite"><LoaderCircle size={16}/><span>{tr(reportLoading === 'pdf' ? 'amb.preparingPdf' : 'amb.preparingReport')}</span></div>}
         </div>
-        <input type="search" value={filtro} onChange={(e) => setFiltro(e.target.value)} placeholder={tr('amb.filter')} aria-label={tr('amb.filter')}/>
       </div>
       {error && <p className="fa-error">{error}</p>}
       {!datos && !error && <p className="fa-note">{tr('amb.loading')}</p>}
@@ -269,17 +250,6 @@ function AmbitosPanel({ map, onClose }) {
           ))}
         </div>
         <p className="fa-note">{tr('amb.coverage', { p: Math.round((datos.cobertura || 0) * 1000) / 10 })}</p>
-        <ol className="fa-list" ref={listRef}>
-          {filas.map((u) => (
-            <li key={u.codigo} data-codigo={u.codigo} className={u.codigo === elegido ? 'is-picked' : ''} onClick={() => setElegido(u.codigo)} aria-current={u.codigo === elegido ? 'true' : undefined}>
-              <span className="fa-rank">{u.puesto ?? '–'}</span>
-              <span className="fa-badge" style={{ background: u.color }}>{u.etiqueta}</span>
-              <span className="fa-name"><b>{u.nombre}</b><small>{u.provincia ? `${u.provincia} · ` : ''}{u.codigo} · {tr('amb.density', { v: u.densidad ?? 0 })}</small></span>
-              <button type="button" className="fa-btn" disabled={Boolean(reportLoading)} title={tr('amb.reportRange', { a: fechaInicio, b: fechaFin })} onClick={(e) => { e.stopPropagation(); setElegido(u.codigo); openGeneratedReport('view', u.codigo) }}><FileText size={14}/>{tr('amb.reportShort')}</button>
-            </li>
-          ))}
-        </ol>
-        {(datos.unidades.length > filas.length) && <p className="fa-note">{tr('amb.more', { n: datos.unidades.length - filas.length })}</p>}
         <div className="fa-actions">
           <a className="fa-btn" href={ambitoUrl(`/api/ambitos/${nivel}.csv`)}><Download size={14}/>{tr('amb.csv')}</a>
           {unidadElegida && <span>{unidadElegida.nombre} · {inicioMes}–{finMes}</span>}
