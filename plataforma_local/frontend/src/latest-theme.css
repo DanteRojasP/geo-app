@@ -229,5 +229,5 @@ button:focus-visible,select:focus-visible{outline:2px solid #197bb5;outline-offs
 @media(max-width:850px){.fc-intro{padding:10px}.fc-intro-frame{grid-template-columns:1fr}.fc-intro-sheet{padding:20px 22px 18px}.fc-intro-map{display:none}.fc-intro-copy{padding:20px 0 16px}.fc-intro-copy h1{font-size:30px}.fc-intro-facts>div{padding:9px}.fc-intro-plain{padding-top:18px}.fc-intro-action{padding-top:16px}}@media(max-width:520px){.fc-intro{padding:0}.fc-intro-frame{border:0;border-radius:0}.fc-intro-sheet{padding:17px 16px}.fc-intro-top>img{width:132px}.fc-intro-copy h1{font-size:27px}.fc-intro-facts{grid-template-columns:1fr}.fc-intro-facts>div{border-right:0;border-bottom:1px solid #e3e8eb}.fc-intro-facts>div:last-child{border-bottom:0}.fc-intro-plain>header{display:block}.fc-intro-plain h2{margin-top:5px}.fc-intro-action{align-items:stretch;flex-direction:column}.fc-intro-action button{justify-content:center}}
 
 /* Keep the four left launchers in separate rows after combining the team UI. */
-.fc-data-launcher.fc-ambitos-launcher{top:264px}
-@media(max-width:650px){.fc-data-launcher.fc-ambitos-launcher{top:218px}}
+.fc-data-launcher.fc-ambitos-launcher{top:264px!important}
+@media(max-width:650px){.fc-data-launcher.fc-ambitos-launcher{top:218px!important}}
