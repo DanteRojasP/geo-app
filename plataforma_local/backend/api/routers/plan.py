@@ -43,7 +43,8 @@ from firecal.plan.query import (
 from firecal.plan.sources import COLS_FOCOS
 
 KNOWN_PARAMS = {"departamento", "bbox", "lat", "lon", "radio_km", "fecha_inicio", "fecha_fin",
-                "mes", "anio", "limite", "graficos", "lang", "horas", "ambito"}
+                "mes", "anio", "limite", "graficos", "lang", "horas", "ambito",
+                "desde", "hasta", "ventana"}
 
 
 def _known_params(request: Request) -> None:

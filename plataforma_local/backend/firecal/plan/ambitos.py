@@ -38,7 +38,7 @@ import pandas as pd
 import shapely
 from shapely.geometry import shape
 
-from firecal.i18n import t
+from firecal.i18n import month_name, t
 from firecal.plan.query import AOI, PlanError, PlanNoData, PlanStore, unidad
 
 AMBITOS_DIR = Path(__file__).resolve().parents[2] / "config" / "ambitos"
@@ -408,6 +408,185 @@ def resumen_nivel(store: PlanStore, nivel: str) -> dict:
         "conteo": {etiqueta(k): int(v) for k, v in conteo.items()},
         "metodo": metodo(),
         "unidades": unidades,
+    }
+
+
+# ------------------------------------------------------------------ distribución por día del año
+ORDEN_PELIGRO = ("muy_alto", "alto", "medio", "bajo", "sin_clasificar")
+VENTANAS = (1, 7, 15, 31)  # días del promedio móvil (1 = sin suavizar)
+
+
+def dia_del_anio(fechas) -> np.ndarray:
+    """Día 1-365 en un calendario sin bisiestos: el 29 de febrero se suma al 28 (día 59)."""
+    f = pd.to_datetime(pd.Series(fechas))
+    d = f.dt.day_of_year.to_numpy()
+    corre = f.dt.is_leap_year.to_numpy() & (
+        (f.dt.month.to_numpy() > 2) | ((f.dt.month.to_numpy() == 2) & (f.dt.day.to_numpy() == 29))
+    )
+    return d - corre
+
+
+def _fecha_dia(dia: int) -> str:
+    f = pd.Timestamp(2001, 1, 1) + pd.Timedelta(days=int(dia) - 1)
+    return t(es=f"{f.day} de {month_name(f.month)}", en=f"{month_name(f.month)} {f.day}")
+
+
+def _suavizar(tabla: pd.DataFrame, ventana: int) -> pd.DataFrame:
+    """Promedio móvil centrado y circular: diciembre empalma con enero, y la suma se conserva."""
+    if ventana <= 1:
+        return tabla
+    h = ventana // 2
+    ext = pd.concat([tabla.iloc[-h:], tabla, tabla.iloc[:h]])
+    out = ext.rolling(ventana, center=True).mean().iloc[h : h + len(tabla)]
+    out.index = tabla.index
+    return out
+
+
+def _percentil_dia(serie: pd.Series, q: float) -> int | None:
+    total = float(serie.sum())
+    if total <= 0:
+        return None
+    return int(serie.index[int(np.searchsorted(serie.cumsum().to_numpy(), q * total))])
+
+
+def distribucion_diaria(
+    store: PlanStore, nivel: str, desde: int = REF[0], hasta: int = REF[1], ventana: int = 7
+) -> dict:
+    """Focos armonizados por día del año, según el nivel de peligro de la unidad donde ocurren.
+
+    Cálculo dinámico (nada precalculado): 1) se tipifican las unidades del nivel (``tipificar``);
+    2) cada celda-día de la serie se asigna a su unidad y toma su nivel de peligro; 3) se suma por
+    día del año (calendario sin bisiestos) en los años elegidos y se divide por el número de años
+    (focos armonizados por año en ese día); 4) se suaviza con un promedio móvil circular.
+    """
+    if not (REF[0] <= desde <= hasta <= REF[1]):
+        raise PlanError(
+            t(
+                es=f"Años no válidos: elige 'desde' y 'hasta' entre {REF[0]} y {REF[1]}, "
+                "con desde ≤ hasta.",
+                en=f"Invalid years: choose 'desde' and 'hasta' between {REF[0]} and {REF[1]}, "
+                "with desde ≤ hasta.",
+            )
+        )
+    if ventana not in VENTANAS:
+        raise PlanError(
+            t(
+                es=f"Ventana no válida: usa {', '.join(map(str, VENTANAS))} días.",
+                en=f"Invalid window: use {', '.join(map(str, VENTANAS))} days.",
+            )
+        )
+    tipos = tipificar(store, nivel)
+    cur = store.cursor()
+    df = cur.execute(
+        "SELECT a.codigo, c.fecha_local, sum(c.eq_hotspots) AS n FROM cd c JOIN ambito_celdas a "
+        "ON a.alat = c.cell_lat AND a.alon = c.cell_lon "
+        "WHERE a.nivel = ? AND c.anio BETWEEN ? AND ? GROUP BY 1, 2",
+        [nivel, desde, hasta],
+    ).df()
+    cur.close()
+    n_anios = hasta - desde + 1
+    presentes = [p for p in ORDEN_PELIGRO if (tipos["nivel_peligro"] == p).any()]
+    df["peligro"] = df["codigo"].map(tipos["nivel_peligro"]).fillna("sin_clasificar")
+    df["dia"] = dia_del_anio(df["fecha_local"]) if len(df) else []
+    dias = pd.RangeIndex(1, 366, name="dia")
+    bruto = (
+        df.pivot_table(index="dia", columns="peligro", values="n", aggfunc="sum", fill_value=0.0)
+        .reindex(index=dias, columns=presentes, fill_value=0.0)
+        / n_anios
+    )
+    suave = _suavizar(bruto, ventana)
+    total_dia = suave.sum(axis=1)
+    total = float(bruto.to_numpy().sum())
+
+    niveles = []
+    for p in presentes:
+        u = tipos[tipos["nivel_peligro"] == p]
+        area = float(u["area_km2"].sum())
+        por_anio = float(bruto[p].sum())
+        pico = int(suave[p].idxmax()) if por_anio > 0 else None
+        p10, p50, p90 = (_percentil_dia(bruto[p], q) for q in (0.1, 0.5, 0.9))
+        niveles.append(
+            {
+                "nivel_peligro": p,
+                "etiqueta": etiqueta(p),
+                "color": COLOR[p],
+                "unidades": len(u),
+                "area_km2": round(area, 1),
+                "focos_por_anio": round(por_anio, 2),
+                "parte": round(por_anio / total, 4) if total else 0.0,
+                "densidad": round(por_anio / area * 100, 3) if area else None,
+                "dia_pico": pico,
+                "fecha_pico": _fecha_dia(pico) if pico else None,
+                "dia_p10": p10,
+                "dia_p50": p50,
+                "dia_p90": p90,
+                "temporada_central": (
+                    None
+                    if not (p10 and p90)
+                    else t(es=f"el {_fecha_dia(p10)}", en=f"on {_fecha_dia(p10)}")
+                    if p10 == p90
+                    else t(
+                        es=f"del {_fecha_dia(p10)} al {_fecha_dia(p90)}",
+                        en=f"{_fecha_dia(p10)} to {_fecha_dia(p90)}",
+                    )
+                ),
+            }
+        )
+
+    filas = [
+        {
+            "dia": int(d),
+            "fecha": (pd.Timestamp(2001, 1, 1) + pd.Timedelta(days=int(d) - 1)).strftime("%m-%d"),
+            "total": round(float(total_dia.loc[d]), 4),
+            **{p: round(float(suave.at[d, p]), 4) for p in presentes},
+        }
+        for d in dias
+    ]
+    con_focos = [n for n in niveles if n["focos_por_anio"] > 0]
+    top = max(con_focos, key=lambda n: n["parte"], default=None)
+    if top:
+        en_simple = t(
+            es=f"Las unidades de peligro {top['etiqueta'].lower()} "
+            f"({top['unidades']} de {len(tipos)}) reúnen el {round(100 * top['parte'])} % de los "
+            f"focos de calor de {desde}-{hasta}. El 80 % de sus focos ocurre "
+            f"{top['temporada_central']}, con el pico el {top['fecha_pico']}.",
+            en=f"Units with {top['etiqueta'].lower()} hazard ({top['unidades']} of {len(tipos)}) "
+            f"hold {round(100 * top['parte'])}% of the hotspots in {desde}-{hasta}. 80% of their "
+            f"hotspots occur from {top['temporada_central']}, peaking on {top['fecha_pico']}.",
+        )
+    else:
+        en_simple = t(
+            es="Sin focos de calor en los años elegidos.", en="No hotspots in the chosen years."
+        )
+    return {
+        "nivel": nivel,
+        "titulo": t(
+            es="Focos de calor por día del año según el nivel de peligro "
+            f"({titulo_nivel(nivel).lower()})",
+            en=f"Hotspots by day of year by hazard level ({titulo_nivel(nivel).lower()})",
+        ),
+        "desde": desde,
+        "hasta": hasta,
+        "anios": n_anios,
+        "ventana": ventana,
+        "ventanas": list(VENTANAS),
+        "unidad": t(
+            es="focos armonizados por año en ese día (promedio de los años elegidos)",
+            en="harmonized hotspots per year on that day (average of the chosen years)",
+        ),
+        "en_simple": en_simple,
+        "como_leerlo": t(
+            es="Cada día del año suma los focos de calor de todos los años elegidos, separados "
+            "por el nivel de peligro de la provincia, distrito o cuenca donde ocurrieron, y se "
+            "divide por el número de años. La curva se suaviza con un promedio móvil de la "
+            "ventana elegida.",
+            en="Each day of the year adds up the hotspots of all the chosen years, split by the "
+            "hazard level of the province, district or basin where they occurred, divided by the "
+            "number of years. The curve is smoothed with a moving average of the chosen window.",
+        ),
+        "niveles": niveles,
+        "dias": filas,
+        "metodo": metodo(),
     }
 
 

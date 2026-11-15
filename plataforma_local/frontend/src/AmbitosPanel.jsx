@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Download, FileText, X } from 'lucide-react'
 import { ambitoUrl, getAmbitoGeojson, getAmbitoNivel, getAmbitos, informeUrl } from './services/api.js'
 import { tr } from './i18n.js'
+import AmbitosDias from './AmbitosDias.jsx'
 
 const LEVELS = ['muy_alto', 'alto', 'medio', 'bajo', 'sin_clasificar']
 const COLORS = { muy_alto: '#c0392b', alto: '#e67e22', medio: '#f1c40f', bajo: '#27ae60', sin_clasificar: '#98a2b3' }
@@ -124,6 +125,7 @@ function AmbitosPanel({ map, onClose }) {
           ))}
         </div>
         <p className="fa-note">{tr('amb.coverage', { p: Math.round((datos.cobertura || 0) * 1000) / 10 })}</p>
+        <AmbitosDias nivel={nivel}/>
         <ol className="fa-list" ref={listRef}>
           {filas.map((u) => (
             <li key={u.codigo} data-codigo={u.codigo} className={u.codigo === elegido ? 'is-picked' : ''}>

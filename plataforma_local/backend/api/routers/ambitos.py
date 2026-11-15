@@ -4,6 +4,7 @@
 - ``GET /api/ambitos/{nivel}``: unidades ordenadas por nivel de peligro, parámetros y método.
 - ``GET /api/ambitos/{nivel}.geojson``: las mismas unidades con geometría y color, para el mapa.
 - ``GET /api/ambitos/{nivel}.csv``: tabla para los tomadores de decisión (UTF-8 con BOM).
+- ``GET /api/ambitos/{nivel}/dias``: focos por día del año según el nivel de peligro (dinámico).
 - ``GET /api/ambitos/{nivel}/{codigo}``: una unidad, con frases "en simple" y serie anual.
 - ``GET /api/ambitos/{nivel}/{codigo}/informe``: informe imprimible (HTML; Imprimir -> PDF).
 
@@ -70,6 +71,23 @@ def nivel(request: Request, nivel: str) -> dict:
     """Unidades del nivel ordenadas de mayor a menor nivel de peligro."""
     store = _store(request)
     body = _call(ambitos.resumen_nivel, store, nivel)
+    return _envelope(store, {**body, "notes": body["metodo"]["notas"]})
+
+
+@router.get("/{nivel}/dias")
+def dias(
+    request: Request,
+    nivel: str,
+    desde: int = ambitos.REF[0],
+    hasta: int = ambitos.REF[1],
+    ventana: int = 7,
+) -> dict:
+    """Focos armonizados por día del año, separados por el nivel de peligro (CENEPRED) de la unidad.
+
+    Se calcula al pedirlo con los años (``desde``-``hasta``) y la ventana de suavizado (1, 7, 15
+    o 31 días) elegidos."""
+    store = _store(request)
+    body = _call(ambitos.distribucion_diaria, store, nivel, desde, hasta, ventana)
     return _envelope(store, {**body, "notes": body["metodo"]["notas"]})
 
 

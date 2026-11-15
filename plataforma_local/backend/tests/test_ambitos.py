@@ -172,3 +172,38 @@ def test_informe_de_un_mes(api):
     assert (
         api.get("/api/ambitos/provincia/0809/informe", params={"mes": "2020-13"}).status_code == 422
     )
+
+
+# ------------------------------------------------------------------ focos por día del año
+def test_dia_del_anio_sin_bisiestos():
+    from firecal.plan.ambitos import dia_del_anio
+
+    fechas = ["2020-02-28", "2020-02-29", "2020-03-01", "2021-03-01", "2020-12-31", "2021-01-01"]
+    assert list(dia_del_anio(fechas)) == [59, 59, 60, 60, 365, 1]
+
+
+def test_dias_suma_lo_mismo_que_la_tipificacion(api):
+    tipos = _get(api, "/api/ambitos/provincia").json()["unidades"]
+    crudo = _get(api, "/api/ambitos/provincia/dias", ventana=1).json()
+    suave = _get(api, "/api/ambitos/provincia/dias", ventana=31).json()
+    assert len(crudo["dias"]) == 365 and crudo["anios"] == REF[1] - REF[0] + 1
+    por_anio = sum(n["focos_por_anio"] for n in crudo["niveles"])
+    # mismas celdas y años que la tipificación (media_anual por unidad, 2003-2025)
+    assert por_anio == pytest.approx(sum(u["media_anual"] for u in tipos), rel=0.002)
+    # el promedio móvil circular no cambia el total del año
+    total = lambda d: sum(f["total"] for f in d["dias"])  # noqa: E731
+    assert total(crudo) == pytest.approx(por_anio, rel=1e-3)
+    assert total(suave) == pytest.approx(total(crudo), rel=1e-3)
+    assert sum(n["parte"] for n in crudo["niveles"]) == pytest.approx(1, abs=0.002)
+    for n in crudo["niveles"]:
+        if n["focos_por_anio"] > 0:
+            assert n["dia_p10"] <= n["dia_p50"] <= n["dia_p90"] and 1 <= n["dia_pico"] <= 365
+    assert not PROHIBIDAS.search(crudo["en_simple"] + crudo["como_leerlo"])
+
+
+def test_dias_parametros(api):
+    corto = _get(api, "/api/ambitos/distrito/dias", desde=2020, hasta=2020, ventana=15).json()
+    assert corto["anios"] == 1 and corto["ventana"] == 15
+    for params in ({"ventana": 5}, {"desde": 1999}, {"desde": 2024, "hasta": 2020}):
+        assert api.get("/api/ambitos/provincia/dias", params=params).status_code == 422
+    assert api.get("/api/ambitos/no_existe/dias").status_code == 404

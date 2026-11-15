@@ -57,6 +57,8 @@ export const getTiempoReal = (horas) => request('/api/tiempo-real', { horas }, f
 // Ámbitos: nivel de peligro por focos de calor (formato CENEPRED) e informes.
 export const getAmbitos = () => request('/api/ambitos')
 export const getAmbitoNivel = (nivel) => request(`/api/ambitos/${nivel}`)
+// Focos por día del año según el nivel de peligro (se calcula al pedirlo: años y ventana de suavizado).
+export const getAmbitoDias = (nivel, params) => request(`/api/ambitos/${nivel}/dias`, params)
 export const getAmbitoGeojson = (nivel) => request(`/api/ambitos/${nivel}.geojson`)
 export const ambitoUrl = (path) => buildUrl(path).toString()
 // Informe técnico imprimible (HTML) de cualquier área y periodo; opcional mes=AAAA-MM.
