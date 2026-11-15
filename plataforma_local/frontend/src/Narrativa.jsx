@@ -1,12 +1,14 @@
 // Vista local "Nikal": barras con criterio narrativo (design thinking + storytelling).
-// - ChapterRail: la barra izquierda es un recorrido de 4 capítulos (Mirar → Entender → Comparar → Actuar)
+// - ChapterRail: la barra izquierda es un recorrido de 3 capítulos (Mirar → Entender → Actuar); Comparar está
+//   en el menú de la derecha.
 //   unidos por un hilo; el hilo se "enciende" hasta el capítulo abierto.
 // - SeasonRibbon: la barra inferior cuenta la temporada: curva de los 12 meses del año elegido contra lo
-//   habitual (mediana del mes), una frase que la resume y la columna de los 26 años debajo.
+//   habitual (mediana del mes), una frase que la resume y la columna de los 26 años debajo. Con un mes
+//   elegido pasa a los días de ese mes; año, mes y día cambian lo que muestra el mapa.
 // Solo describe lo que ya pasó (no es pronóstico) y usa la unidad "focos armonizados".
 import { createElement, useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { IcoActuar, IcoComparar, IcoEntender, IcoMirar, IcoPausa, IcoPlay } from './NkIcons.jsx'
+import { IcoActuar, IcoEntender, IcoMirar, IcoPausa, IcoPlay } from './NkIcons.jsx'
 import { locale, months, tr } from './i18n.js'
 
 const fmt = (v, d = 0) => (v === null || v === undefined || Number.isNaN(v)) ? '–'
@@ -21,7 +23,6 @@ const pixels = (v, max) => (v > 0 ? LLAMA.slice(0, Math.max(1, Math.round((5 * v
 const CHAPTERS = [
   { id: 'data', icon: IcoMirar },
   { id: 'simple', icon: IcoEntender },
-  { id: 'compare', icon: IcoComparar },
   { id: 'ambitos', icon: IcoActuar },
 ]
 
@@ -29,12 +30,10 @@ export function ChapterRail({ active, onPick }) {
   const idx = CHAPTERS.findIndex((c) => c.id === active)
   return (
     <nav className="nk-chapters" aria-label={tr('nk.story')} style={{ '--nk-progress': idx < 0 ? 0 : idx / (CHAPTERS.length - 1) }}>
-      <p className="nk-chapters-kicker">{tr('nk.story')}</p>
       <span className="nk-thread" aria-hidden="true"><i/></span>
       {CHAPTERS.map((c, i) => (
         <button key={c.id} className={`nk-ch ${active === c.id ? 'is-active' : ''} ${idx > i ? 'is-past' : ''}`}
           aria-pressed={active === c.id} aria-label={`${tr(`nk.ch.${c.id}`)}: ${tr(`nk.ch.${c.id}.sub`)}`} onClick={() => onPick(c.id)}>
-          <span className="nk-ch-num">{String(i + 1).padStart(2, '0')}</span>
           <span className="nk-ch-icon">{createElement(c.icon, { size: 19 })}</span>
           <b>{tr(`nk.ch.${c.id}`)}</b>
           <span className="nk-ch-tip"><b>{tr(`nk.ch.${c.id}`)}</b><small>{tr(`nk.ch.${c.id}.sub`)}</small></span>
@@ -62,7 +61,7 @@ function storyLine({ cell, mesNombre, yearTotal, peak, rank, nYears, year }) {
   return tr(key, { k: rank, n: nYears, mes: peak })
 }
 
-export function SeasonRibbon({ calendar, selected, onMonth, onYear, onAllYear, onShiftYear, playing, onPlay, firstYear, lastYear, customLabel }) {
+export function SeasonRibbon({ calendar, selected, onMonth, onYear, onAllYear, onShiftYear, onShiftMonth, playing, onPlay, firstYear, lastYear, customLabel, dias, onDay }) {
   const MESES = months()
   const [hover, setHover] = useState(null)
   const cells = useMemo(() => calendar?.celdas || [], [calendar])
@@ -97,8 +96,16 @@ export function SeasonRibbon({ calendar, selected, onMonth, onYear, onAllYear, o
   const peakIdx = yearCells.reduce((best, c, i) => ((c?.focos_armonizados || 0) > (yearCells[best]?.focos_armonizados || 0) ? i : best), 0)
   const cell = selected.month ? yearCells[selected.month - 1] : null
   const big = cell ? (cell.sin_dato ? null : cell.focos_armonizados) : yearTotal
-  const kicker = customLabel || (selected.month ? `${MESES[selected.month - 1]} ${selected.year}` : String(selected.year))
-  const sentence = customLabel ? tr('nk.custom') : storyLine({ cell, mesNombre: MESES[(selected.month || 1) - 1], yearTotal, peak: MESES[peakIdx], rank, nYears: full.length, year: selected.year })
+  // Vista de días: con un mes elegido, la cinta muestra sus días (suma de focos armonizados por día).
+  const vistaDias = Boolean(selected.month && dias && !customLabel)
+  const totalMes = vistaDias ? dias.reduce((s, d) => s + d, 0) : 0
+  const maxDia = vistaDias ? Math.max(1e-9, ...dias) : 1
+  const valorDia = vistaDias && selected.day ? dias[selected.day - 1] || 0 : null
+  const kicker = customLabel || (selected.day ? `${selected.day} ${MESES[selected.month - 1]} ${selected.year}` : selected.month ? `${MESES[selected.month - 1]} ${selected.year}` : String(selected.year))
+  const sentence = customLabel ? tr('nk.custom')
+    : valorDia !== null ? (valorDia > 0 ? tr('nk.day.line', { p: ((q) => fmt(q, q > 0 && q < 1 ? 1 : 0))(totalMes ? (100 * valorDia) / totalMes : 0), mes: MESES[selected.month - 1] }) : tr('nk.day.none'))
+    : storyLine({ cell, mesNombre: MESES[(selected.month || 1) - 1], yearTotal, peak: MESES[peakIdx], rank, nYears: full.length, year: selected.year })
+  const grande = valorDia !== null ? valorDia : big
   const hv = hover !== null ? yearCells[hover] : null
 
   return (
@@ -107,18 +114,32 @@ export function SeasonRibbon({ calendar, selected, onMonth, onYear, onAllYear, o
         <button className="nk-play" onClick={onPlay} title={playing ? tr('timeline.pause') : tr('timeline.play')} aria-label={playing ? tr('timeline.pause') : tr('timeline.play')}>{playing ? <IcoPausa size={16}/> : <IcoPlay size={16}/>}</button>
         <div>
           <p>{kicker}</p>
-          <strong>{big === null ? '–' : fmtFocos(big)}<small>{tr('nk.unit')}</small></strong>
+          <strong>{grande === null ? '–' : fmtFocos(grande)}<small>{tr('nk.unit')}</small></strong>
           <span>{sentence}</span>
         </div>
       </div>
 
       <div className="nk-season">
-        <header>
+        {vistaDias ? <header>
+          <span>{MESES[selected.month - 1]} {selected.year} · {tr('nk.days')}</span>
+          <span className="nk-legend">{tr('nk.day.hint')}</span>
+          <span className="nk-mes-nav">
+            <button onClick={() => onShiftMonth(-1)} aria-label={tr('nk.prevMonth')} title={tr('nk.prevMonth')}><ChevronLeft size={13}/></button>
+            <button onClick={() => onShiftMonth(1)} aria-label={tr('nk.nextMonth')} title={tr('nk.nextMonth')}><ChevronRight size={13}/></button>
+            <button onClick={onAllYear}>{tr('timeline.allYear')}</button>
+          </span>
+        </header> : <header>
           <span>{tr('nk.season')} {selected.year}</span>
           <span className="nk-legend"><i className="v"/>{tr('nk.legend.value')}<i className="m"/>{tr('nk.legend.usual')}</span>
           <button className={selected.month === null && !customLabel ? 'is-active' : ''} onClick={onAllYear}>{tr('timeline.allYear')}</button>
-        </header>
-        <div className="nk-chart" onMouseLeave={() => setHover(null)}>
+        </header>}
+        {vistaDias ? <div className="nk-dias" style={{ gridTemplateColumns: `repeat(${dias.length}, 1fr)` }}>
+          {dias.map((v, i) => <button key={i} className={selected.day === i + 1 ? 'is-active' : ''} onClick={() => onDay(i + 1)}
+            aria-pressed={selected.day === i + 1} aria-label={`${i + 1} ${MESES[selected.month - 1]}: ${fmtFocos(v)}`} title={`${i + 1} ${MESES[selected.month - 1]}: ${fmtFocos(v)} ${tr('nk.unit')}`}>
+            <i style={{ height: `${v > 0 ? Math.max(6, (100 * v) / maxDia) : 0}%` }}/>
+            <span>{i === 0 || (i + 1) % 5 === 0 || selected.day === i + 1 ? i + 1 : ''}</span>
+          </button>)}
+        </div> : <div className="nk-chart" onMouseLeave={() => setHover(null)}>
           <div className="nk-plot">
           <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-hidden="true">
             <defs>
@@ -141,7 +162,7 @@ export function SeasonRibbon({ calendar, selected, onMonth, onYear, onAllYear, o
                 aria-label={`${m} ${selected.year}: ${noData ? tr('noData') : fmtFocos(c.focos_armonizados)}`}><span>{m}</span></button>
             })}
           </div>
-        </div>
+        </div>}
       </div>
 
       <div className="nk-spine" aria-label={tr('timeline.years')}>

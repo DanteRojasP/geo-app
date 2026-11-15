@@ -2,7 +2,8 @@
 // Datos: GET /api/ambitos/{nivel}/dias (curva) y /api/ambitos/{nivel}/dias/{dia} (celdas del día para el
 // mapa); ambos se calculan al pedirlos con los años y la ventana de suavizado elegidos.
 // Áreas apiladas por nivel (colores de datos de CENEPRED, los mismos del mapa y la lista). El día elegido
-// (clic, ◀ ▶ o ▶ reproducir) se refleja en el mapa: se ven solo los focos de esos días.
+// (clic, ◀ ▶ o ▶ reproducir) se refleja en el mapa: se ven solo los focos de esos días. La barra inferior manda:
+// si cambia el año, el mes o el día de la cinta, se suelta el día y el mapa vuelve a seguir a la cinta.
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight, Pause, Play, X } from 'lucide-react'
 import { getAmbitoDia, getAmbitoDias } from './services/api.js'
@@ -38,7 +39,7 @@ function pintarDia(map, geojson) {
   ;['ambito-dia-heat', 'ambito-dia-pts'].forEach((id) => map.setLayoutProperty(id, 'visibility', 'visible'))
 }
 
-function AmbitosDias({ nivel, map }) {
+function AmbitosDias({ nivel, map, periodoClave }) {
   const [desde, setDesde] = useState(2003)
   const [hasta, setHasta] = useState(2025)
   const [ventana, setVentana] = useState(7)
@@ -57,8 +58,6 @@ function AmbitosDias({ nivel, map }) {
       .then(({ body }) => {
         if (!activo) return
         setEstado({ d: body })
-        // primera vez: el día pico del nivel con más focos, para que el mapa ya cuente algo
-        setFijo((f) => f ?? (body.niveles.filter((n) => n.dia_pico).sort((a, b) => b.parte - a.parte)[0]?.dia_pico || null))
       })
       .catch((e) => activo && setEstado({ error: e.message }))
     return () => { activo = false }
@@ -89,6 +88,14 @@ function AmbitosDias({ nivel, map }) {
     return undefined
   }, [fijo, map])
   useEffect(() => () => restaurar(map, previo), [map])
+
+  // La cinta inferior cambió (año, mes o día): el mapa vuelve a mostrar ese periodo.
+  const claveInicial = useRef(periodoClave)
+  useEffect(() => {
+    if (claveInicial.current === periodoClave) return
+    claveInicial.current = periodoClave
+    setJugando(false); setFijo(null); setDelDia(null)
+  }, [periodoClave])
 
   // ▶ recorre el año avanzando de a una ventana.
   useEffect(() => {

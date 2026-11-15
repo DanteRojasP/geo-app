@@ -13,6 +13,10 @@
 // Los colores de datos (escala de calor, anomalía, niveles CENEPRED, sensores, En vivo) no cambian.
 export const NK = typeof window === 'undefined' || new URLSearchParams(window.location.search).get('diseno') !== 'dante'
 
+// Apertura de marca al entrar (IntroNikal.jsx); ?intro=0 la omite.
+export const introActiva = () => typeof window !== 'undefined'
+  && new URLSearchParams(window.location.search).get('intro') !== '0'
+
 export const PALETA = {
   noche: '#121011', papel: '#f5f3ee', tinta: '#141210', magenta: '#b5367a',
   brasa: '#dd513a', brasaHonda: '#b83a24', ichu: '#fca50a', chispa: '#fcffa4',

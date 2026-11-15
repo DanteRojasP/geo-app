@@ -15,8 +15,10 @@ import AmbitosPanel from './AmbitosPanel.jsx'
 import SimplePanel from './SimplePanel.jsx'
 import PanelHistoria from './PanelHistoria.jsx'
 import { ChapterRail, SeasonRibbon } from './Narrativa.jsx'
-import { MAPA, NK } from './diseno.js'
-import { IcoAjustes, IcoArea, IcoCalendario, IcoCapas, IcoFocos, IcoHabitual, IcoHistorico, IcoPlano, IcoRelieve, IcoSatelite, IcoVivo } from './NkIcons.jsx'
+import { MAPA, NK, introActiva } from './diseno.js'
+import IntroNikal from './IntroNikal.jsx'
+import NikalSnake from './NikalSnake.jsx'
+import { IcoAjustes, IcoArea, IcoCalendario, IcoCapas, IcoComparar, IcoFocos, IcoHabitual, IcoHistorico, IcoPlano, IcoRelieve, IcoSatelite, IcoVivo } from './NkIcons.jsx'
 import ComparisonWorkspace from './ComparisonWorkspace.jsx'
 import { LANGS, getLang, locale, months, setLang, tr } from './i18n.js'
 import { CUSCO, downloadCsv, getCalendar, getDepartments, getFocos, getMonth, getTiempoReal, informeUrl } from './services/api.js'
@@ -324,6 +326,17 @@ function FireMapApp() {
   const [selection, setSelection] = useState(null)
   const [lang, setLangState] = useState(getLang())
   const changeLang = (l) => { setLang(l); setLangState(l) }
+  // Apertura de marca (cada vez que se entra) y juego oculto (tres clics en el logo).
+  const [intro, setIntro] = useState(() => NK && introActiva())
+  const cerrarIntro = useCallback(() => setIntro(false), [])
+  const [snake, setSnake] = useState(null)
+  const clicsLogo = useRef([])
+  const tocarLogo = (e) => {
+    if (!NK) return
+    const ahora = Date.now()
+    clicsLogo.current = [...clicsLogo.current.filter((t) => ahora - t < 900), ahora]
+    if (clicsLogo.current.length >= 3) { clicsLogo.current = []; setSnake(e.currentTarget.querySelector('img').getBoundingClientRect()) }
+  }
   const MESES = months()
   const selectedRegion = departments.find((d) => d.code === selectedRegionCode) || { code: CUSCO, name: 'Cusco', datos: 'armonizados' }
 
@@ -332,7 +345,7 @@ function FireMapApp() {
     return selected.month
       ? { inicio: ym(selected.year, selected.month), fin: ym(selected.year, selected.month), label: `${months()[selected.month - 1]} ${selected.year}` }
       : { inicio: ym(selected.year, selected.year === FIRST_YEAR ? 11 : 1), fin: ym(selected.year, 12), label: tr('period.year', { y: selected.year }) }
-  }, [selected, lang, customPeriod]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selected.year, selected.month, lang, customPeriod]) // eslint-disable-line react-hooks/exhaustive-deps
   const aoi = { departamento: selectedRegionCode }
   // Informe técnico: toda la serie; con un mes elegido, ese mes en detalle; con el filtro, ese rango.
   const reportExtra = customPeriod ? { fecha_inicio: periodo.inicio, fecha_fin: periodo.fin }
@@ -349,9 +362,23 @@ function FireMapApp() {
       return key >= fromMonth && key <= toMonth
     })
   }, [calendar, customPeriod, yearCells])
+  // Día elegido en la cinta: el mapa muestra solo los focos de esa fecha (dentro de los del mes).
+  const diaFecha = !customPeriod && selected.month && selected.day ? `${ym(selected.year, selected.month)}-${String(selected.day).padStart(2, '0')}` : null
+  const mapFocos = useMemo(() => (diaFecha ? filterFocosByDate(focos, diaFecha, diaFecha) : focos), [focos, diaFecha])
+  // Focos armonizados por día del mes elegido (suma de eq_foco), para la vista de días de la cinta.
+  const diasMes = useMemo(() => {
+    if (customPeriod || !selected.month) return null
+    const out = Array(new Date(selected.year, selected.month, 0).getDate()).fill(0)
+    const pref = ym(selected.year, selected.month)
+    for (const f of focos.features || []) {
+      const d = f.properties?.fecha_local
+      if (d && d.startsWith(pref)) out[Number(d.slice(8, 10)) - 1] += Number(f.properties.eq_foco) || 0
+    }
+    return out
+  }, [focos, selected.year, selected.month, customPeriod])
   playableRef.current = new Set(yearCells.filter((c) => !c.sin_dato).map((c) => c.mes))
   selectionModeRef.current = selectionMode
-  focosRef.current = focos
+  focosRef.current = mapFocos
 
   // Datos base: catálogo regional, contorno, metadatos y calendario de la región elegida.
   useEffect(() => {
@@ -628,8 +655,8 @@ function FireMapApp() {
 
   useEffect(() => {
     const map = mapRef.current
-    if (mapReadyRef.current && map?.getSource('focos')) map.getSource('focos').setData(focos)
-  }, [focos])
+    if (mapReadyRef.current && map?.getSource('focos')) map.getSource('focos').setData(mapFocos)
+  }, [mapFocos])
 
   useEffect(() => {
     const map = mapRef.current
@@ -686,6 +713,11 @@ function FireMapApp() {
     if (!was) ({ data: setDetailsOpen, simple: setSimpleOpen, compare: setCompareOpen, ambitos: setAmbitosOpen })[id](true)
   }
   const selectMonth = (year, m) => { setPlaying(false); setCustomPeriod(null); setSelected({ year, month: m }) }
+  const elegirDia = (d) => { setPlaying(false); setSelected((s) => ({ ...s, day: s.day === d ? null : d })) }
+  const shiftMonth = (delta) => setSelected((s) => {
+    const k = Math.min(LAST_YEAR * 12 + 11, Math.max(FIRST_YEAR * 12 + 10, s.year * 12 + s.month - 1 + delta))
+    return { year: Math.floor(k / 12), month: (k % 12) + 1 }
+  })
   const shiftYear = (delta) => { setCustomPeriod(null); setSelected((s) => ({ year: Math.min(LAST_YEAR, Math.max(FIRST_YEAR, s.year + delta)), month: null })) }
   const toggleSelectionMode = () => {
     setPlaying(false)
@@ -732,7 +764,7 @@ function FireMapApp() {
   return (
     <div className={`fw-app ${liveOn ? 'is-live' : ''} ${NK ? 'nk' : ''}`}>
       <div ref={mapContainerRef} className="fw-map" aria-label={tr('map.aria')} />
-      <div className="fw-nubel-brand nk-brand" aria-label="Nikal Cusco"><img src="./nikal-icono.svg" alt="Nikal"/></div>
+      <div className="fw-nubel-brand nk-brand" aria-label="Nikal Cusco" onClick={tocarLogo} style={snake ? { visibility: 'hidden' } : undefined}><img src="./nikal-icono.svg" alt="Nikal"/></div>
       <div className="fc-mode" role="group" aria-label={tr('mode.label')}>
         <button className={!liveOn ? 'is-active' : ''} aria-pressed={!liveOn} title={tr('mode.historic')} onClick={goHistoric}><I.historico size={14}/><span>{tr('mode.historic')}</span></button>
         <button className={liveOn ? 'is-active live' : ''} aria-pressed={liveOn} title={tr('mode.live')} onClick={goLive}><I.vivo size={14}/><span>{tr('mode.live')}</span></button>
@@ -764,12 +796,13 @@ function FireMapApp() {
       </>}
       <div className="fc-map-menu">
         <div className="fc-lang" role="group" aria-label={tr('lang.title')}>{LANGS.map((l) => <button key={l} className={l === lang ? 'is-active' : ''} aria-pressed={l === lang} onClick={() => changeLang(l)}>{l.toUpperCase()}</button>)}</div>
-        <button className={`fc-menu-toggle ${toolsOpen ? 'is-open' : ''}`} aria-label={tr('rail.label')} aria-expanded={toolsOpen} onClick={() => setToolsOpen((v) => !v)}><I.capas size={21}/></button>
+        <button className={`fc-menu-toggle ${toolsOpen ? 'is-open' : ''}`} aria-label={tr('rail.label')} aria-expanded={toolsOpen} onClick={() => setToolsOpen((v) => !v)}><I.capas size={21}/>{NK && <span className="nk-tip"><b>{tr('nk.tip.tools')}</b><small>{tr('nk.tip.tools.sub')}</small></span>}</button>
+        {NK && <button className={`fc-menu-toggle nk-compare-btn ${compareOpen ? 'is-open' : ''}`} aria-label={tr('nk.ch.compare')} aria-pressed={compareOpen} onClick={() => openChapter('compare')}><IcoComparar size={20}/>{NK && <span className="nk-tip"><b>{tr('nk.ch.compare')}</b><small>{tr('nk.ch.compare.sub')}</small></span>}</button>}
         {toolsOpen && <nav className="fw-rail" aria-label={tr('rail.label')} onClickCapture={goHistoric}>
-          <button className="is-active" title={tr('rail.hotspotsTitle')} onClick={() => { focusRegion(); setDetailsOpen(true); setActiveLayer('surface') }}><I.focos size={19}/><span>{tr('rail.hotspots')}</span></button>
-          <button className={calendarOpen ? 'is-active' : ''} title={tr('rail.calendar')} onClick={() => setCalendarOpen((v) => !v)}><I.calendario size={19}/><span>{tr('rail.calendar')}</span></button>
-          <button className={selectionMode ? 'is-active select' : ''} title={tr('rail.areaTitle')} onClick={toggleSelectionMode}><I.area size={19}/><span>{tr('rail.area')}</span></button>
-          <button className={layersOpen ? 'is-active' : ''} title={tr('rail.layers')} onClick={() => setLayersOpen((v) => !v)}><I.ajustes size={19}/><span>{tr('rail.layers')}</span></button>
+          <button className="is-active" title={NK ? undefined : tr('rail.hotspotsTitle')} aria-label={tr('rail.hotspotsTitle')} onClick={() => { focusRegion(); setDetailsOpen(true); setActiveLayer('surface') }}><I.focos size={19}/><span>{tr('rail.hotspots')}</span>{NK && <span className="nk-tip"><b>{tr('rail.hotspots')}</b><small>{tr('nk.tip.hotspots.sub')}</small></span>}</button>
+          <button className={calendarOpen ? 'is-active' : ''} title={NK ? undefined : tr('rail.calendar')} aria-label={tr('rail.calendar')} onClick={() => setCalendarOpen((v) => !v)}><I.calendario size={19}/><span>{tr('rail.calendar')}</span>{NK && <span className="nk-tip"><b>{tr('rail.calendar')}</b><small>{tr('nk.tip.calendar.sub')}</small></span>}</button>
+          <button className={selectionMode ? 'is-active select' : ''} title={NK ? undefined : tr('rail.areaTitle')} aria-label={tr('rail.areaTitle')} onClick={toggleSelectionMode}><I.area size={19}/><span>{tr('rail.area')}</span>{NK && <span className="nk-tip"><b>{tr('rail.area')}</b><small>{tr('nk.tip.area.sub')}</small></span>}</button>
+          <button className={layersOpen ? 'is-active' : ''} title={NK ? undefined : tr('rail.layers')} aria-label={tr('rail.layers')} onClick={() => setLayersOpen((v) => !v)}><I.ajustes size={19}/><span>{tr('rail.layers')}</span>{NK && <span className="nk-tip"><b>{tr('rail.layers')}</b><small>{tr('nk.tip.layers.sub')}</small></span>}</button>
         </nav>}
       </div>
       {detailsOpen && <aside className="fw-summary">
@@ -834,12 +867,13 @@ function FireMapApp() {
       {simpleOpen && (NK
         ? <PanelHistoria key={lang} aoi={selection?.bbox || aoi} etiqueta={selection?.bbox ? 'area' : 'cusco'}/>
         : <SimplePanel key={lang} aoi={selection?.bbox || aoi} etiqueta={selection?.bbox ? 'area' : 'cusco'} onClose={() => setSimpleOpen(false)}/>)}
-      {ambitosOpen && !liveOn && <AmbitosPanel key={lang} map={mapRef.current} onClose={() => setAmbitosOpen(false)}/>}
+      {ambitosOpen && !liveOn && <AmbitosPanel key={lang} map={mapRef.current} periodoClave={`${selected.year}-${selected.month}-${selected.day}-${customPeriod ? 'f' : ''}`} onClose={() => setAmbitosOpen(false)}/>}
       {compareOpen && <ComparisonWorkspace key={lang} calendar={calendar} region={region} regionName={selectedRegion.name} onClose={() => setCompareOpen(false)}/>}
       {calendarOpen && <CalendarPanel calendar={calendar} mode={calendarMode} setMode={setCalendarMode} selected={selected} onSelect={selectMonth} onClose={() => setCalendarOpen(false)} reportUrl={informeUrl(aoi, reportExtra)}/>}
       {NK ? <SeasonRibbon calendar={calendar} selected={selected} onMonth={selectMonth} firstYear={FIRST_YEAR} lastYear={LAST_YEAR}
         customLabel={customPeriod ? periodo.label : null} playing={playing} onPlay={() => { setCustomPeriod(null); setPlaying((v) => !v) }}
         onYear={(y) => { setPlaying(false); setCustomPeriod(null); setSelected({ year: y, month: null }) }} onShiftYear={shiftYear}
+        dias={diasMes} onDay={elegirDia} onShiftMonth={shiftMonth}
         onAllYear={() => { setCustomPeriod(null); setSelected((st) => ({ year: st.year, month: null })); setPlaying(false) }}/> : <>
       <section className="fw-timeline fc-timeline">
         <button className="fw-play" onClick={() => { setCustomPeriod(null); setPlaying((v) => !v) }} title={playing ? tr('timeline.pause') : tr('timeline.play')}>{playing ? <Pause size={19}/> : <Play size={19}/>}</button>
@@ -866,6 +900,8 @@ function FireMapApp() {
         </div>
       </section>
       </>}
+      {intro && <IntroNikal onDone={cerrarIntro}/>}
+      {snake && <NikalSnake origen={snake} onClose={() => setSnake(null)}/>}
     </div>
   )
 }

@@ -167,3 +167,37 @@
   .nk .fs-panel,.nk .fa-panel{left:64px;right:78px;top:62px}
   .nk .fw-map .maplibregl-ctrl-bottom-right{bottom:262px}
 }
+
+/* ---------- v3: recorrido sin rótulo ni números (el hilo une los íconos) ---------- */
+.nk-chapters{padding:8px 0}
+.nk-thread{top:28px;bottom:30px}
+.nk-ch{height:60px}
+
+/* ---------- v3: cinta con los días del mes elegido ---------- */
+.nk-dias{flex:1;min-height:0;display:grid;gap:2px;align-items:end;margin-top:6px}
+.nk-dias button{position:relative;height:100%;padding:0 0 14px;border:0;border-radius:4px;background:transparent;display:flex;align-items:flex-end;justify-content:center;cursor:pointer}
+.nk-dias button i{display:block;width:72%;max-width:12px;border-radius:2px 2px 0 0;background:rgba(252,165,10,.5);transition:background .15s}
+.nk-dias button span{position:absolute;bottom:0;left:50%;transform:translateX(-50%);font:600 9px var(--nk-font);color:#8a847b}
+.nk-dias button:hover{background:rgba(245,243,238,.05)}
+.nk-dias button:hover i{background:rgba(252,165,10,.85)}
+.nk-dias button.is-active i{background:var(--nk-pale);outline:2px solid var(--nk-tinta);box-shadow:2px 2px 0 var(--nk-magenta)}
+.nk-dias button.is-active span{color:var(--nk-pale)}
+.nk-mes-nav{margin-left:auto;display:flex;align-items:center;gap:4px}
+.nk-season header .nk-mes-nav button{margin-left:0}
+.nk-season header .nk-mes-nav button:not(:last-child){padding:3px 5px;display:grid;place-items:center}
+
+/* ---------- v3: menú derecho con explicación al pasar el cursor (como los capítulos), hacia la izquierda ---------- */
+.nk .fc-map-menu button{position:relative}
+.nk .nk-tip{position:absolute;z-index:5;right:calc(100% + 14px);top:50%;width:212px;padding:9px 12px;display:flex;flex-direction:column;gap:2px;
+  text-align:left;white-space:normal;background:var(--nk-paper);color:var(--nk-tinta);border:1.5px solid var(--nk-tinta);border-radius:8px;
+  box-shadow:-4px 4px 0 var(--nk-magenta);opacity:0;pointer-events:none;transform:translate(6px,-50%);transition:opacity .16s,transform .16s;font-family:var(--nk-font)}
+.nk .nk-tip b{font-size:11.5px;color:var(--nk-tinta)!important}
+.nk .nk-tip small{font-size:10.5px;line-height:1.35;color:#57514a!important}
+.nk .fc-map-menu .fw-rail button span.nk-tip{display:flex!important}
+.nk .fc-map-menu button:hover .nk-tip,.nk .fc-map-menu button:focus-visible .nk-tip{opacity:1;transform:translate(0,-50%)}
+.nk .fc-map-menu .fw-rail{overflow:visible!important}
+@media(max-width:650px),(hover:none){.nk .nk-tip{display:none!important}}
+
+/* ---------- v3: logo clicable (tres clics: juego oculto) ---------- */
+.nk .nk-brand{pointer-events:auto;user-select:none;-webkit-user-select:none}
+@media(max-width:650px){.nk .fw-summary{right:76px!important}}
