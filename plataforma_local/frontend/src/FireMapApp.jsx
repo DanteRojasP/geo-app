@@ -101,9 +101,11 @@ function boundsToGeoJson(bounds) {
   return { type: 'FeatureCollection', features: [{ type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[[west, south], [east, south], [east, north], [west, north], [west, south]]] } }] }
 }
 
-function fitTo(map, bounds, compact = window.innerWidth < 650) {
+// Márgenes: barra lateral (izq.), botones del mapa (der.) y línea de tiempo (abajo). Los paneles
+// laterales empiezan cerrados, así que Cusco se centra en el espacio libre del mapa.
+function fitTo(map, bounds, pad = {}, compact = window.innerWidth < 650) {
   map.fitBounds(bounds, {
-    padding: compact ? { top: 76, right: 24, bottom: 112, left: 24 } : { top: 100, right: 160, bottom: 300, left: 430 },
+    padding: compact ? { top: 76, right: 24, bottom: 112, left: 24 } : { top: 90, right: 100, bottom: 130, left: 110, ...pad },
     duration: 900, maxZoom: 8.6,
   })
 }
@@ -276,8 +278,16 @@ function FireMapApp() {
   const [calendarMode, setCalendarMode] = useState('valor')
   // ?calendario=0 abre la página sin el calendario (p. ej. para incrustarla en una presentación).
   // Abierto solo en pantallas anchas: en 1440x900 tapaba Cusco (auditoría de Gabriel).
-  const [calendarOpen, setCalendarOpen] = useState(window.innerWidth >= 1600
-    && new URLSearchParams(window.location.search).get('calendario') !== '0')
+  // Un solo panel de la barra lateral abierto a la vez: 'info' | 'calendar' | 'simple' | null.
+  // Al inicio, ninguno: el mapa queda libre (Info solo se abre con su botón).
+  const [panel, setPanel] = useState(null)
+  const panelSetter = (name) => (v) => setPanel((p) => {
+    const open = typeof v === 'function' ? v(p === name) : v
+    if (open) return name
+    return p === name ? null : p
+  })
+  const calendarOpen = panel === 'calendar'
+  const setCalendarOpen = panelSetter('calendar')
   const [playing, setPlaying] = useState(false)
   const playableRef = useRef(new Set())
   // Tiempo real (NASA FIRMS NRT): capa aparte de la serie armonizada.
@@ -286,8 +296,10 @@ function FireMapApp() {
   const [live, setLive] = useState(null)              // { body } | { error } | null
   const liveRef = useRef(EMPTY)
   const yearsRef = useRef(null)
-  const [simpleOpen, setSimpleOpen] = useState(false)
-  const [detailsOpen, setDetailsOpen] = useState(true)
+  const simpleOpen = panel === 'simple'
+  const setSimpleOpen = panelSetter('simple')
+  const detailsOpen = panel === 'info'
+  const setDetailsOpen = panelSetter('info')
   const [layersOpen, setLayersOpen] = useState(true)
   const [selectionMode, setSelectionMode] = useState(false)
   const [selectionBounds, setSelectionBounds] = useState(null)
@@ -447,7 +459,7 @@ function FireMapApp() {
         const first = map.unproject([Math.min(dragStart.x, end.x), Math.max(dragStart.y, end.y)])
         const second = map.unproject([Math.max(dragStart.x, end.x), Math.min(dragStart.y, end.y)])
         setSelectionBounds({ west: first.lng, south: first.lat, east: second.lng, north: second.lat })
-        if (window.innerWidth < 650) setDetailsOpen(false)
+        setPanel(null)
         setSelectionMode(false)
       }
       removeDrawBox()
@@ -628,7 +640,7 @@ function FireMapApp() {
   // Cambiar de modo: el área dibujada y lo abierto del histórico se conservan para cuando se vuelva.
   const goLive = () => { setPlaying(false); setSelectionMode(false); setLiveOn(true) }
   const goHistoric = () => setLiveOn(false)
-  const focusCusco = () => { if (mapReadyRef.current && region) fitTo(mapRef.current, boundsOf(region)) }
+  const focusCusco = (pad) => { if (mapReadyRef.current && region) fitTo(mapRef.current, boundsOf(region), pad) }
 
   const runDownload = async (aoiParams, label) => {
     setNotice(tr('csv.preparing'))
@@ -650,7 +662,7 @@ function FireMapApp() {
   const notes = [...new Set([...(selected.month ? month?.notes || [] : []), ...(calendar?.notes || [])])]
 
   return (
-    <div className="fw-app">
+    <div className={`fw-app ${panel ? 'has-panel' : ''}`}>
       <div ref={mapContainerRef} className="fw-map" aria-label={tr('map.aria')} />
       <div className="fw-nubel-brand" aria-label="Nubel Team · FireCal Cusco"><img src="./nubel-team-logo.png" alt="Nubel Team"/></div>
       <div className="fc-topright">
@@ -664,10 +676,10 @@ function FireMapApp() {
         <button className={liveOn ? 'is-active live' : ''} aria-pressed={liveOn} onClick={goLive}><Radio size={14}/>{tr('mode.live')}</button>
       </div>
       <nav className="fw-rail" aria-label={tr('rail.label')}>
-        <button className={!liveOn ? 'is-active' : ''} title={tr('rail.hotspotsTitle')} onClick={() => { goHistoric(); focusCusco(); setDetailsOpen(true); setActiveLayer('surface') }}><Flame size={20}/><span>{tr('rail.hotspots')}</span></button>
+        <button className={!liveOn ? 'is-active' : ''} title={tr('rail.hotspotsTitle')} onClick={() => { goHistoric(); focusCusco(); setActiveLayer('surface') }}><Flame size={20}/><span>{tr('rail.hotspots')}</span></button>
         <button className={liveOn ? 'is-active live' : ''} title={tr('rail.liveTitle')} aria-pressed={liveOn} onClick={() => (liveOn ? goHistoric() : goLive())}><Radio size={20}/><span>{tr('rail.live')}</span></button>
         <button className={calendarOpen && !liveOn ? 'is-active' : ''} title={tr('rail.calendar')} onClick={() => { if (liveOn) { goHistoric(); setCalendarOpen(true) } else setCalendarOpen((v) => !v) }}><CalendarDays size={20}/><span>{tr('rail.calendar')}</span></button>
-        <button className={selectionMode && !liveOn ? 'is-active select' : ''} title={tr('rail.areaTitle')} onClick={() => { goHistoric(); toggleSelectionMode() }}><Scan size={20}/><span>{tr('rail.area')}</span></button>
+        <button className={selectionMode && !liveOn ? 'is-active select' : ''} title={tr('rail.areaTitle')} onClick={() => { goHistoric(); if (!selectionMode) { setPanel(null); focusCusco({ bottom: 40 }) } toggleSelectionMode() }}><Scan size={20}/><span>{tr('rail.area')}</span></button>
         <button className={simpleOpen && !liveOn ? 'is-active' : ''} title={tr('rail.simpleTitle')} onClick={() => { if (liveOn) { goHistoric(); setSimpleOpen(true) } else setSimpleOpen((v) => !v) }}><MessageCircleQuestion size={20}/><span>{tr('rail.simple')}</span></button>
         <button title={tr('rail.layers')} onClick={() => setLayersOpen((v) => !v)}><Layers3 size={20}/><span>{tr('rail.layers')}</span></button>
         <button title={tr('rail.infoTitle')} onClick={() => setDetailsOpen((v) => !v)}><Info size={20}/><span>{tr('rail.info')}</span></button>
@@ -727,9 +739,9 @@ function FireMapApp() {
           ? <div className="fw-heat-legend fc-dock-points"><header><span>{tr('layers.pointsLegend')}</span></header><p><i className="modis"/>MODIS</p><p><i className="viirs"/>VIIRS</p><p><i className="outside"/>{tr('layers.outside')}</p></div>
           : <div className="fw-heat-legend"><header><span>{tr('layers.scaleDensity')}</span></header><i/><div><span>{tr('scale.low')}</span><span>{tr('scale.mid')}</span><span>{tr('scale.high')}</span></div></div>}
       </aside>}
-      <div className="fw-map-meta"><button onClick={focusCusco}><MapPin size={13}/>Cusco</button><span><Satellite size={13}/>MODIS + VIIRS</span><span><CalendarDays size={13}/>{periodo.label}</span></div>
+      <div className="fw-map-meta"><button onClick={() => focusCusco()}><MapPin size={13}/>Cusco</button><span><Satellite size={13}/>MODIS + VIIRS</span><span><CalendarDays size={13}/>{periodo.label}</span></div>
       {selectionMode && !liveOn && <div className="fw-draw-hint"><Scan size={20}/><div><b>{tr('draw.title')}</b><span>{tr('draw.hint')}</span></div><button onClick={() => setSelectionMode(false)} title={tr('btn.cancel')}><X size={16}/></button></div>}
-      {selectionBounds && !simpleOpen && !liveOn && <aside className="fw-selection-card">
+      {selectionBounds && !selectionMode && panel === null && !liveOn && <aside className="fw-selection-card">
         <div className="fw-selection-head"><div><p>{tr('sel.kicker')}</p><h2>{tr('sel.title')}</h2><span>{periodo.label} · {tr('sel.within')}</span></div><button onClick={clearSelection} title={tr('sel.clear')}><Trash2 size={17}/></button></div>
         <SatelliteSelectionMap bounds={selectionBounds} focos={selection?.focos || EMPTY}/>
         <div className="fw-selection-source"><span>{tr('sel.source')}</span><b>Esri World Imagery · NASA FIRMS</b></div>
@@ -746,7 +758,7 @@ function FireMapApp() {
       </aside>}
       {simpleOpen && !liveOn && <SimplePanel key={lang} aoi={selection?.bbox || aoi} etiqueta={selection?.bbox ? 'area' : 'cusco'} onClose={() => setSimpleOpen(false)}/>}
       {calendarOpen && !liveOn && <CalendarPanel calendar={calendar} mode={calendarMode} setMode={setCalendarMode} selected={selected} onSelect={selectMonth} onClose={() => setCalendarOpen(false)}/>}
-      {!liveOn && <section className="fw-timeline fc-timeline">
+      {!liveOn && !selectionMode && <section className="fw-timeline fc-timeline">
         <button className="fw-play" onClick={() => setPlaying((v) => !v)} title={playing ? tr('timeline.pause') : tr('timeline.play')}>{playing ? <Pause size={19}/> : <Play size={19}/>}</button>
         <div className="fw-timeline-panel" style={{ '--progress': `${selected.month ? ((selected.month - 1) / 11) * 100 : 100}%` }}>
           <div className={`fw-time-callout ${selected.month === 1 ? 'is-start' : !selected.month || selected.month === 12 ? 'is-end' : ''}`}><b>{periodo.label}</b><span>{tr('timeline.yearSum', { n: fmtFocos(selected.month ? (month?.focos_armonizados ?? 0) : yearTotal) })}</span></div>

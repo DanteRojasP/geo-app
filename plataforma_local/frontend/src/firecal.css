@@ -163,3 +163,10 @@ button:focus-visible,select:focus-visible{outline:2px solid #197bb5;outline-offs
 .fc-live-back{margin-top:10px;width:100%;display:flex;align-items:center;justify-content:center;gap:7px;border:1px solid rgba(180,210,226,.3);border-radius:6px;padding:7px;background:transparent;color:#dbe8ef;font-size:11px;cursor:pointer}
 .fc-live-back:hover{background:rgba(255,255,255,.08)}
 @media(max-width:950px){.fc-mode{display:none}.fc-live-panel{left:10px;right:10px;top:122px;width:auto}}
+/* Sin superposiciones: la tarjeta del área queda entre la barra superior y la línea de tiempo,
+   y en el celular los paneles empiezan debajo de la barra lateral (que ahí es horizontal). */
+@media(min-width:951px){.fw-selection-card{top:76px;bottom:220px}}
+@media(max-width:950px){.fw-selection-card{top:122px;bottom:112px}.fs-panel{top:122px}.fc-calendar{top:auto;max-height:calc(100dvh - 240px)}}
+@media(min-width:951px){.fc-calendar{bottom:230px}.fs-panel{right:96px;bottom:230px}}
+@media(max-width:950px){.fw-app.has-panel .fw-display-dock,.fw-app.has-panel .fw-layers{display:none}.fc-calendar,.fs-panel{bottom:118px}}
+@media(min-width:951px){.fc-calendar{top:76px;bottom:230px;left:96px;right:96px;max-height:none}}

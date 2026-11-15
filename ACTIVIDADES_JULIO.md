@@ -336,6 +336,16 @@ Revisión **`firecal-00009`** (imagen `firecal-cusco:gabriel-dante-v1`).
       calendario, la línea de tiempo, "En simple" y el área dibujada; la leyenda muestra la antigüedad. Al volver, el
       histórico queda como estaba.
 
+## Orden de la interfaz (dom 15 nov 2026)
+
+Revisión **`firecal-00016`**.
+- [x] El panel "Focos armonizados" (Info) empieza cerrado y solo se abre con el botón **Info** (o con "?").
+- [x] **Área:** centra Cusco con más zoom, cierra los paneles y oculta la línea de tiempo mientras se dibuja; al
+      terminar aparecen la tarjeta del área y la línea de tiempo (día, mes y año).
+- [x] **Un solo panel a la vez** (Info, Calendario, En simple o la tarjeta del área): abrir uno cierra el otro.
+- [x] Sin superposiciones: auditoría automática en la URL pública (7 pasos × 3 anchos: 1440, 1100 y celular) sin
+      ningún choque entre paneles, barra lateral, barra superior, selector de modo, línea de tiempo, fondo y capas.
+
 ## Pendientes que me afectan
 
 - [x] Datos reales de FIRMS (Cusco, de Antonio).
