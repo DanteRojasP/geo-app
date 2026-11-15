@@ -7,6 +7,10 @@ cómo la interfaz llama al API y cómo se ven los números. Hay **2 fallos altos
 
 Evidencia en [`auditoria/`](auditoria/): capturas, scripts para repetir cada prueba y resultados.
 
+> **Actualización (14-nov, noche).** Las secciones 1 a 9 describen `main` en `f53ad18`. Según sus commits, `main` ya
+> aplicó varias de las mejoras de la sección 7 (revisiones 6 y 8 de Julio). La **sección 10 es nueva**: revisa si el
+> backend aguanta 50–60 personas a la vez, sobre `main` en `ff7558d`, y esta rama incluye los cambios que propone.
+
 ## 1. Pruebas
 
 | Prueba | Resultado |
@@ -140,3 +144,86 @@ $py = "plataforma_local\backend\.venv\Scripts\python"
 ```
 
 Los scripts usan `http://127.0.0.1:8000` por defecto; se puede pasar otra URL como último argumento.
+
+## 10. Capacidad: 50–60 personas a la vez
+
+**Resumen:** `main` no aguantaba 60 personas a la vez: el 89 % de las llamadas fallaba y la página no abría. Con
+los cambios de esta rama, la misma prueba termina sin errores y la página abre al instante, también con 200.
+
+### Cómo se probó
+
+Cada persona simulada hace lo que hace la interfaz: abre la página (4 llamadas en paralelo), mira 4 meses, cambia
+de año, y algunas abren "En simple" (60 %), dibujan un área (25 %) o descargan el CSV (15 %). Ante un 429/503
+espera `Retry-After` y reintenta una vez, igual que `api.js`. Las 60 llegan repartidas en 10 segundos. El servidor
+corre en un portátil **limitado a 1 núcleo**, para parecerse a la instancia de Cloud Run (1 vCPU).
+
+### Resultados
+
+| Escenario | Errores | Abrir la página (mediana / peor) | CPU del servidor |
+|---|---|---|---|
+| `main`, 10 personas | 0 % | 9,7 s / 10,9 s | 97 s |
+| `main`, 20 personas | 0,3 % | 17,5 s / 30 s | 159 s |
+| `main`, 60 personas | **89 %** | no abre (30 s de espera) | 270 s |
+| `main`, 60 personas, 8 núcleos | 3,4 % | 8,8 s / 21,6 s (cada mes ~23 s) | 1.077 s |
+| **Esta rama, 60 personas** | **0 %** | **0,0 s / 0,3 s** | 14 s |
+| Esta rama, 60 personas con la misma IP | 0,7 % | 0,0 s / 0,3 s | 14 s |
+| Esta rama, 200 personas | 0 % | 0,1 s / 1,1 s | 24 s |
+
+Antes de los cambios de límites, 60 personas con la misma IP recibían un 86 % de rechazos 429 aunque el servidor
+estuviera libre. El 0,7 % que queda son consultas de área y CSV que superan el cupo de pesadas de esa IP.
+
+### Por qué se caía
+
+1. **Cada consulta reabría 562 archivos Parquet.** DuckDB leía vistas sobre el Parquet particionado: de los ~790 ms
+   de CPU de `focos.geojson` de un año, ~630 ms eran abrir archivos. Con los datos en una tabla en memoria, 43 ms.
+2. **Nada se reutilizaba entre visitantes.** Solo la serie mensual quedaba en memoria. Los datos son históricos y la
+   región es una sola: existen unas 1.300 respuestas distintas y se recalculaban para cada persona.
+3. **El trabajo abandonado seguía corriendo.** Cuando el navegador se rinde, el servidor sigue calculando esa
+   respuesta; la cola crece hasta el colapso (pico de 625 MB de 1 GB).
+4. **El límite por IP trataba a una sala entera como un visitante.** Quienes comparten wifi salen por la misma IP
+   pública: 60 personas agotaban el cupo de 120 solicitudes por minuto al abrir la página.
+
+Más CPU sola no lo arregla: con 8 núcleos el servidor gastó 4 veces más CPU y cada mes seguía tardando ~23 s.
+
+### Cambios aplicados en esta rama (`plataforma_local/backend`)
+
+| Cambio | Dónde | Efecto medido |
+|---|---|---|
+| Datos en **tablas en memoria** (antes, vistas sobre el Parquet) | `firecal/plan/query.py` | 60 personas: de 89 % de errores a 0 %; 1,6 s al arrancar y ~20 MB |
+| **Caché de respuestas** de Cusco entero, ya comprimidas; 60 consultas iguales a la vez = 1 cálculo | `api/cache.py` (nuevo) | Abrir la página: de 2,6 s a 0,1 s; ~1,4 MB para ~300 respuestas |
+| Lo servido desde la caché **no gasta cupo**; cupos por IP dimensionados para una sala (600/min y 60 pesadas/min) | `api/cache.py`, `config/settings.yaml` | Misma IP: de 86 % de rechazos a 0,7 % |
+| **Carril de pesadas:** 4 a la vez (antes 2), hasta 8 s de espera (antes 2 s) y 503 inmediato si hay más de 16 en fila | `api/limits.py` | Con 200 personas, 0 respuestas 503 (antes 23) |
+| El **CSV libera su turno antes de enviarse**: una descarga lenta ya no retiene el carril | `api/routers/plan.py` | — |
+| Los datos se cargan **al arrancar**, no con el primer visitante | `api/main.py` | — |
+
+Verificación: 104 pruebas pasan (13 nuevas en `tests/test_cache.py` y `tests/test_limits.py`), ruff sin errores, y
+el Q/A de lógica y de analíticas da los mismos números (57 de 57 y 26 de 26). `GET /health/limits` ahora muestra
+también el estado de la caché. Dos pruebas existentes cambiaron: apagan la caché para probar el límite por IP solo,
+porque con la caché una consulta repetida ya no gasta cupo.
+
+### Pendiente (no está en esta rama)
+
+1. **Cloud Run:** desplegar con `--cpu 2 --max-instances 4 --concurrency 60 --cpu-boost`; con 2 vCPU, arrancar
+   `uvicorn` con `--workers 2`. Cada instancia tiene su propia caché y sus propios cupos.
+2. **Interfaz:** comprimirla cuesta ~114 ms de CPU por visitante nuevo; se puede precomprimir al compilar. El API
+   ya envía `Cache-Control` de 1 hora, así que una CDN delante (Cloud CDN o Firebase Hosting) serviría lo repetido
+   sin tocar Python.
+3. **Navegador:** cancelar las consultas que ya no importan (clic rápido entre meses) con `AbortController`.
+4. **Operación:** alerta de errores y latencia en Cloud Run, y correr esta prueba antes de cada demo.
+
+### Lo que no se probó
+
+- **Producción.** La carga se lanzó contra un servidor local, no contra la URL publicada (para no gastar créditos ni
+  tumbarla). En mediciones sueltas, Cloud Run respondía cerca del doble de rápido que este portátil por consulta.
+- La descarga de la interfaz y los mapas base externos (OpenFreeMap, Esri) no forman parte de la prueba.
+- El escalado automático a una segunda instancia.
+
+### Cómo repetirla
+
+```powershell
+.\auditoria\scripts\carga_escenario.ps1 -Label "60 personas"                 # 60 personas, 1 núcleo
+.\auditoria\scripts\carga_escenario.ps1 -Label "misma IP" -Modo misma-ip     # una sala con la misma IP
+.\auditoria\scripts\carga_escenario.ps1 -Label "200" -Users 200              # margen
+```
+
+Resultados completos de todos los escenarios: [`auditoria/resultados/carga.txt`](auditoria/resultados/carga.txt).

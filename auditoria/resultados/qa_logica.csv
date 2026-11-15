@@ -9,7 +9,7 @@
 1. Conteos,manual: anio 2025 = 385,True,385.02
 1. Conteos,API /calendario Cusco responde 200,True,200
 1. Conteos,API total = manual,True,API 15732.03 vs 15732.03
-1. Conteos,meses fuera de cobertura marcados sin_dato (no cero),True,22 meses sin_dato
+1. Conteos,meses fuera de cobertura marcados sin_dato (no cero),True,10 meses sin_dato
 1. Conteos,"API por anio = manual (2000-2025, todos)",True,max dif 0.015
 1. Conteos,"API por mes = manual (todos los meses, ceros incluidos)",True,"302 meses, max dif 0.0050"
 1. Conteos,"API rango solo 2005 = 1,355",True,1355.0
@@ -43,10 +43,10 @@
 4. CSV,2012-06..2013-06 n filas = manual,True,3853 vs 3853
 4. CSV,2012-06..2013-06 suma eq_foco = total del calendario,True,CSV 673.476 vs pantalla 673.48
 4. CSV,2012-06..2013-06 hora_utc con 4 digitos (HHMM),True,
-5. Casos limite,antes de 2000-11 -> 'sin datos' (no cero),True,"404 {""detail"":""Sin datos: la serie cubre de 2000-11 (desde el 2000-11-04) a 2025-12.""}"
+5. Casos limite,antes de 2000-11 -> 'sin datos' (no cero),True,"404 {""detail"":""No data: the series covers 2000-11 (from 2000-11-04) to 2025-12.""}"
 5. Casos limite,otro departamento cargado (Apurimac) -> 404 sin datos,True,404
-5. Casos limite,otro departamento no cargado (Loreto) -> 404 sin datos (MAESTRO 12),True,404 Sin datos para 'PE-LOR': el prototipo solo tiene datos armonizados y validados d
-5. Casos limite,rectangulo fuera de Cusco -> 404,True,"404 {""detail"":""Sin datos: el área está fuera de Cusco, la única región con datos armonizados y validados"
+5. Casos limite,otro departamento no cargado (Loreto) -> 404 sin datos (MAESTRO 12),True,"404 No data for 'PE-LOR': the prototype only has harmonized, validated data for Cusc"
+5. Casos limite,rectangulo fuera de Cusco -> 404,True,"404 {""detail"":""No data: the area is outside Cusco, the only region with harmonized, validated data.""}"
 5. Casos limite,rango invertido -> 422,True,422
 5. Casos limite,mes invalido (2020-13) -> 422,True,422
 5. Casos limite,"CSV periodo completo: 58,779 focos y suma = 15,732 (MAESTRO 12)",True,"200 58779 filas, 15732.01"
@@ -55,4 +55,4 @@
 5. Casos limite,bbox: total = manual (por posicion del foco o de la celda),True,API 51.81 | manual foco 51.810 | manual celda 51.810
 5. Casos limite,focos.geojson ago-2020: n y suma eq_foco = manual,True,"2984 vs 2984, 508.380 vs 508.380"
 5. Casos limite,focos.geojson sin FRP (decision del equipo),True,
-5. Casos limite,metadatos: total = manual y creditos FIRMS,True,"{'data_mode': 'real', 'version': 'cusco-v1.2', 'generado': '2026-11-14T22:47:33+00:00', 'unidad': {'nombre': 'Focos armonizados', 'nombre_en': 'Harmonized hotspots', 'definicion': 'Focos armonizados: "
+5. Casos limite,metadatos: total = manual y creditos FIRMS,True,"{'data_mode': 'real', 'version': 'cusco-v1.2', 'generado': '2026-11-15T03:46:01+00:00', 'unidad': {'nombre': 'Harmonized hotspots', 'nombre_en': 'Harmonized hotspots', 'definicion': 'Harmonized hotspo"

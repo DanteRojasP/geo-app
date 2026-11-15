@@ -25,8 +25,9 @@ cli = httpx.Client(base_url=BASE, timeout=120)
 
 
 def get(path, **p):
+    # lang=es: las frases se comprueban en español (la API responde en inglés por defecto).
     for _ in range(6):
-        r = cli.get(path, params=p)
+        r = cli.get(path, params={"lang": "es", **p})
         if r.status_code in (429, 503) and "Retry-After" in r.headers:
             time.sleep(float(r.headers["Retry-After"]) + 0.5)
             continue
