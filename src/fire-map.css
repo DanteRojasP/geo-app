@@ -174,3 +174,23 @@
 
 @media(max-width:950px){.fw-layers{top:76px}.fw-summary{top:80px}.fw-selection-card{top:16px}}
 @media(max-width:650px){.fw-nubel-brand{top:10px;left:10px;width:142px;height:42px}.fw-summary{top:66px}.fw-layers{top:66px}.fw-selection-card{top:66px}.fw-draw-hint{top:66px}}
+
+/* Nubel institutional blue theme */
+.fw-app{background:#dbe5ec}
+.fw-rail{border-color:#24445b;background:#0c2438;box-shadow:4px 0 18px rgba(5,24,39,.14)}
+.fw-rail button{color:#91aabc}.fw-rail button:hover,.fw-rail button.is-active{background:#163a55;color:#fff}.fw-rail button.is-active{box-shadow:inset 3px 0 #35a1dc}.fw-rail button.is-active svg{color:#78c9f2}
+.fw-summary{border-color:#bdceda;box-shadow:0 12px 32px rgba(13,42,63,.16)}
+.fw-summary-head{border-color:#dbe6ed}.fw-summary-head p{color:#176a9d}.fw-summary-head h1{color:#102c42}.fw-summary-head span{color:#61798a}.fw-summary-head button{border-color:#bdceda;color:#496577}
+.fw-summary-status{border-color:#dbe6ed;background:#f3f8fb;color:#60798a}.fw-metric{border-color:#dfE8ee}.fw-metric b{color:#102c42}.fw-metric small,.fw-sensor-row,.fw-disclaimer{color:#667e8e}
+.fw-summary-actions button{border-color:#bfd0dc;background:#f7fafc;color:#173b55}.fw-summary-actions button:hover{border-color:#7eacc7;background:#eaf4f9}.fw-disclaimer{border-color:#dbe6ed;background:#f5f9fb}
+.fw-basemap-switch button{background:rgba(11,39,60,.94);color:#b9cbd7}.fw-basemap-switch button:hover{background:#16496b}.fw-basemap-switch button.is-active{background:#1577b1;color:#fff;box-shadow:0 0 0 2px #fff,0 4px 14px rgba(8,45,69,.32)}
+.fw-layer-button .heat,.fw-layer-button .activity,.fw-layer-button .points,.fw-layer-button .boundary,.fw-layer-button .select{background:#102d44;color:#e9f4fa}
+.fw-layer-button:hover>span{background:#164b6d}.fw-layer-button.is-active>span{background:#1682bd;box-shadow:0 0 0 2px #fff,0 0 0 4px rgba(22,130,189,.44),0 5px 15px rgba(5,32,51,.28)}
+.fw-basemap-switch button b,.fw-layer-button b{background:rgba(10,35,53,.97)}
+.fw-map-meta span,.fw-map-meta button{border-color:#bfd0dc;color:#3e6075}.fw-map-meta button:hover,.fw-map-meta button.is-active{border-color:#2585bb;color:#123b55;box-shadow:inset 0 -2px #2585bb}
+.fw-timeline-panel{border-color:#31536b;background:rgba(13,38,57,.97);box-shadow:0 10px 30px rgba(6,29,45,.3)}
+.fw-play{border-color:#b7cad6;background:#fff;color:#146fa8;box-shadow:0 6px 20px rgba(6,31,48,.25)}.fw-play:hover{background:#edf7fc;color:#0c5f94}
+.fw-time-callout{background:#197bb5;box-shadow:0 4px 12px rgba(5,48,76,.3)}.fw-time-callout:after{border-top-color:#197bb5}
+.fw-timeline-panel .fw-days:before{background:#31a2dc}.fw-timeline-panel .fw-days button{border-color:rgba(181,211,228,.19);color:#d8e7ef}.fw-timeline-panel .fw-days button:hover{background:rgba(73,145,184,.14)}.fw-timeline-panel .fw-days button.is-active{background:rgba(30,115,162,.3);box-shadow:inset 0 3px #3aaddf}.fw-timeline-panel .fw-days button small{color:#8eacbd}
+.fw-timeline-options{border-color:rgba(177,211,229,.2)}.fw-timeline-options>button:hover,.fw-timeline-options>button.is-active{background:rgba(56,143,190,.2)}.fw-sensor-tabs b{background:#1d79ad}.fw-timeline-source span{color:#94adbc}.fw-timeline-source b{color:#6fd0ff}
+.fw-draw-hint,.fw-selection-card{border-color:#b8ccd9;box-shadow:0 12px 32px rgba(13,42,63,.18)}.fw-draw-hint>svg,.fw-selection-head p{color:#1779ad}.fw-selection-box{border-color:#1687bd;background:rgba(22,135,189,.12)}.fw-selection-actions button{border-color:#bfd0dc;color:#173b55}
