@@ -201,3 +201,15 @@
 /* ---------- v3: logo clicable (tres clics: juego oculto) ---------- */
 .nk .nk-brand{pointer-events:auto;user-select:none;-webkit-user-select:none}
 @media(max-width:650px){.nk .fw-summary{right:76px!important}}
+
+/* ---------- v4: la lista de herramientas se despliega con animación y empuja a Comparar y Calendario ---------- */
+.nk .fc-map-menu .fw-rail.nk-rail{gap:0!important;transition:gap .3s cubic-bezier(.2,.8,.2,1)}
+.nk .fc-map-menu .fw-rail.nk-rail.is-open{gap:7px!important}
+.nk .fc-map-menu .fw-rail.nk-rail button{flex:0 0 0px!important;height:0!important;min-height:0!important;opacity:0;transform:scale(.4);border-width:0!important;pointer-events:none;
+  transition:flex-basis .34s cubic-bezier(.2,.8,.2,1),height .34s cubic-bezier(.2,.8,.2,1),opacity .2s ease,transform .34s cubic-bezier(.34,1.56,.64,1),border-width .34s}
+.nk .fc-map-menu .fw-rail.nk-rail.is-open button{flex:0 0 40px!important;height:40px!important;opacity:1;transform:none;border-width:1px!important;pointer-events:auto}
+.nk .fc-map-menu .fw-rail.nk-rail.is-open button:nth-child(2){transition-delay:.05s}
+.nk .fc-map-menu .fw-rail.nk-rail.is-open button:nth-child(3){transition-delay:.1s}
+.nk .nk-compare-btn,.nk .nk-cal-btn{transition:transform .34s cubic-bezier(.2,.8,.2,1),background .2s}
+@media(max-width:650px){.nk .fc-map-menu .fw-rail.nk-rail.is-open button{flex-basis:36px!important;height:36px!important}}
+@media(prefers-reduced-motion:reduce){.nk .fc-map-menu .fw-rail.nk-rail,.nk .fc-map-menu .fw-rail.nk-rail button{transition:none}}

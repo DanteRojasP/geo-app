@@ -83,3 +83,5 @@
 .nk .fc-compare-buttons .is-primary *{color:#141210!important}
 .nk :is(.fc-split-dates,.fc-split-label,.fc-compare-actions){font-family:var(--ph-cuerpo);color-scheme:dark}
 .nk .fc-split-dates :is(input,select){background:#1f1b1c!important;color:var(--ph-texto)!important;border:1px solid var(--ph-linea)!important}
+.fa-dias-mes{fill:rgba(20,18,16,.07)}
+.nk .fa-dias-mes{fill:rgba(252,165,10,.1);stroke:rgba(252,165,10,.45);stroke-dasharray:3 3}

@@ -3,7 +3,8 @@
 // mapa); ambos se calculan al pedirlos con los años y la ventana de suavizado elegidos.
 // Áreas apiladas por nivel (colores de datos de CENEPRED, los mismos del mapa y la lista). El día elegido
 // (clic, ◀ ▶ o ▶ reproducir) se refleja en el mapa: se ven solo los focos de esos días. La barra inferior manda:
-// si cambia el año, el mes o el día de la cinta, se suelta el día y el mapa vuelve a seguir a la cinta.
+// su año fija los años del gráfico, su mes se marca en el gráfico y su día se fija (ventana de 1 día), así el
+// mapa muestra la distribución por nivel de peligro de la fecha elegida en la cinta.
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight, Pause, Play, X } from 'lucide-react'
 import { getAmbitoDia, getAmbitoDias } from './services/api.js'
@@ -15,6 +16,13 @@ const INICIO_MES = [1, 32, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335]
 const n1 = (v) => (v >= 10 ? Math.round(v) : Math.round(v * 10) / 10).toLocaleString(locale())
 const fechaCorta = (dia) => new Date(2001, 0, dia).toLocaleDateString(locale(), { day: 'numeric', month: 'long' })
 const OCULTAR = ['fire-heat', 'fire-points']   // capas del periodo general mientras se ve un día
+const REF = [2003, 2025]                         // años de la tipificación (completos, sin extrapolados)
+// Día 1-365 sin bisiestos (el 29 de febrero cuenta como el 28), igual que el backend.
+function diaDelAnio(y, m, d) {
+  const n = Math.round((Date.UTC(y, m - 1, d) - Date.UTC(y, 0, 1)) / 864e5) + 1
+  const bis = (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0
+  return bis && (m > 2 || (m === 2 && d === 29)) ? n - 1 : n
+}
 
 // ---------- capa del día en el mapa ----------
 function pintarDia(map, geojson) {
@@ -39,7 +47,7 @@ function pintarDia(map, geojson) {
   ;['ambito-dia-heat', 'ambito-dia-pts'].forEach((id) => map.setLayoutProperty(id, 'visibility', 'visible'))
 }
 
-function AmbitosDias({ nivel, map, periodoClave }) {
+function AmbitosDias({ nivel, map, seleccion }) {
   const [desde, setDesde] = useState(2003)
   const [hasta, setHasta] = useState(2025)
   const [ventana, setVentana] = useState(7)
@@ -89,13 +97,16 @@ function AmbitosDias({ nivel, map, periodoClave }) {
   }, [fijo, map])
   useEffect(() => () => restaurar(map, previo), [map])
 
-  // La cinta inferior cambió (año, mes o día): el mapa vuelve a mostrar ese periodo.
-  const claveInicial = useRef(periodoClave)
+  // La cinta inferior manda: su año (si está en 2003-2025) fija los años; su día se fija con ventana de 1 día.
+  // Sin día, se suelta el día y el mapa muestra el periodo de la cinta sobre las unidades por nivel de peligro.
+  const sy = seleccion?.year, sm = seleccion?.month, sd = seleccion?.day, sc = seleccion?.custom
   useEffect(() => {
-    if (claveInicial.current === periodoClave) return
-    claveInicial.current = periodoClave
-    setJugando(false); setFijo(null); setDelDia(null)
-  }, [periodoClave])
+    if (sc || !sy) return
+    setJugando(false)
+    if (sy >= REF[0] && sy <= REF[1]) { setDesde(sy); setHasta(sy) }
+    if (sm && sd) { setVentana(1); setFijo(diaDelAnio(sy, sm, sd)) } else { setFijo(null); setDelDia(null) }
+  }, [sy, sm, sd, sc])
+  const mesRango = sm && !sc ? [diaDelAnio(2001, sm, 1), diaDelAnio(2001, sm, new Date(2001, sm, 0).getDate())] : null
 
   // ▶ recorre el año avanzando de a una ventana.
   useEffect(() => {
@@ -151,6 +162,7 @@ function AmbitosDias({ nivel, map, periodoClave }) {
             onMouseMove={(e) => setDia(diaDe(e))} onMouseLeave={() => setDia(null)} onClick={(e) => { setJugando(false); setFijo(diaDe(e)) }}>
             {[0.5, 1].map((f) => <g key={f}><line x1={M.l} x2={W - M.r} y1={capas.y(capas.max * f)} y2={capas.y(capas.max * f)} className="fa-dias-grid"/>
               <text x={M.l - 4} y={capas.y(capas.max * f) + 3} textAnchor="end" className="fa-dias-eje">{modo === 'parte' ? `${Math.round(100 * f)} %` : n1(capas.max * f)}</text></g>)}
+            {mesRango && <rect x={capas.x(mesRango[0] - 1)} width={capas.x(mesRango[1] - 1) - capas.x(mesRango[0] - 1)} y={M.t} height={capas.y(0) - M.t} className="fa-dias-mes"/>}
             {fijo && ventana > 1 && <rect x={capas.x(Math.max(0, fijo - 1 - Math.floor(ventana / 2)))} width={capas.x(Math.min(364, fijo - 1 + Math.floor(ventana / 2))) - capas.x(Math.max(0, fijo - 1 - Math.floor(ventana / 2)))} y={M.t} height={capas.y(0) - M.t} className="fa-dias-ventana"/>}
             {capas.areas.map(({ n, path }) => <path key={n.nivel_peligro} d={path} fill={n.color} fillOpacity=".88"><title>{n.etiqueta}</title></path>)}
             <line x1={M.l} x2={W - M.r} y1={capas.y(0)} y2={capas.y(0)} className="fa-dias-grid"/>

@@ -305,7 +305,8 @@ function FireMapApp() {
   const [calendarMode, setCalendarMode] = useState('valor')
   // ?calendario=0 abre la página sin el calendario (p. ej. para incrustarla en una presentación).
   // Abierto solo en pantallas anchas: en 1440x900 tapaba Cusco (auditoría de Gabriel).
-  const [calendarOpen, setCalendarOpen] = useState(window.innerWidth >= 1600
+  // En Nikal el calendario nunca se abre solo al cargar (tapaba el mapa en la primera vista).
+  const [calendarOpen, setCalendarOpen] = useState(!NK && window.innerWidth >= 1600
     && new URLSearchParams(window.location.search).get('calendario') !== '0')
   const [playing, setPlaying] = useState(false)
   const playableRef = useRef(new Set())
@@ -797,13 +798,14 @@ function FireMapApp() {
       <div className="fc-map-menu">
         <div className="fc-lang" role="group" aria-label={tr('lang.title')}>{LANGS.map((l) => <button key={l} className={l === lang ? 'is-active' : ''} aria-pressed={l === lang} onClick={() => changeLang(l)}>{l.toUpperCase()}</button>)}</div>
         <button className={`fc-menu-toggle ${toolsOpen ? 'is-open' : ''}`} aria-label={tr('rail.label')} aria-expanded={toolsOpen} onClick={() => setToolsOpen((v) => !v)}><I.capas size={21}/>{NK && <span className="nk-tip"><b>{tr('nk.tip.tools')}</b><small>{tr('nk.tip.tools.sub')}</small></span>}</button>
-        {NK && <button className={`fc-menu-toggle nk-compare-btn ${compareOpen ? 'is-open' : ''}`} aria-label={tr('nk.ch.compare')} aria-pressed={compareOpen} onClick={() => openChapter('compare')}><IcoComparar size={20}/>{NK && <span className="nk-tip"><b>{tr('nk.ch.compare')}</b><small>{tr('nk.ch.compare.sub')}</small></span>}</button>}
-        {toolsOpen && <nav className="fw-rail" aria-label={tr('rail.label')} onClickCapture={goHistoric}>
+        {(toolsOpen || NK) && <nav className={`fw-rail ${NK ? 'nk-rail' : ''} ${toolsOpen ? 'is-open' : ''}`} aria-label={tr('rail.label')} aria-hidden={!toolsOpen} inert={toolsOpen ? undefined : ''} onClickCapture={goHistoric}>
           <button className="is-active" title={NK ? undefined : tr('rail.hotspotsTitle')} aria-label={tr('rail.hotspotsTitle')} onClick={() => { focusRegion(); setDetailsOpen(true); setActiveLayer('surface') }}><I.focos size={19}/><span>{tr('rail.hotspots')}</span>{NK && <span className="nk-tip"><b>{tr('rail.hotspots')}</b><small>{tr('nk.tip.hotspots.sub')}</small></span>}</button>
-          <button className={calendarOpen ? 'is-active' : ''} title={NK ? undefined : tr('rail.calendar')} aria-label={tr('rail.calendar')} onClick={() => setCalendarOpen((v) => !v)}><I.calendario size={19}/><span>{tr('rail.calendar')}</span>{NK && <span className="nk-tip"><b>{tr('rail.calendar')}</b><small>{tr('nk.tip.calendar.sub')}</small></span>}</button>
+          {!NK && <button className={calendarOpen ? 'is-active' : ''} title={NK ? undefined : tr('rail.calendar')} aria-label={tr('rail.calendar')} onClick={() => setCalendarOpen((v) => !v)}><I.calendario size={19}/><span>{tr('rail.calendar')}</span>{NK && <span className="nk-tip"><b>{tr('rail.calendar')}</b><small>{tr('nk.tip.calendar.sub')}</small></span>}</button>}
           <button className={selectionMode ? 'is-active select' : ''} title={NK ? undefined : tr('rail.areaTitle')} aria-label={tr('rail.areaTitle')} onClick={toggleSelectionMode}><I.area size={19}/><span>{tr('rail.area')}</span>{NK && <span className="nk-tip"><b>{tr('rail.area')}</b><small>{tr('nk.tip.area.sub')}</small></span>}</button>
           <button className={layersOpen ? 'is-active' : ''} title={NK ? undefined : tr('rail.layers')} aria-label={tr('rail.layers')} onClick={() => setLayersOpen((v) => !v)}><I.ajustes size={19}/><span>{tr('rail.layers')}</span>{NK && <span className="nk-tip"><b>{tr('rail.layers')}</b><small>{tr('nk.tip.layers.sub')}</small></span>}</button>
         </nav>}
+        {NK && <button className={`fc-menu-toggle nk-compare-btn ${compareOpen ? 'is-open' : ''}`} aria-label={tr('nk.ch.compare')} aria-pressed={compareOpen} onClick={() => openChapter('compare')}><IcoComparar size={20}/>{NK && <span className="nk-tip"><b>{tr('nk.ch.compare')}</b><small>{tr('nk.ch.compare.sub')}</small></span>}</button>}
+        {NK && <button className={`fc-menu-toggle nk-cal-btn ${calendarOpen ? 'is-open' : ''}`} aria-label={tr('rail.calendar')} aria-pressed={calendarOpen} onClick={() => { goHistoric(); setCalendarOpen((v) => !v) }}><I.calendario size={20}/>{NK && <span className="nk-tip"><b>{tr('rail.calendar')}</b><small>{tr('nk.tip.calendar.sub')}</small></span>}</button>}
       </div>
       {detailsOpen && <aside className="fw-summary">
         <div className="fw-summary-head"><div><p>{selectedRegion.name.toUpperCase()} · {tr('summary.series')}</p><h1>{tr('filter.title')}</h1><span>{periodo.label}{!customPeriod && month?.calidad ? ` · ${calidadLabel(month.calidad)}` : ''}</span></div><button onClick={() => setDetailsOpen(false)} title={tr('btn.close')} aria-label={tr('btn.close')}><X size={17}/></button></div>
@@ -867,7 +869,7 @@ function FireMapApp() {
       {simpleOpen && (NK
         ? <PanelHistoria key={lang} aoi={selection?.bbox || aoi} etiqueta={selection?.bbox ? 'area' : 'cusco'}/>
         : <SimplePanel key={lang} aoi={selection?.bbox || aoi} etiqueta={selection?.bbox ? 'area' : 'cusco'} onClose={() => setSimpleOpen(false)}/>)}
-      {ambitosOpen && !liveOn && <AmbitosPanel key={lang} map={mapRef.current} periodoClave={`${selected.year}-${selected.month}-${selected.day}-${customPeriod ? 'f' : ''}`} onClose={() => setAmbitosOpen(false)}/>}
+      {ambitosOpen && !liveOn && <AmbitosPanel key={lang} map={mapRef.current} seleccion={{ year: selected.year, month: selected.month, day: selected.day, custom: Boolean(customPeriod) }} onClose={() => setAmbitosOpen(false)}/>}
       {compareOpen && <ComparisonWorkspace key={lang} calendar={calendar} region={region} regionName={selectedRegion.name} onClose={() => setCompareOpen(false)}/>}
       {calendarOpen && <CalendarPanel calendar={calendar} mode={calendarMode} setMode={setCalendarMode} selected={selected} onSelect={selectMonth} onClose={() => setCalendarOpen(false)} reportUrl={informeUrl(aoi, reportExtra)}/>}
       {NK ? <SeasonRibbon calendar={calendar} selected={selected} onMonth={selectMonth} firstYear={FIRST_YEAR} lastYear={LAST_YEAR}

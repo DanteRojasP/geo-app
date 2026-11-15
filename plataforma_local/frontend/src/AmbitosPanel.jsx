@@ -34,7 +34,7 @@ function hide(map) {
   }
 }
 
-function AmbitosPanel({ map, onClose, periodoClave }) {
+function AmbitosPanel({ map, onClose, seleccion }) {
   const [niveles, setNiveles] = useState([])
   const [nivel, setNivel] = useState('provincia')
   const [datos, setDatos] = useState(null)
@@ -125,7 +125,7 @@ function AmbitosPanel({ map, onClose, periodoClave }) {
           ))}
         </div>
         <p className="fa-note">{tr('amb.coverage', { p: Math.round((datos.cobertura || 0) * 1000) / 10 })}</p>
-        <AmbitosDias nivel={nivel} map={map} periodoClave={periodoClave}/>
+        <AmbitosDias nivel={nivel} map={map} seleccion={seleccion}/>
         <ol className="fa-list" ref={listRef}>
           {filas.map((u) => (
             <li key={u.codigo} data-codigo={u.codigo} className={u.codigo === elegido ? 'is-picked' : ''}>

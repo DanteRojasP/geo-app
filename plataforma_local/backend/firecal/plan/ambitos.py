@@ -528,15 +528,16 @@ def distribucion_diaria(
         for d in dias
     ]
     con_focos = [n for n in niveles if n["focos_por_anio"] > 0]
+    anios_txt = str(desde) if desde == hasta else f"{desde}-{hasta}"
     top = max(con_focos, key=lambda n: n["parte"], default=None)
     if top:
         en_simple = t(
             es=f"Las unidades de peligro {top['etiqueta'].lower()} "
             f"({top['unidades']} de {len(tipos)}) reúnen el {round(100 * top['parte'])} % de los "
-            f"focos de calor de {desde}-{hasta}. El 80 % de sus focos ocurre "
+            f"focos de calor de {anios_txt}. El 80 % de sus focos ocurre "
             f"{top['temporada_central']}, con el pico el {top['fecha_pico']}.",
             en=f"Units with {top['etiqueta'].lower()} hazard ({top['unidades']} of {len(tipos)}) "
-            f"hold {round(100 * top['parte'])}% of the hotspots in {desde}-{hasta}. 80% of their "
+            f"hold {round(100 * top['parte'])}% of the hotspots in {anios_txt}. 80% of their "
             f"hotspots occur from {top['temporada_central']}, peaking on {top['fecha_pico']}.",
         )
     else:
