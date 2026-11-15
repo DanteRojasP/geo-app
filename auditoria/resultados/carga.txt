@@ -1,0 +1,221 @@
+Prueba de carga de FireCal Cusco (14-nov-2026). Servidor local limitado a N nucleos; cada persona simulada
+abre la pagina, mira 4 meses, cambia de anio y algunas abren 'En simple', dibujan un area o bajan el CSV.
+A*: main (caade78) sin cambios. B, C, C200, D: prototipos sobre main. E, F, G: implementacion de esta rama.
+
+
+##### A. main actual (vistas sobre Parquet, sin cache), 1 nucleo | 60 personas llegando en 10 s | duracion 299 s | 874 llamadas (2.9/s) | 10.8 MB
+  abrir la pagina (4 llamadas): mediana  30.0 s | p95  30.1 s | peor  31.6 s
+  llamada                           n   mediana       p95      peor  (ms)
+  focos.geojson (anio)            120     30025     32053     32075
+  resumen                          38     30020     31045     32053
+  calendario (area)                13     30026     30541     30541
+  focos.geojson (area)             13     30024     30538     30538
+  departamentos.geojson            60     30027     30071     30086
+  metadatos                        60     30026     30069     30085
+  calendario                       60     30024     30068     30083
+  focos.geojson (mes)             240     30021     30042     32076
+  anomalias                       240     30018     30035     32071
+  analitica/acumulado              22     30020     30027     30028
+  hotspots.csv                      8     30020     30027     30027
+  respuestas: {200: 96, 'ReadTimeout': 590, 'ConnectError': 188} | reintentos: 0
+  ERRORES VISIBLES PARA LA PERSONA: 778 de 874 (89.0 %) {'ReadTimeout focos.geojson (anio)': 98, 'ReadTimeout departamentos.geojson': 32, 'ReadTimeout metadatos': 32, 'ReadTimeout calendario': 32, 'ReadTimeout anomalias': 151, 'ReadTimeout focos.geojson (mes)': 152, 'ConnectError focos.geojson (mes)': 88, 'ConnectError anomalias': 89, 'ConnectError focos.geojson (anio)': 10, 'ConnectError resumen': 1, 'ReadTimeout focos.geojson (area)': 13, 'ReadTimeout calendario (area)': 13, 'ReadTimeout resumen': 37, 'ReadTimeout analitica/acumulado': 22, 'ReadTimeout hotspots.csv': 8}
+  servidor: 3 proceso(s), 1 nucleo(s) | pico de memoria 625 MB | CPU usada 270 s
+
+##### A10. main actual, 10 personas, 1 nucleo | 10 personas llegando en 10 s | duracion 109 s | 145 llamadas (1.3/s) | 15.9 MB
+  abrir la pagina (4 llamadas): mediana   9.7 s | p95  10.9 s | peor  10.9 s
+  llamada                           n   mediana       p95      peor  (ms)
+  resumen                           8     14401     15541     15541
+  focos.geojson (mes)              40     11157     13396     13458
+  focos.geojson (anio)             20      7448     10865     10865
+  hotspots.csv                      3      3317      8612      8612
+  anomalias                        40      5225      7201      8148
+  calendario                       10      3018      3646      3646
+  focos.geojson (area)              1      3486      3486      3486
+  metadatos                        10      2509      3188      3188
+  departamentos.geojson            10      2496      3181      3181
+  calendario (area)                 1      2926      2926      2926
+  analitica/acumulado               2      1661      1778      1778
+  respuestas: {200: 145, 503: 1} | reintentos: 1
+  ERRORES VISIBLES PARA LA PERSONA: 0 de 145 (0.0 %) 
+  servidor: 3 proceso(s), 1 nucleo(s) | pico de memoria 271 MB | CPU usada 97 s
+
+##### A20. main actual, 20 personas, 1 nucleo | 20 personas llegando en 10 s | duracion 172 s | 287 llamadas (1.7/s) | 32.4 MB
+  abrir la pagina (4 llamadas): mediana  17.5 s | p95  30.1 s | peor  30.1 s
+  llamada                           n   mediana       p95      peor  (ms)
+  focos.geojson (anio)             40     15796     29843     30057
+  focos.geojson (mes)              80     19057     27318     27901
+  resumen                          13     23659     25333     25333
+  focos.geojson (area)              2     10829     19359     19359
+  calendario                       20      9588     16181     16181
+  anomalias                        80     10532     15923     18499
+  metadatos                        20      8901     15586     15586
+  departamentos.geojson            20      8634     14897     14897
+  hotspots.csv                      5      3275     13389     13389
+  calendario (area)                 2      5055      8399      8399
+  analitica/acumulado               5       992      5605      5605
+  respuestas: {200: 286, 'ReadTimeout': 1, 503: 1} | reintentos: 1
+  ERRORES VISIBLES PARA LA PERSONA: 1 de 287 (0.3 %) {'ReadTimeout focos.geojson (anio)': 1}
+  servidor: 3 proceso(s), 1 nucleo(s) | pico de memoria 312 MB | CPU usada 159 s
+
+##### A8. main actual, 60 personas, 8 nucleos (1 proceso) | 60 personas llegando en 10 s | duracion 195 s | 874 llamadas (4.5/s) | 96.1 MB
+  abrir la pagina (4 llamadas): mediana   8.8 s | p95  21.1 s | peor  21.6 s
+  llamada                           n   mediana       p95      peor  (ms)
+  focos.geojson (mes)             240     22974     30274     31325
+  resumen                          38     26683     30265     30390
+  focos.geojson (anio)            120     16852     28085     28874
+  anomalias                       240     19960     25879     29814
+  calendario (area)                13      5751     23272     23272
+  focos.geojson (area)             13      4524     15500     15500
+  calendario                       60      7544     13943     14531
+  metadatos                        60      7405     13830     14410
+  departamentos.geojson            60      7282     13704     14332
+  hotspots.csv                      8      5804     11199     11199
+  analitica/acumulado              22      5284      9417     10271
+  respuestas: {200: 844, 'ReadTimeout': 25, 503: 15} | reintentos: 10
+  ERRORES VISIBLES PARA LA PERSONA: 30 de 874 (3.4 %) {'ReadTimeout focos.geojson (mes)': 22, '503 hotspots.csv': 2, '503 calendario (area)': 1, 'ReadTimeout resumen': 3, '503 focos.geojson (area)': 2}
+  servidor: 3 proceso(s), 8 nucleo(s) | pico de memoria 406 MB | CPU usada 1,077 s
+
+##### B. tablas en memoria (sin cache), 1 nucleo | 60 personas llegando en 10 s | duracion 50 s | 874 llamadas (17.5/s) | 99.4 MB
+  abrir la pagina (4 llamadas): mediana   2.6 s | p95   3.5 s | peor   3.7 s
+  llamada                           n   mediana       p95      peor  (ms)
+  resumen                          38      2564      5540      5778
+  focos.geojson (anio)            120      2453      3567      5930
+  calendario                       60      2285      3189      3490
+  metadatos                        60      2252      3138      3360
+  departamentos.geojson            60      2249      3130      3307
+  focos.geojson (mes)             240       946      2978      3804
+  anomalias                       240       862      2942      3475
+  hotspots.csv                      8       725      2858      2858
+  calendario (area)                13       917      2213      2213
+  analitica/acumulado              22       423      1991      2624
+  focos.geojson (area)             13       380      1984      1984
+  respuestas: {200: 874} | reintentos: 0
+  ERRORES VISIBLES PARA LA PERSONA: 0 de 874 (0.0 %) 
+  servidor: 3 proceso(s), 1 nucleo(s) | pico de memoria 292 MB | CPU usada 43 s
+
+##### C. tablas + cache de respuestas (cache fria), 1 nucleo | 60 personas llegando en 10 s | duracion 38 s | 874 llamadas (22.8/s) | 99.4 MB
+  abrir la pagina (4 llamadas): mediana   0.1 s | p95   0.5 s | peor   0.7 s
+  llamada                           n   mediana       p95      peor  (ms)
+  focos.geojson (mes)             240        96       681      1124
+  anomalias                       240        64       633       818
+  calendario                       60        57       449       478
+  calendario (area)                13       196       357       357
+  metadatos                        60        56       321       353
+  focos.geojson (anio)            120        48       319      1195
+  hotspots.csv                      8       111       281       281
+  analitica/acumulado              22       102       257       291
+  resumen                          38        16       236       867
+  departamentos.geojson            60        58       185       433
+  focos.geojson (area)             13        53       167       167
+  respuestas: {200: 874} | reintentos: 0
+  ERRORES VISIBLES PARA LA PERSONA: 0 de 874 (0.0 %) 
+  servidor: 3 proceso(s), 1 nucleo(s) | pico de memoria 272 MB | CPU usada 21 s
+
+##### C200. tablas + cache (fria), 200 personas, 1 nucleo | 200 personas llegando en 10 s | duracion 45 s | 2932 llamadas (64.7/s) | 348.7 MB
+  abrir la pagina (4 llamadas): mediana   0.7 s | p95   2.5 s | peor   3.8 s
+  llamada                           n   mediana       p95      peor  (ms)
+  calendario (area)                48      2208      8018      8041
+  focos.geojson (area)             48      2101      7806      7897
+  hotspots.csv                     31       851      7702      7721
+  focos.geojson (mes)             800       748      2617      3930
+  anomalias                       800       655      2545      3835
+  calendario                      200       647      2499      3722
+  metadatos                       200       521      2499      3676
+  departamentos.geojson           200       531      2498      3659
+  focos.geojson (anio)            400       261      2384      3783
+  analitica/acumulado              70       188      1284      1398
+  resumen                         135        65       450      1216
+  respuestas: {200: 2931, 'ConnectError': 1, 503: 23} | reintentos: 23
+  ERRORES VISIBLES PARA LA PERSONA: 1 de 2932 (0.0 %) {'ConnectError focos.geojson (mes)': 1}
+  servidor: 3 proceso(s), 1 nucleo(s) | pico de memoria 337 MB | CPU usada 36 s
+
+##### D. tablas en memoria, 60 personas con la MISMA IP, 1 nucleo | 60 personas llegando en 10 s | duracion 48 s | 881 llamadas (18.2/s) | 14.5 MB
+  abrir la pagina (4 llamadas): mediana   1.2 s | p95   2.2 s | peor   2.2 s
+  llamada                           n   mediana       p95      peor  (ms)
+  focos.geojson (area)             17      1032      4073      4073
+  calendario                       60      1135      2150      2168
+  metadatos                        60      1113      2043      2146
+  departamentos.geojson            60      1100      2017      2102
+  focos.geojson (anio)            120      1081      1527      2176
+  resumen                          38      1038      1321      1331
+  hotspots.csv                      8      1037      1238      1238
+  calendario (area)                17      1047      1164      1164
+  focos.geojson (mes)             240      1084      1161      1283
+  anomalias                       240      1073      1144      1253
+  analitica/acumulado              21      1030      1117      1122
+  respuestas: {200: 120, 429: 1567} | reintentos: 806
+  ERRORES VISIBLES PARA LA PERSONA: 761 de 881 (86.4 %) {'429 calendario': 49, '429 focos.geojson (anio)': 97, '429 departamentos.geojson': 42, '429 metadatos': 45, '429 anomalias': 215, '429 focos.geojson (mes)': 232, '429 resumen': 32, '429 focos.geojson (area)': 12, '429 calendario (area)': 15, '429 hotspots.csv': 7, '429 analitica/acumulado': 15}
+  servidor: 3 proceso(s), 1 nucleo(s) | pico de memoria 283 MB | CPU usada 17 s
+
+##### E. gabriel2 (tablas + cache + limites nuevos), 60 personas, 1 nucleo | 60 personas llegando en 10 s | duracion 37 s | 874 llamadas (23.3/s) | 99.4 MB
+  abrir la pagina (4 llamadas): mediana   0.0 s | p95   0.2 s | peor   0.3 s
+  llamada                           n   mediana       p95      peor  (ms)
+  resumen                          38         7       254       285
+  calendario (area)                13        97       236       236
+  focos.geojson (mes)             240        45       167       298
+  hotspots.csv                      8        72       157       157
+  focos.geojson (anio)            120        20       150       266
+  anomalias                       240        43       139       275
+  focos.geojson (area)             13        42       107       107
+  calendario                       60        23       100       109
+  analitica/acumulado              22        47        95       134
+  departamentos.geojson            60        22        89       200
+  metadatos                        60        24        88        99
+  respuestas: {200: 874} | reintentos: 0
+  ERRORES VISIBLES PARA LA PERSONA: 0 de 874 (0.0 %) 
+  servidor: 3 proceso(s), 1 nucleo(s) | pico de memoria 278 MB | CPU usada 14 s
+
+##### F. gabriel2, 60 personas con la MISMA IP, 1 nucleo | 60 personas llegando en 10 s | duracion 38 s | 881 llamadas (23.3/s) | 98.0 MB
+  abrir la pagina (4 llamadas): mediana   0.0 s | p95   0.2 s | peor   0.3 s
+  llamada                           n   mediana       p95      peor  (ms)
+  hotspots.csv                      8       132      1185      1185
+  calendario (area)                17        92      1084      1084
+  focos.geojson (area)             17        40      1019      1019
+  focos.geojson (mes)             240        51       293       370
+  anomalias                       240        46       254       360
+  focos.geojson (anio)            120        22       154       238
+  calendario                       60        25       131       135
+  analitica/acumulado              21        55       119       162
+  metadatos                        60        25       118       126
+  departamentos.geojson            60        24       111       211
+  resumen                          38         8        41       237
+  respuestas: {200: 875, 429: 14} | reintentos: 8
+  ERRORES VISIBLES PARA LA PERSONA: 6 de 881 (0.7 %) {'429 calendario (area)': 2, '429 focos.geojson (area)': 2, '429 hotspots.csv': 2}
+  servidor: 3 proceso(s), 1 nucleo(s) | pico de memoria 274 MB | CPU usada 14 s
+
+##### G. gabriel2, 200 personas, 1 nucleo | 200 personas llegando en 10 s | duracion 38 s | 2932 llamadas (76.3/s) | 348.8 MB
+  abrir la pagina (4 llamadas): mediana   0.1 s | p95   0.9 s | peor   1.1 s
+  llamada                           n   mediana       p95      peor  (ms)
+  focos.geojson (mes)             800        50      1026      1383
+  anomalias                       800        40      1001      1309
+  calendario                      200        75       890      1071
+  metadatos                       200        73       880      1060
+  departamentos.geojson           200        72       880      1047
+  focos.geojson (anio)            400        35       842      1079
+  hotspots.csv                     31       184       603       621
+  analitica/acumulado              70        18       485       593
+  calendario (area)                48       196       475       562
+  focos.geojson (area)             48        67       179       324
+  resumen                         135        14        61       357
+  respuestas: {200: 2932} | reintentos: 0
+  ERRORES VISIBLES PARA LA PERSONA: 0 de 2932 (0.0 %) 
+  servidor: 3 proceso(s), 1 nucleo(s) | pico de memoria 345 MB | CPU usada 24 s
+
+===== Perfil de una consulta (un solo usuario, main sin cambios) =====
+== focos.geojson de un anio (2020) ==
+  funcion completa     706 ms = SQL count 290 + SQL select 337 + armar 7295 dicts ~78
+  + JSON    50 ms (1648 KB) + gzip-9    31 ms (75 KB) | gzip-6 12 ms (82 KB) | gzip-1 3 ms (131 KB)
+  TOTAL por visita ~787 ms de CPU
+  focos con peso en la serie: 6107 de 7295 (84 %)
+== lo mismo con los datos en una TABLA en memoria (no vistas sobre ~600 Parquet) ==
+  SQL count 3 ms + select 40 ms  (antes 290 + 337)
+  archivos Parquet que abre cada consulta: 562
+== otras consultas (funcion + JSON) ==
+  calendario (serie en cache)         13 ms + gzip    5 ms |   113.8 KB ->   10.0 KB
+  anomalias 2020-08                  250 ms + gzip    0 ms |     3.6 KB ->    0.9 KB
+  focos.geojson mes 2020-08          673 ms + gzip   14 ms |   741.8 KB ->   30.6 KB
+  resumen con graficos              1401 ms + gzip    0 ms |    14.7 KB ->    3.2 KB
+  analitica acumulado 2019           383 ms + gzip    0 ms |     5.1 KB ->    1.5 KB
+  analitica recurrencia              626 ms + gzip   12 ms |   328.6 KB ->   26.0 KB
+== cuantas respuestas distintas existen para Cusco entero ==
+  calendario 1 + focos por mes 302 + focos por anio 26 + anomalias 302 + resumen 2 + analiticas ~30, x 2 idiomas = ~1,300

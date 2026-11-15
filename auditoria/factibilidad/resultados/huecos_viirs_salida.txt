@@ -1,0 +1,25 @@
+== días de junio a noviembre sin VIIRS S-NPP en todo Perú ==
+2013:   0 días | tramos de 3+ días: -
+2014:   1 días | tramos de 3+ días: -
+2015:   0 días | tramos de 3+ días: -
+2016:   0 días | tramos de 3+ días: -
+2017:   0 días | tramos de 3+ días: -
+2018:   0 días | tramos de 3+ días: -
+2019:   0 días | tramos de 3+ días: -
+2020:   0 días | tramos de 3+ días: -
+2021:   0 días | tramos de 3+ días: -
+2022:  15 días | tramos de 3+ días: ['27-07..10-08 (15 d)']
+2023:   2 días | tramos de 3+ días: -
+2024:  18 días | tramos de 3+ días: ['01-06..03-06 (3 d)', '10-07..15-07 (6 d)', '24-07..28-07 (5 d)', '03-11..05-11 (3 d)']
+2025:   2 días | tramos de 3+ días: -
+
+== Cusco ==
+celdas-día de la serie en días sin VIIRS: 0 (focos armonizados 0.0): esos días cuentan 0
+celdas-día MODIS de Cusco en esos días (límite geoBoundaries): 101
+  2022-07: la app muestra 54; con MODIS en los días sin VIIRS serían ~100 (+85 %)
+  2022-08: la app muestra 158; con MODIS en los días sin VIIRS serían ~164 (+4 %)
+  2023-07: la app muestra 66; con MODIS en los días sin VIIRS serían ~72 (+9 %)
+  2024-06: la app muestra 28; con MODIS en los días sin VIIRS serían ~31 (+11 %)
+  2024-07: la app muestra 46; con MODIS en los días sin VIIRS serían ~79 (+72 %)
+  2024-09: la app muestra 223; con MODIS en los días sin VIIRS serían ~225 (+1 %)
+  2025-07: la app muestra 58; con MODIS en los días sin VIIRS serían ~63 (+9 %)

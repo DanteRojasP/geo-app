@@ -1,0 +1,79 @@
+
+== Paquetes de Python en este entorno ==
+  instalado  pandas               tablas
+  instalado  numpy                cálculo
+  instalado  scipy                estadística
+  instalado  sklearn              modelos
+  instalado  shapely              geometría
+  instalado  duckdb               consultas
+  instalado  httpx                descargas
+  FALTA      ee                   Earth Engine (earthengine-api)
+  FALTA      xarray               grillas (ERA5, CHIRPS)
+  FALTA      netCDF4              leer NetCDF
+  FALTA      rasterio             leer GeoTIFF
+  FALTA      geopandas            límites y zonas
+  FALTA      statsmodels          modelos con errores agrupados
+  FALTA      cdsapi               Copernicus (FWI, ERA5-Land)
+  FALTA      pystac_client        catálogo de Planetary Computer
+  FALTA      planetary_computer   firmar descargas
+  FALTA      xclim                calcular el índice FWI
+  FALTA      zarr                 ERA5 en la nube
+
+== Credenciales guardadas (solo se comprueba si el archivo existe) ==
+  FALTA  Earth Engine
+  FALTA  Google Cloud (ADC)
+  FALTA  Copernicus CDS/EWDS
+  FALTA  NASA Earthdata
+  hay    credenciales_firms.txt
+  hay    credenciales_meteo.txt
+
+== NASA FIRMS (MAP_KEY) ==
+  [200] cuota de la clave | 63 de 5000 en 10 minutes
+  [200] disponibilidad por fuente | 
+      MODIS_NRT,2026-09-01,2026-11-15
+      MODIS_SP,2000-11-01,2026-08-31
+      VIIRS_NOAA20_NRT,2026-08-01,2026-11-15
+      VIIRS_NOAA20_SP,2018-04-01,2026-07-31
+      VIIRS_NOAA21_NRT,2024-01-17,2026-11-15
+      VIIRS_NOAA21_SP,2023-03-01,2026-07-31
+      VIIRS_SNPP_NRT,2026-08-01,2026-11-02
+      VIIRS_SNPP_SP,2012-01-20,2026-07-31
+      LANDSAT_NRT,2022-06-20,2026-11-15
+      GOES_NRT,2022-08-09,2026-11-15
+      BA_MODIS,2000-11-01,2026-08-01
+      BA_VIIRS,2012-03-01,2026-08-01
+
+== Meteomatics ==
+  [200] estado de la cuenta | vence 2026-11-22T00:00:00Z | hoy 5 de 1000 solicitudes | histórico 1900-01-01T00:00:00Z--2028-11-15T00:00:00Z
+
+== Google Cloud (proyecto sonic-mile-514718-r5) ==
+  activa  run.googleapis.com               servidor y tareas
+  activa  storage.googleapis.com           guardar tablas
+  activa  secretmanager.googleapis.com     claves
+  activa  bigquery.googleapis.com          consultas
+  FALTA   earthengine.googleapis.com       Earth Engine
+  FALTA   cloudscheduler.googleapis.com    tarea diaria programada
+  facturación activa: True (el crédito restante solo se ve en la consola)
+
+== Fuentes sin clave ==
+  [200] Open-Meteo histórico (ERA5), 1981 | ['1981-08-01', '1981-08-02']
+  [200] Open-Meteo pronóstico de 16 días | hasta 2026-11-30
+  [200] Open-Meteo estacional | hasta 2027-05-16
+  [200] NASA POWER (MERRA-2) | ok
+  [200] NOAA ONI (El Niño) | último: ASO 2026 29.23 2.46
+  [200] CHIRPS (UCSB) | v2.0/, v3.0/
+  [200] PISCO de SENAMHI (IRI) | ok
+  [200] GWIS (mapas de FWI, solo visual) | 211 capas
+  [200] ERA5 público en Google Cloud | 3+ carpetas
+  [200] Planetary Computer: modis-64A1-061 | MODIS Burned Area Monthly
+  [200] Planetary Computer: modis-13A1-061 | MODIS Vegetation Indices 16-Day (500m)
+  [200] Planetary Computer: modis-14A1-061 | MODIS Thermal Anomalies/Fire Daily
+  [200] Planetary Computer: io-lulc-annual-v02 | 10m Annual Land Use Land Cover (9-class) V2
+  [200] Planetary Computer: cop-dem-glo-30 | Copernicus DEM GLO-30
+  [200] Planetary Computer: era5-pds | ERA5 - PDS
+
+== Fuentes que piden cuenta (se comprueba solo que el servicio responde) ==
+  [200] Copernicus EWDS: FWI histórico | Fire danger indices historical data from the Copernicus Emergency Mana
+  [200] Copernicus EWDS: FWI estacional | Seasonal forecast of fire danger indices from the Copernicus Emergency
+  [200] Copernicus CDS: ERA5-Land | ERA5-Land hourly data from 1950 to present
+  [200] NASA AppEEARS | 194 productos

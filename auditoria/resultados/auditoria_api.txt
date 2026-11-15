@@ -1,0 +1,83 @@
+======================================================================== 
+1. CONTRATO (OpenAPI)
+  /api/analitica/acumulado           resp. tipada: NO  | anio, departamento, bbox, lat, lon, radio_km
+  /api/analitica/altitud             resp. tipada: NO  | departamento, bbox, lat, lon, radio_km
+  /api/analitica/estacionalidad      resp. tipada: NO  | departamento, bbox, lat, lon, radio_km
+  /api/analitica/ranking             resp. tipada: NO  | departamento, bbox, lat, lon, radio_km
+  /api/analitica/recurrencia         resp. tipada: NO  | limite, departamento, bbox, lat, lon, radio_km
+  /api/anomalias                     resp. tipada: NO  | mes, departamento, bbox, lat, lon, radio_km
+  /api/calendario                    resp. tipada: NO  | departamento, bbox, lat, lon, radio_km, fecha_inicio, fecha_fin
+  /api/departamentos                 resp. tipada: NO  | 
+  /api/departamentos.geojson         resp. tipada: NO  | 
+  /api/focos.geojson                 resp. tipada: NO  | fecha_inicio, fecha_fin, departamento, bbox, lat, lon, radio_km
+  /api/hotspots.csv                  resp. tipada: NO  | fecha_inicio, fecha_fin, departamento, bbox, lat, lon, radio_km
+  /api/metadatos                     resp. tipada: NO  | 
+  /api/resumen                       resp. tipada: NO  | departamento, bbox, lat, lon, radio_km
+  /health                            resp. tipada: NO  | 
+  /health/limits                     resp. tipada: NO  | 
+  rutas: 15 | con esquema de respuesta: 0 | titulo: FireCal Perú API v0.1.0
+======================================================================== 
+2. CABECERAS, TAMANO Y COMPRESION
+  /api/calendario                 102.5 KB | gzip: NO   | cache-control: NO       | etag: NO | application/json; charset=utf-8
+  /api/focos.geojson             1648.3 KB | gzip: NO   | cache-control: NO       | etag: NO | application/json; charset=utf-8
+  /api/focos.geojson              674.8 KB | gzip: NO   | cache-control: NO       | etag: NO | application/json; charset=utf-8
+  /api/anomalias                    3.4 KB | gzip: NO   | cache-control: NO       | etag: NO | application/json; charset=utf-8
+  /api/metadatos                    2.7 KB | gzip: NO   | cache-control: NO       | etag: NO | application/json; charset=utf-8
+  /api/departamentos.geojson       70.8 KB | gzip: NO   | cache-control: NO       | etag: NO | application/json; charset=utf-8
+  /api/resumen                      1.8 KB | gzip: NO   | cache-control: NO       | etag: NO | application/json; charset=utf-8
+  /api/analitica/recurrencia      289.5 KB | gzip: NO   | cache-control: NO       | etag: NO | application/json; charset=utf-8
+  cabeceras de seguridad en /: {'x-content-type-options': 'NO', 'content-security-policy': 'NO', 'x-frame-options': 'NO', 'strict-transport-security': 'NO', 'referrer-policy': 'NO'}
+  CORS preflight desde origen externo: 400 | allow-origin: NO
+  /docs: 200 | /openapi.json: 200 | /favicon.ico: 404
+======================================================================== 
+3. LATENCIA (ms del servidor, X-Process-Time-ms; 1.a llamada y mediana de 5 repetidas)
+  /api/calendario                        1.a     46.0 | mediana     43.5 | total cliente     49.1 | 200
+  /api/calendario (anio)                 1.a     24.6 | mediana     26.1 | total cliente     31.1 | 200
+  /api/anomalias                         1.a    391.2 | mediana    389.7 | total cliente    393.0 | 200
+  /api/focos.geojson                     1.a   1223.1 | mediana    898.3 | total cliente    903.1 | 200
+  /api/focos.geojson (anio)              1.a   1006.6 | mediana   1008.0 | total cliente   1016.6 | 200
+  /api/metadatos                         1.a      3.3 | mediana      2.8 | total cliente      5.6 | 200
+  /api/resumen                           1.a   1689.7 | mediana   1772.3 | total cliente   1775.6 | 200
+  /api/analitica/estacionalidad          1.a     49.0 | mediana     45.0 | total cliente     48.2 | 200
+  /api/analitica/acumulado               1.a    401.4 | mediana    418.2 | total cliente    421.5 | 200
+  /api/analitica/recurrencia             1.a    736.8 | mediana    789.8 | total cliente    793.3 | 200
+  /api/calendario?bbox                   1.a    734.6 | mediana     29.2 | total cliente     34.1 | 200
+  /api/focos.geojson?bbox (anio)         1.a    965.1 | mediana    770.0 | total cliente    774.5 | 200
+  /api/resumen?bbox                      1.a   1290.0 | mediana   1517.2 | total cliente   1533.9 | 200
+  /api/hotspots.csv                      1.a    845.4 | mediana    913.7 | total cliente   2458.3 | 200
+======================================================================== 
+4. VALIDACION Y MENSAJES DE ERROR
+  422  sin AOI                              AOI vacío: indica 'departamento' (PE-CUS), 'bbox' (oeste,sur,este,norte) o 'lat', 'lon' y 'radi
+  422  dos AOI a la vez                     Indica un solo tipo de AOI: departamento, bbox o punto + radio.
+  422  parametro mal escrito (departmento)  AOI vacío: indica 'departamento' (PE-CUS), 'bbox' (oeste,sur,este,norte) o 'lat', 'lon' y 'radi
+  200  departamento en minusculas           OK total=15732.03
+  422  bbox con 3 numeros                   bbox inválido: usa 'oeste,sur,este,norte' en grados, p. ej. -72.5,-14,-71.5,-13.
+  422  bbox con texto                       bbox inválido: usa 'oeste,sur,este,norte' en grados, p. ej. -72.5,-14,-71.5,-13.
+  422  bbox invertido (oeste > este)        bbox inválido: se espera oeste < este y sur < norte (WGS84).
+  422  bbox demasiado grande                Área demasiado grande: el bbox mide 2,625,099 km² y el máximo es 50,000 km². Usa el departament
+  422  lat sin lon                          Para un punto indica 'lat', 'lon' y 'radio_km'.
+  200  punto + radio valido                 OK total=247.96
+  422  radio negativo                       radio_km debe estar entre 0 y 100.0 km.
+  422  radio > maximo                       radio_km debe estar entre 0 y 100.0 km.
+  200  fecha con dia (2020-01-15)           OK total=5.93
+  422  fecha solo anio (2020)               fecha_inicio inválida ('2020'): usa el formato AAAA-MM, p. ej. 2020-08.
+  200  mes 2020-8 sin cero                  OK total=None
+  422  mes faltante                         Solicitud inválida: revisa los campos indicados en 'errors'. + errors[{'campo': 'mes', 'error': 'Field required'}]
+  404  mes futuro 2026-03                   Sin datos para 2026-03: la serie cubre de 2000-11 a 2025-12.
+  422  anio no numerico                     Solicitud inválida: revisa los campos indicados en 'errors'. + errors[{'campo': 'anio', 'error': 'Input should be a valid integer,
+  422  limite fuera de rango                Solicitud inválida: revisa los campos indicados en 'errors'. + errors[{'campo': 'limite', 'error': 'Input should be less than or e
+  404  ruta inexistente                     Not Found
+  404  inyeccion en departamento            Sin datos para 'PE-CUS' OR 1=1 --': el prototipo solo tiene datos armonizados y validados de Cu
+  422  inyeccion en bbox                    bbox inválido: usa 'oeste,sur,este,norte' en grados, p. ej. -72.5,-14,-71.5,-13.
+======================================================================== 
+5. LIMITES (protocolo de solicitudes)
+  rafaga de 50 livianas seguidas: 40 x 200, 10 x 429 (limite documentado: rafaga de 40)
+  cabeceras del 429: {'retry-after': '1', 'x-ratelimit-limit': '40', 'x-ratelimit-remaining': '0'} | Demasiadas solicitudes desde tu conexión. Espera 1 s y vuelve a intentar.
+  9 seguidas de calendario?bbox (declarada pesada)  : [200, 200, 200, 200, 200, 429, 429, 429, 429]
+  9 seguidas de focos.geojson?bbox                  : [200, 200, 200, 200, 200, 200, 200, 200, 200]
+  9 seguidas de analitica/altitud?bbox              : [200, 200, 200, 200, 200, 200, 200, 200, 200]
+  -- concurrencia: 6 consultas pesadas a la vez (turnos: 2 simultaneas, espera 2 s) --
+  /api/resumen?bbox x6 simultaneas: [(503, 2.03), (503, 2.04), (200, 4.32), (503, 2.06), (503, 2.01), (200, 3.97)]
+  /health/limits: {'activo': True, 'clientes': 1, 'rechazadas_429': 25, 'pesadas_activas': 0, 'max_pesadas': 2, 'rechazadas_503': 4}
+
+[exited with code 0]
