@@ -381,6 +381,23 @@ Revisión **`firecal-00021`**.
 - [x] Meteomatics en 99 zonas agrupadas con DEM: `exploratorio/meteomatics/resultados/ZONAS_CLUSTERS.md`.
 - [ ] MAESTRO P2 pide que 2025 lleve su nota en pantalla: confirmar con el equipo que se acepta quitarla.
 
+## Ámbitos CENEPRED e informe técnico de Antonio (dom 15 nov 2026, noche)
+
+Revisión **`firecal-00023`** (imagen `firecal-cusco:v13-informe`).
+- [x] **PR #14 unido** (incluye el #13): `/api/ambitos` (nivel de peligro por focos de calor por provincia, distrito
+      y cuenca Pfafstetter, formato CENEPRED) e `/api/informe` (informe técnico imprimible de cualquier área y
+      periodo). 137 pruebas en verde.
+- [x] Su interfaz se llevó al diseño de Dante: **Scopes/Ámbitos** es el cuarto acceso de la izquierda, y el botón
+      **Informe técnico** está en Calendario, Data (resumen de Cusco) y área dibujada. Con el filtro de fechas, el
+      informe usa ese rango de meses.
+- [x] Comprobado en producción:
+      - `/api/metadatos` → `cusco-v1.3`;
+      - `/api/informe?mes=2024-09` → 200;
+      - `ambito=distrito:080910` → 200 (la primera vez ~15 s, calcula todos los ámbitos) y `distrito:999999` → 404;
+      - los cuatro botones abren el informe en otra pestaña.
+- [x] `.github/workflows/pages.yml` borrado de `main`.
+- [ ] Cerrar los PR #2 y #3: no hay `gh` ni token en esta máquina; hacerlo desde github.com.
+
 ## Pendientes que me afectan
 
 - [x] Datos reales de FIRMS (Cusco, de Antonio).

@@ -272,3 +272,4 @@ button:focus-visible,select:focus-visible{outline:2px solid #197bb5;outline-offs
 .fa-panel{left:88px;top:78px;bottom:110px}
 .fw-app.is-live .fa-panel{display:none!important}
 @media(max-width:650px){.fc-ambitos-launcher{top:218px}.fa-panel{left:64px;right:9px;width:auto;top:62px;bottom:100px}}
+.fa-list li{grid-template-columns:26px auto 1fr auto auto}
