@@ -96,19 +96,15 @@ function isInsidePeru(point, departments) {
   return departments.features.some((feature) => isInsideGeometry(point, feature.geometry))
 }
 
-function addActivityToDepartments(departments, points, simulationSeed = 2026) {
+function addActivityToDepartments(departments, points) {
   return {
     ...departments,
-    features: departments.features.map((feature, index) => {
+    features: departments.features.map((feature) => {
       const matches = points.filter((point) => isInsideGeometry(point, feature.geometry))
       const frp = matches.reduce((sum, point) => sum + point.frp, 0)
       const confidence = matches.length
         ? Math.round(matches.reduce((sum, point) => sum + point.confidence, 0) / matches.length)
         : 0
-      const wave = (Math.sin(simulationSeed * 0.017 + index * 1.67) + 1) / 2
-      const cluster = (Math.cos(simulationSeed * 0.011 - index * 0.81) + 1) / 2
-      const combined = wave * 0.68 + cluster * 0.32
-      const syntheticRisk = combined > 0.56 ? Math.round(((combined - 0.56) / 0.44) * 100) : 0
       return {
         ...feature,
         properties: {
@@ -116,7 +112,6 @@ function addActivityToDepartments(departments, points, simulationSeed = 2026) {
           fireCount: matches.length,
           frp: Number(frp.toFixed(1)),
           confidence,
-          syntheticRisk: Math.min(100, syntheticRisk),
         },
       }
     }),
@@ -317,12 +312,7 @@ function FireMapApp() {
     : scopedHotspots.filter((point) => String(point.date || '').startsWith(`${selectedYear}-`)), [scopedHotspots, selectedYear])
   const dates = useMemo(() => [...new Set(yearHotspots.map((point) => point.date).filter(Boolean))].sort().slice(-5), [yearHotspots])
   const visibleHotspots = useMemo(() => selectedDate === 'all' ? yearHotspots : yearHotspots.filter((point) => point.date === selectedDate), [yearHotspots, selectedDate])
-  const simulationSeed = useMemo(() => {
-    const year = selectedYear === 'all' ? 2026 : selectedYear
-    const dateValue = selectedDate === 'all' ? 17 : [...selectedDate].reduce((sum, character) => sum + character.charCodeAt(0), 0)
-    return year * 97 + dateValue
-  }, [selectedDate, selectedYear])
-  const mappedDepartments = useMemo(() => addActivityToDepartments(departments, visibleHotspots, simulationSeed), [departments, simulationSeed, visibleHotspots])
+  const mappedDepartments = useMemo(() => addActivityToDepartments(departments, visibleHotspots), [departments, visibleHotspots])
   const selectedHotspots = useMemo(() => selectionBounds ? visibleHotspots.filter((point) => point.lon >= selectionBounds.west && point.lon <= selectionBounds.east && point.lat >= selectionBounds.south && point.lat <= selectionBounds.north) : [], [selectionBounds, visibleHotspots])
   hotspotsRef.current = visibleHotspots
   departmentsRef.current = mappedDepartments
@@ -459,11 +449,9 @@ function FireMapApp() {
       map.addLayer({
         id: 'department-fill', type: 'fill', source: 'peru-departments',
         paint: {
-          'fill-color': ['interpolate', ['linear'], ['coalesce', ['get', 'syntheticRisk'], 0],
-            0, '#dbeafe', 18, '#93c5fd', 38, '#fde68a', 58, '#fb923c', 78, '#ef4444', 100, '#7f1d1d'],
+          'fill-color': ['interpolate', ['linear'], ['coalesce', ['get', 'fireCount'], 0],
+            0, '#e2e8f0', 1, '#fef3c7', 5, '#fde68a', 15, '#f59e0b', 35, '#ea580c', 70, '#991b1b'],
           'fill-opacity': ['case', ['boolean', ['feature-state', 'hover'], false], 0.18, 0.045],
-          'fill-color-transition': { duration: 850, delay: 0 },
-          'fill-opacity-transition': { duration: 520, delay: 0 },
         },
       })
       map.addLayer({
@@ -539,7 +527,6 @@ function FireMapApp() {
             { value: `${properties.fireCount || 0} detecciones recientes` },
             { value: `${Number(properties.frp || 0).toFixed(1)} MW FRP`, strong: true },
             { value: properties.fireCount ? `Confianza media ${properties.confidence}%` : 'Sin actividad térmica visible' },
-            { value: `Índice zonal sintético ${properties.syntheticRisk || 0}/100 · simulación` },
           ]))
           .addTo(map)
       })
@@ -605,16 +592,8 @@ function FireMapApp() {
   useEffect(() => {
     const map = mapRef.current
     if (!mapReadyRef.current || !map?.getSource('peru-departments')) return
-    const targetOpacity = activeLayer === 'activity'
-      ? ['case', ['boolean', ['feature-state', 'hover'], false], 0.92, 0.76]
-      : ['case', ['boolean', ['feature-state', 'hover'], false], 0.18, 0.045]
-    map.setPaintProperty('department-fill', 'fill-opacity', 0.02)
     map.getSource('peru-departments').setData(mappedDepartments)
-    const timer = window.setTimeout(() => {
-      if (map.getLayer('department-fill')) map.setPaintProperty('department-fill', 'fill-opacity', targetOpacity)
-    }, 70)
-    return () => window.clearTimeout(timer)
-  }, [activeLayer, mappedDepartments])
+  }, [mappedDepartments])
 
   useEffect(() => {
     const map = mapRef.current
@@ -751,7 +730,7 @@ function FireMapApp() {
       {layersOpen && !selectionBounds && <aside className="fw-layers">
         <div className="fw-layers-title"><span>CAPAS DEL MAPA</span><SlidersHorizontal size={15}/></div>
         <LayerButton active={activeLayer === 'surface'} icon={ThermometerSun} label="Superficie" tone="heat" onClick={() => setActiveLayer('surface')}/>
-        <LayerButton active={activeLayer === 'activity'} icon={Gauge} label="Zonas demo" tone="activity" onClick={() => setActiveLayer('activity')}/>
+        <LayerButton active={activeLayer === 'activity'} icon={Gauge} label="Regiones" tone="activity" onClick={() => setActiveLayer('activity')}/>
         <LayerButton active={activeLayer === 'points'} icon={MapPin} label="Puntos" tone="points" onClick={() => setActiveLayer('points')}/>
         <LayerButton active={activeLayer === 'aoi'} icon={Layers3} label="Límite" tone="boundary" onClick={() => setActiveLayer('aoi')}/>
         <LayerButton active={selectionMode} icon={Scan} label="Área" tone="select" onClick={toggleSelectionMode}/>
@@ -762,9 +741,8 @@ function FireMapApp() {
           <button className={baseMap === 'standard' ? 'is-active' : ''} onClick={() => setBaseMap('standard')}><MapIcon size={14}/><span>Mapa</span></button>
           <button className={baseMap === 'relief' ? 'is-active' : ''} onClick={() => setBaseMap('relief')}><Mountain size={14}/><span>Relieve</span></button>
         </div>
-        <div className={`fw-heat-legend ${activeLayer === 'activity' ? 'is-synthetic' : ''}`}><header><span>{activeLayer === 'activity' ? 'RIESGO ZONAL · SIMULACIÓN' : 'INTENSIDAD TÉRMICA'}</span><b>{activeLayer === 'activity' ? '0–100' : 'FRP'}</b></header><i/><div><span>Baja</span><span>Media</span><span>Alta</span></div></div>
+        <div className="fw-heat-legend"><header><span>INTENSIDAD TÉRMICA</span><b>FRP</b></header><i/><div><span>Baja</span><span>Media</span><span>Alta</span></div></div>
       </aside>}
-      {activeLayer === 'activity' && <div className="fw-simulation-badge"><i/>Datos sintéticos · demostración visual</div>}
       <div className="fw-map-meta"><button onClick={focusStudyArea} className={studySelected ? 'is-active' : ''}><MapPin size={13}/>{activeScope === 'peru' ? 'Abrir piloto · Cusco' : 'Volver a Perú'}</button><span><Satellite size={13}/>MODIS + VIIRS</span><span><CloudSun size={13}/>Últimos 5 días</span></div>
       {selectionMode && <div className="fw-draw-hint"><Scan size={20}/><div><b>Selecciona un área</b><span>Arrastra sobre el mapa para dibujar el cuadro</span></div><button onClick={() => setSelectionMode(false)} title="Cancelar"><X size={16}/></button></div>}
       {selectionBounds && <aside className="fw-selection-card">
@@ -782,7 +760,7 @@ function FireMapApp() {
         <div className="fw-selection-actions"><button onClick={toggleSelectionMode}><Scan size={15}/>Redibujar</button><button onClick={() => downloadCsv(selectedHotspots, 'area-seleccionada')} disabled={!selectedHotspots.length}><Download size={15}/>CSV</button></div>
       </aside>}
       <section className="fw-timeline">
-        <button className={`fw-play ${playing ? 'is-playing' : ''}`} onClick={() => setPlaying((value) => !value)} title={playing ? 'Pausar' : 'Reproducir'}>{playing ? <Pause size={19}/> : <Play size={19}/>}</button>
+        <button className="fw-play" onClick={() => setPlaying((value) => !value)} title={playing ? 'Pausar' : 'Reproducir'}>{playing ? <Pause size={19}/> : <Play size={19}/>}</button>
         <div className="fw-timeline-panel" style={{ '--progress': `${timelineProgress}%` }}>
           <div className={`fw-time-callout ${timelineIndex === 0 ? 'is-start' : timelineIndex === dates.length - 1 ? 'is-end' : ''}`}><b>{timelineLabel}</b><span>{visibleHotspots.length ? `${visibleHotspots.length} focos` : 'sin detalle'}</span></div>
           <div className="fw-days">{dates.length ? dates.map((date) => {
