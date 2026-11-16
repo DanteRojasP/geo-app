@@ -129,3 +129,43 @@ export const IcoSatelite = ({ size = 16 }) => base(size, <>
   <path d="m10 14.5-2 3.5M14 14.5l2 3.5" strokeWidth="1.3" strokeDasharray="1.4 1.6"/>
   <Spark cx={12} cy={19.5} r={1.9}/>
 </>)
+
+// ---------- Íconos de píxeles (menú derecho) ----------
+// Mismo lenguaje que la llama del logo: se dibujan sobre una grilla de 12 × 12 con píxeles de esquinas suaves.
+// '#' = color del texto, '*' = chispa (foco de calor), '.' = vacío. Referencia de estilo: pixelarticons (MIT);
+// los dibujos son propios.
+function Pixeles({ size, filas, label }) {
+  const rects = []
+  filas.forEach((fila, y) => [...fila].forEach((c, x) => {
+    if (c === '.') return
+    rects.push(<rect key={`${x}-${y}`} x={x * 2 + 0.15} y={y * 2 + 0.15} width="1.7" height="1.7" rx="0.45"
+      fill={c === '*' ? 'var(--nk-spark, #dd513a)' : 'currentColor'}/>)
+  }))
+  return <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden={label ? undefined : 'true'} role={label ? 'img' : undefined} aria-label={label} className="nk-ico nk-ico-px">{rects}</svg>
+}
+const px = (filas) => function IcoPx({ size = 20, label }) { return <Pixeles size={size} filas={filas} label={label}/> }
+
+// Herramientas: cuatro bloques, uno encendido (abre el estuche).
+export const IcoPxHerramientas = px([
+  '............', '.###....***.', '.###....***.', '.###....***.', '............', '............',
+  '............', '.###....###.', '.###....###.', '.###....###.', '............', '............'])
+// Capas: estratos del terreno apilados, con la chispa en la cima.
+export const IcoPxCapas = px([
+  '............', '.....**.....', '....####....', '...######...', '............', '..########..',
+  '............', '.##########.', '............', '############', '............', '............'])
+// Área: esquinas de selección alrededor de un grupo de píxeles encendidos.
+export const IcoPxArea = px([
+  '###......###', '#..........#', '#..........#', '............', '....**......', '....***.....',
+  '.....**.....', '............', '#..........#', '#..........#', '###......###', '............'])
+// Comparar: dos llamas de distinto tamaño (antes y después).
+export const IcoPxComparar = px([
+  '.........*..', '........##..', '..*.....###.', '..##...####.', '.###...####.', '.###..#####.',
+  '.###..#####.', '.###..#####.', '..#....###..', '............', '#####.######', '............'])
+// Calendario: grilla de días con uno encendido.
+export const IcoPxCalendario = px([
+  '..#......#..', '############', '............', '##.##.##.##.', '##.##.##.##.', '............',
+  '##.##.**.##.', '##.##.**.##.', '............', '##.##.##....', '##.##.##....', '............'])
+// Peligro CENEPRED: cuatro niveles escalonados, el más alto encendido.
+export const IcoPxPeligro = px([
+  '............', '.........**.', '.........**.', '......##.**.', '......##.**.', '...##.##.**.',
+  '...##.##.**.', '##.##.##.**.', '##.##.##.**.', '##.##.##.**.', '............', '############'])
