@@ -69,6 +69,8 @@
 .nk .fa-dias-ventana{fill:rgba(252,165,10,.14)}
 .nk .fa-dias-mapa{background:rgba(245,243,238,.06)!important}
 .nk .fa-dias-mapa>div b{color:var(--ph-anio)!important}
+.nk .fa-dias-lead{color:#f5f3ee!important}
+.fa-period{margin-top:4px;padding:10px;border:1px solid var(--line);border-radius:8px}.fa-period>strong{display:flex;align-items:center;gap:7px;font-size:11px}.fa-period>div{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}.fa-period>small{display:block;margin-top:6px}.fa-period-error{color:#ff8a70!important}.fa-report-buttons button{justify-content:center}.fa-report-primary{background:var(--ph-anio)!important;color:#141210!important}.fa-report-loading{margin-top:8px;display:flex!important;grid-column:1/-1;align-items:center;justify-content:center;gap:7px;color:#f5f3ee}.fa-report-loading svg{animation:fa-spin .8s linear infinite}@keyframes fa-spin{to{transform:rotate(360deg)}}.fa-actions{display:flex;align-items:center;gap:8px}.fa-actions>span{font-size:10px;color:var(--ph-texto2)!important}
 
 /* rótulos de formularios en minúsculas normales (sin mayúsculas pequeñas) */
 .nk :is(.fw-summary,.fa-panel,.fc-calendar,.fw-selection-card,.fc-live-panel,.fc-compare-panel,.fc-compare-workspace)

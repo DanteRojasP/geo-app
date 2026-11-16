@@ -15,14 +15,15 @@ import AmbitosPanel from './AmbitosPanel.jsx'
 import SimplePanel from './SimplePanel.jsx'
 import PanelHistoria from './PanelHistoria.jsx'
 import { ChapterRail, SeasonRibbon } from './Narrativa.jsx'
-import { MAPA, NK, introActiva } from './diseno.js'
-import IntroNikal from './IntroNikal.jsx'
+import { MAPA, NK } from './diseno.js'
 import NikalSnake from './NikalSnake.jsx'
 import TutorialGuide from './TutorialGuide.jsx'
-import { IcoAjustes, IcoArea, IcoCalendario, IcoCapas, IcoComparar, IcoFocos, IcoHabitual, IcoHistorico, IcoPlano, IcoRelieve, IcoSatelite, IcoVivo } from './NkIcons.jsx'
+import { IcoFocos, IcoHabitual, IcoHistorico, IcoPlano, IcoPxArea, IcoPxCalendario, IcoPxCapas, IcoPxComparar, IcoPxHerramientas, IcoRelieve, IcoSatelite, IcoVivo } from './NkIcons.jsx'
+import PeligroFiltro from './PeligroFiltro.jsx'
+import { clasificar, prepararUnidades } from './peligro.js'
 import ComparisonWorkspace from './ComparisonWorkspace.jsx'
 import { LANGS, getLang, locale, months, setLang, tr } from './i18n.js'
-import { CUSCO, downloadCsv, getCalendar, getDepartments, getFocos, getMonth, getTiempoReal, informeUrl } from './services/api.js'
+import { CUSCO, downloadCsv, getAmbitoGeojson, getCalendar, getDepartments, getFocos, getMonth, getTiempoReal, informeUrl } from './services/api.js'
 
 // Informe técnico (HTML imprimible) en una pestaña nueva (Antonio, PR #14).
 const openReport = (url) => window.open(url, '_blank', 'noopener')
@@ -45,7 +46,7 @@ const SATELLITE_STYLE = {
 const EMPTY = { type: 'FeatureCollection', features: [] }
 // Íconos: propios de Nikal (NkIcons.jsx) o los de Dante con ?diseno=dante.
 const I = NK
-  ? { focos: IcoFocos, calendario: IcoCalendario, area: IcoArea, ajustes: IcoAjustes, capas: IcoCapas, historico: IcoHistorico, vivo: IcoVivo, plano: IcoPlano, relieve: IcoRelieve, habitual: IcoHabitual, satelite: IcoSatelite }
+  ? { focos: IcoFocos, calendario: IcoPxCalendario, area: IcoPxArea, ajustes: IcoPxCapas, capas: IcoPxHerramientas, historico: IcoHistorico, vivo: IcoVivo, plano: IcoPlano, relieve: IcoRelieve, habitual: IcoHabitual, satelite: IcoSatelite }
   : { focos: Flame, calendario: CalendarDays, area: Scan, ajustes: SlidersHorizontal, capas: Layers3, historico: CalendarDays, vivo: Radio, plano: MapIcon, relieve: Mountain, habitual: Gauge, satelite: Satellite }
 const FIRST_YEAR = 2000
 const LAST_YEAR = 2025
@@ -304,6 +305,8 @@ function FireMapApp() {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [activeLayer, setActiveLayer] = useState('surface')
+  // Nikal: capas superponibles (densidad y puntos a la vez, o ninguna: solo Cusco).
+  const [capasNk, setCapasNk] = useState({ calor: true, puntos: false })
   const [showBoundary, setShowBoundary] = useState(false)
   const [baseMap, setBaseMap] = useState('relief')      // Dante (450cc43): relieve por defecto
   const [calendarMode, setCalendarMode] = useState('valor')
@@ -331,17 +334,12 @@ function FireMapApp() {
   const [selection, setSelection] = useState(null)
   const [lang, setLangState] = useState(getLang())
   const changeLang = (l) => { setLang(l); setLangState(l) }
-  // Apertura de marca (cada vez que se entra) y juego oculto (tres clics en el logo).
   const forceTutorial = new URLSearchParams(window.location.search).get('tutorial') === '1'
-  const [intro, setIntro] = useState(() => NK && introActiva() && !forceTutorial)
-  const [tutorialPrompt, setTutorialPrompt] = useState(false)
+  const [tutorialPrompt, setTutorialPrompt] = useState(() => !forceTutorial && !tutorialSeen())
   const [tutorialOpen, setTutorialOpen] = useState(forceTutorial)
-  const cerrarIntro = useCallback(() => {
-    setIntro(false)
-    if (!tutorialSeen()) setTutorialPrompt(true)
-  }, [])
-  const startTutorial = () => { setTutorialPrompt(false); setTutorialOpen(true); setDetailsOpen(false); setSimpleOpen(false); setCompareOpen(false); setAmbitosOpen(false); setToolsOpen(false) }
+  const startTutorial = () => { setTutorialPrompt(false); setTutorialOpen(true); setDetailsOpen(true); setSimpleOpen(false); setCompareOpen(false); setAmbitosOpen(false); setToolsOpen(false) }
   const closeTutorial = () => { markTutorialSeen(); setTutorialPrompt(false); setTutorialOpen(false) }
+  // Juego oculto (tres clics en el logo). La apertura de marca está en index.html.
   const [snake, setSnake] = useState(null)
   const clicsLogo = useRef([])
   const tocarLogo = (e) => {
@@ -377,7 +375,34 @@ function FireMapApp() {
   }, [calendar, customPeriod, yearCells])
   // Día elegido en la cinta: el mapa muestra solo los focos de esa fecha (dentro de los del mes).
   const diaFecha = !customPeriod && selected.month && selected.day ? `${ym(selected.year, selected.month)}-${String(selected.day).padStart(2, '0')}` : null
-  const mapFocos = useMemo(() => (diaFecha ? filterFocosByDate(focos, diaFecha, diaFecha) : focos), [focos, diaFecha])
+  const focosDia = useMemo(() => (diaFecha ? filterFocosByDate(focos, diaFecha, diaFecha) : focos), [focos, diaFecha])
+  // Capa "Peligro CENEPRED" (en Capas): cómo se reparten los focos del periodo según el nivel de peligro de su
+  // unidad, y filtro para ver en el mapa solo los focos de los niveles elegidos.
+  const [peligro, setPeligro] = useState({ on: false, nivel: 'provincia', solo: [] })
+  const [unidadesPeligro, setUnidadesPeligro] = useState(null)
+  useEffect(() => {
+    if (!peligro.on) return undefined
+    let activo = true
+    getAmbitoGeojson(peligro.nivel)
+      .then(({ body }) => activo && setUnidadesPeligro({ nivel: peligro.nivel, geojson: body, unidades: prepararUnidades(body) }))
+      .catch(() => activo && setUnidadesPeligro(null))
+    return () => { activo = false }
+  }, [peligro.on, peligro.nivel])
+  const clasePeligro = useMemo(() => (peligro.on && unidadesPeligro?.nivel === peligro.nivel
+    ? clasificar(focosDia, unidadesPeligro.unidades) : null), [peligro.on, peligro.nivel, unidadesPeligro, focosDia])
+  const mapFocos = useMemo(() => {
+    if (!clasePeligro || !peligro.solo.length) return focosDia
+    const features = focosDia.features.filter((_, i) => peligro.solo.includes(clasePeligro.niveles[i]))
+    return { ...focosDia, features, n_focos: features.length }
+  }, [focosDia, clasePeligro, peligro.solo])
+  // Panel de Capas: aparece a la altura de su botón.
+  const capasRef = useRef(null)
+  const [capasTop, setCapasTop] = useState(110)
+  const abrirCapas = () => {
+    const r = capasRef.current?.getBoundingClientRect()
+    if (r) setCapasTop(Math.round(r.top))
+    setLayersOpen((v) => !v)
+  }
   // Focos armonizados por día del mes elegido (suma de eq_foco), para la vista de días de la cinta.
   const diasMes = useMemo(() => {
     if (customPeriod || !selected.month) return null
@@ -671,6 +696,34 @@ function FireMapApp() {
     if (mapReadyRef.current && map?.getSource('focos')) map.getSource('focos').setData(mapFocos)
   }, [mapFocos])
 
+  // Unidades pintadas por nivel de peligro bajo los focos (capa Peligro CENEPRED); con filtro, se atenúan las demás.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!mapReadyRef.current || !map) return
+    const visible = Boolean(peligro.on && !liveOn && unidadesPeligro?.nivel === peligro.nivel)
+    if (visible && !map.getSource('peligro-unidades')) {
+      map.addSource('peligro-unidades', { type: 'geojson', data: unidadesPeligro.geojson, promoteId: 'codigo' })
+      const antes = map.getLayer('fire-heat') ? 'fire-heat' : undefined
+      map.addLayer({ id: 'peligro-fill', type: 'fill', source: 'peligro-unidades', paint: { 'fill-color': ['get', 'color'], 'fill-opacity': 0.35 } }, antes)
+      map.addLayer({ id: 'peligro-line', type: 'line', source: 'peligro-unidades', paint: { 'line-color': '#141210', 'line-width': 0.8, 'line-opacity': 0.7 } }, antes)
+    } else if (visible) {
+      map.getSource('peligro-unidades').setData(unidadesPeligro.geojson)
+    }
+    if (!map.getLayer('peligro-fill')) return
+    // Color = nivel de peligro de la unidad; intensidad = sus focos en el año, mes o día de la cinta.
+    if (visible && clasePeligro) {
+      ;(unidadesPeligro.geojson.features || []).forEach((f) => map.setFeatureState(
+        { source: 'peligro-unidades', id: f.properties.codigo }, { act: clasePeligro.actividad.get(f.properties.codigo) || 0 }))
+    }
+    const intensidad = ['interpolate', ['linear'], ['coalesce', ['feature-state', 'act'], 0], 0, 0.05, 1, 0.68]
+    map.setPaintProperty('peligro-fill', 'fill-opacity', peligro.solo.length
+      ? ['case', ['in', ['get', 'nivel_peligro'], ['literal', peligro.solo]], intensidad, 0.03] : intensidad)
+    ;['peligro-fill', 'peligro-line'].forEach((id) => map.setLayoutProperty(id, 'visibility', visible ? 'visible' : 'none'))
+  }, [peligro, unidadesPeligro, liveOn, clasePeligro])
+
+  // Al cerrar Herramientas se cierra también el panel de Capas.
+  useEffect(() => { if (NK && !toolsOpen) setLayersOpen(false) }, [toolsOpen])
+
   useEffect(() => {
     const map = mapRef.current
     if (mapReadyRef.current && map?.getSource('selection-area')) map.getSource('selection-area').setData(boundsToGeoJson(selectionBounds))
@@ -695,12 +748,12 @@ function FireMapApp() {
     if (!mapReadyRef.current || !map) return
     // Dos modos que no se mezclan: la serie histórica o las detecciones en vivo.
     const vis = (on) => (on ? 'visible' : 'none')
-    map.setLayoutProperty('fire-heat', 'visibility', vis(!liveOn && activeLayer === 'surface'))
-    map.setLayoutProperty('fire-points', 'visibility', vis(!liveOn && activeLayer === 'points'))
+    map.setLayoutProperty('fire-heat', 'visibility', vis(!liveOn && (NK ? capasNk.calor : activeLayer === 'surface')))
+    map.setLayoutProperty('fire-points', 'visibility', vis(!liveOn && (NK ? capasNk.puntos : activeLayer === 'points')))
     map.setLayoutProperty('selection-area-fill', 'visibility', vis(!liveOn))
     map.setLayoutProperty('selection-area-line', 'visibility', vis(!liveOn))
     map.setLayoutProperty('live-points', 'visibility', vis(liveOn))
-  }, [activeLayer, liveOn])
+  }, [activeLayer, liveOn, capasNk])
 
   useEffect(() => {
     const map = mapRef.current
@@ -811,12 +864,13 @@ function FireMapApp() {
         <div className="fc-lang" role="group" aria-label={tr('lang.title')}>{LANGS.map((l) => <button key={l} className={l === lang ? 'is-active' : ''} aria-pressed={l === lang} onClick={() => changeLang(l)}>{l.toUpperCase()}</button>)}</div>
         <button className={`fc-menu-toggle ${toolsOpen ? 'is-open' : ''}`} aria-label={tr('rail.label')} aria-expanded={toolsOpen} onClick={() => setToolsOpen((v) => !v)}><I.capas size={21}/>{NK && <span className="nk-tip"><b>{tr('nk.tip.tools')}</b><small>{tr('nk.tip.tools.sub')}</small></span>}</button>
         {(toolsOpen || NK) && <nav className={`fw-rail ${NK ? 'nk-rail' : ''} ${toolsOpen ? 'is-open' : ''}`} aria-label={tr('rail.label')} aria-hidden={!toolsOpen} inert={toolsOpen ? undefined : ''} onClickCapture={goHistoric}>
-          <button className="is-active" title={NK ? undefined : tr('rail.hotspotsTitle')} aria-label={tr('rail.hotspotsTitle')} onClick={() => { focusRegion(); setDetailsOpen(true); setActiveLayer('surface') }}><I.focos size={19}/><span>{tr('rail.hotspots')}</span>{NK && <span className="nk-tip"><b>{tr('rail.hotspots')}</b><small>{tr('nk.tip.hotspots.sub')}</small></span>}</button>
+          {!NK && <button className="is-active" title={NK ? undefined : tr('rail.hotspotsTitle')} aria-label={tr('rail.hotspotsTitle')} onClick={() => { focusRegion(); setDetailsOpen(true); setActiveLayer('surface') }}><I.focos size={19}/><span>{tr('rail.hotspots')}</span>{NK && <span className="nk-tip"><b>{tr('rail.hotspots')}</b><small>{tr('nk.tip.hotspots.sub')}</small></span>}</button>}
           {!NK && <button className={calendarOpen ? 'is-active' : ''} title={NK ? undefined : tr('rail.calendar')} aria-label={tr('rail.calendar')} onClick={() => setCalendarOpen((v) => !v)}><I.calendario size={19}/><span>{tr('rail.calendar')}</span>{NK && <span className="nk-tip"><b>{tr('rail.calendar')}</b><small>{tr('nk.tip.calendar.sub')}</small></span>}</button>}
+          {NK && <button ref={capasRef} className={layersOpen ? 'is-active' : ''} title={NK ? undefined : tr('rail.layers')} aria-label={tr('rail.layers')} onClick={abrirCapas}><I.ajustes size={19}/><span>{tr('rail.layers')}</span>{NK && <span className="nk-tip"><b>{tr('rail.layers')}</b><small>{tr('nk.tip.layers.sub')}</small></span>}</button>}
           <button className={selectionMode ? 'is-active select' : ''} title={NK ? undefined : tr('rail.areaTitle')} aria-label={tr('rail.areaTitle')} onClick={toggleSelectionMode}><I.area size={19}/><span>{tr('rail.area')}</span>{NK && <span className="nk-tip"><b>{tr('rail.area')}</b><small>{tr('nk.tip.area.sub')}</small></span>}</button>
-          <button className={layersOpen ? 'is-active' : ''} title={NK ? undefined : tr('rail.layers')} aria-label={tr('rail.layers')} onClick={() => setLayersOpen((v) => !v)}><I.ajustes size={19}/><span>{tr('rail.layers')}</span>{NK && <span className="nk-tip"><b>{tr('rail.layers')}</b><small>{tr('nk.tip.layers.sub')}</small></span>}</button>
+          {!NK && <button className={layersOpen ? 'is-active' : ''} title={NK ? undefined : tr('rail.layers')} aria-label={tr('rail.layers')} onClick={() => setLayersOpen((v) => !v)}><I.ajustes size={19}/><span>{tr('rail.layers')}</span>{NK && <span className="nk-tip"><b>{tr('rail.layers')}</b><small>{tr('nk.tip.layers.sub')}</small></span>}</button>}
         </nav>}
-        {NK && <button className={`fc-menu-toggle nk-compare-btn ${compareOpen ? 'is-open' : ''}`} aria-label={tr('nk.ch.compare')} aria-pressed={compareOpen} onClick={() => openChapter('compare')}><IcoComparar size={20}/>{NK && <span className="nk-tip"><b>{tr('nk.ch.compare')}</b><small>{tr('nk.ch.compare.sub')}</small></span>}</button>}
+        {NK && <button className={`fc-menu-toggle nk-compare-btn ${compareOpen ? 'is-open' : ''}`} aria-label={tr('nk.ch.compare')} aria-pressed={compareOpen} onClick={() => openChapter('compare')}><IcoPxComparar size={20}/>{NK && <span className="nk-tip"><b>{tr('nk.ch.compare')}</b><small>{tr('nk.ch.compare.sub')}</small></span>}</button>}
         {NK && <button className={`fc-menu-toggle nk-cal-btn ${calendarOpen ? 'is-open' : ''}`} aria-label={tr('rail.calendar')} aria-pressed={calendarOpen} onClick={() => { goHistoric(); setCalendarOpen((v) => !v) }}><I.calendario size={20}/>{NK && <span className="nk-tip"><b>{tr('rail.calendar')}</b><small>{tr('nk.tip.calendar.sub')}</small></span>}</button>}
         {NK && <button className="fc-menu-toggle nk-tutorial-btn" aria-label={lang === 'es' ? 'Abrir tutorial' : 'Open tutorial'} onClick={startTutorial}><CircleHelp size={20}/><span className="nk-tip"><b>Tutorial</b><small>{lang === 'es' ? 'Recorrido guiado' : 'Guided tour'}</small></span></button>}
       </div>
@@ -846,7 +900,20 @@ function FireMapApp() {
         <div className="fw-summary-actions"><button onClick={() => setCalendarOpen(true)}><CalendarDays size={16}/>{tr('rail.calendar')}</button><button onClick={() => runDownload(aoi, selectedRegion.name)}><Download size={16}/>CSV</button><button onClick={() => openReport(informeUrl(aoi, reportExtra))} title={tr('report.tip')}><FileText size={16}/>{tr('report.short')}</button></div>
         {notice && <p className="fc-notice">{notice}</p>}
       </aside>}
-      {layersOpen && !selectionBounds && <aside className="fw-layers">
+      {layersOpen && !selectionBounds && NK && <aside className="fw-layers nk-capas" style={{ top: capasTop }} aria-label={tr('layers.title')}>
+        <header className="nk-capas-head"><b>{tr('layers.title')}</b>
+          {(capasNk.calor || capasNk.puntos || showBoundary || peligro.on)
+            ? <button className="nk-capas-todas" onClick={() => { setCapasNk({ calor: false, puntos: false }); setShowBoundary(false); setPeligro((p) => ({ ...p, on: false, solo: [] })) }}>{tr('nk.capas.none')}</button>
+            : <button className="nk-capas-todas" onClick={() => setCapasNk({ calor: true, puntos: false })}>{tr('nk.capas.reset')}</button>}
+        </header>
+        <div className="nk-capas-base">
+          <LayerButton active={capasNk.calor} icon={ThermometerSun} label={tr('layers.density')} tone="heat" onClick={() => setCapasNk((c) => ({ ...c, calor: !c.calor }))}/>
+          <LayerButton active={capasNk.puntos} icon={MapPin} label={tr('layers.points')} tone="points" onClick={() => setCapasNk((c) => ({ ...c, puntos: !c.puntos }))}/>
+          <LayerButton active={showBoundary} icon={Layers3} label={tr('layers.boundary')} tone="boundary" onClick={() => setShowBoundary((v) => !v)}/>
+        </div>
+        <PeligroFiltro peligro={peligro} setPeligro={setPeligro} clase={clasePeligro}/>
+      </aside>}
+      {layersOpen && !selectionBounds && !NK && <aside className="fw-layers">
         <div className="fw-layers-title"><span>{tr('layers.title')}</span><SlidersHorizontal size={15}/></div>
         <LayerButton active={activeLayer === 'surface'} icon={ThermometerSun} label={tr('layers.density')} tone="heat" onClick={() => setActiveLayer('surface')}/>
         <LayerButton active={activeLayer === 'points'} icon={MapPin} label={tr('layers.points')} tone="points" onClick={() => setActiveLayer('points')}/>
@@ -858,7 +925,7 @@ function FireMapApp() {
           <button className={baseMap === 'relief' ? 'is-active' : ''} aria-pressed={baseMap === 'relief'} title={tr('basemap.relief')} onClick={() => setBaseMap('relief')}><I.relieve size={14}/><span>{tr('basemap.relief')}</span></button>
         </div>
         {liveOn ? <div className="fw-heat-legend fc-dock-points"><header><span>{tr('liveLayer.age')}</span></header><p><i style={{ background: '#ff1f4b' }}/>{'< 6 h'}</p><p><i style={{ background: '#ff7a1a' }}/>6–24 h</p><p><i style={{ background: '#ffc24b' }}/>{'> 24 h'}</p></div>
-          : activeLayer === 'points'
+          : (NK ? capasNk.puntos && !capasNk.calor : activeLayer === 'points')
           ? <div className="fw-heat-legend fc-dock-points"><header><span>{tr('layers.pointsLegend')}</span></header><p><i className="modis"/>MODIS</p><p><i className="viirs"/>VIIRS</p><p><i className="outside"/>{tr('layers.outside')}</p></div>
           : <div className="fw-heat-legend"><header><span>{tr('layers.scaleDensity')}</span></header><i/><div><span>{tr('scale.low')}</span><span>{tr('scale.mid')}</span><span>{tr('scale.high')}</span></div></div>}
       </aside>
@@ -915,7 +982,6 @@ function FireMapApp() {
         </div>
       </section>
       </>}
-      {intro && <IntroNikal onDone={cerrarIntro}/>}
       <TutorialGuide lang={lang} prompt={tutorialPrompt} open={tutorialOpen} onStart={startTutorial} onSkip={closeTutorial} onClose={closeTutorial}/>
       {snake && <NikalSnake origen={snake} onClose={() => setSnake(null)}/>}
     </div>
