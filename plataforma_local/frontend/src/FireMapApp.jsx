@@ -18,6 +18,7 @@ import { ChapterRail, SeasonRibbon } from './Narrativa.jsx'
 import { MAPA, NK } from './diseno.js'
 import NikalSnake from './NikalSnake.jsx'
 import TutorialGuide from './TutorialGuide.jsx'
+import IntroWelcome from './IntroWelcome.jsx'
 import { IcoFocos, IcoHabitual, IcoHistorico, IcoPlano, IcoPxArea, IcoPxCalendario, IcoPxCapas, IcoPxComparar, IcoPxHerramientas, IcoRelieve, IcoSatelite, IcoVivo } from './NkIcons.jsx'
 import PeligroFiltro from './PeligroFiltro.jsx'
 import { clasificar, prepararUnidades } from './peligro.js'
@@ -335,7 +336,8 @@ function FireMapApp() {
   const [lang, setLangState] = useState(getLang())
   const changeLang = (l) => { setLang(l); setLangState(l) }
   const forceTutorial = new URLSearchParams(window.location.search).get('tutorial') === '1'
-  const [tutorialPrompt, setTutorialPrompt] = useState(() => !forceTutorial && !tutorialSeen())
+  const welcomeOpen = new URLSearchParams(window.location.search).get('welcome') !== '0' && !forceTutorial
+  const [tutorialPrompt, setTutorialPrompt] = useState(() => new URLSearchParams(window.location.search).get('tutorialPrompt') === '1' && !tutorialSeen())
   const [tutorialOpen, setTutorialOpen] = useState(forceTutorial)
   const startTutorial = () => { setTutorialPrompt(false); setTutorialOpen(true); setDetailsOpen(true); setSimpleOpen(false); setCompareOpen(false); setAmbitosOpen(false); setToolsOpen(false) }
   const closeTutorial = () => { markTutorialSeen(); setTutorialPrompt(false); setTutorialOpen(false) }
@@ -830,6 +832,7 @@ function FireMapApp() {
   return (
     <div className={`fw-app ${liveOn ? 'is-live' : ''} ${NK ? 'nk' : ''}`}>
       <div ref={mapContainerRef} className="fw-map" aria-label={tr('map.aria')} />
+      {welcomeOpen && <IntroWelcome lang={lang} onLanguage={changeLang}/>}
       <div className="fw-nubel-brand nk-brand" aria-label="Nikal Cusco" onClick={tocarLogo} style={snake ? { visibility: 'hidden' } : undefined}><img src="./nikal-icono.svg" alt="Nikal"/></div>
       <div className="fc-mode" role="group" aria-label={tr('mode.label')}>
         <button className={!liveOn ? 'is-active' : ''} aria-pressed={!liveOn} title={tr('mode.historic')} onClick={goHistoric}><I.historico size={14}/><span>{tr('mode.historic')}</span></button>
