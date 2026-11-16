@@ -50,7 +50,7 @@
 .nk-peligro-nota{margin:0;font-size:10.5px;line-height:1.4;color:var(--ph-texto2)!important}
 .fw-app.is-live .nk-capas{display:none!important}
 
-@media(max-width:650px){.nk .fw-layers.nk-capas{right:58px!important;width:min(272px,calc(100vw - 120px))!important}}
+@media(max-width:650px){.nk .fw-layers.nk-capas{right:78px!important;width:min(272px,calc(100vw - 140px))!important}}
 @media(prefers-reduced-motion:reduce){.nk .fw-layers.nk-capas{animation:none}}
 /* Etiquetas visibles en los botones de capa (Dante las oculta o las pone como globo). */
 .nk .nk-capas-base .fw-layer-button{display:flex!important;flex-direction:column;align-items:center;justify-content:center;gap:5px}
