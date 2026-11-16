@@ -3,9 +3,8 @@ import { ArrowRight, Database, Layers3, MapPinned, Satellite, ShieldCheck } from
 import { LANGS, tr } from './i18n.js'
 import { CUSCO, getResumen } from './services/api.js'
 
-function IntroScreen({ lang, onLanguage, onEnter }) {
+function IntroScreen({ lang, onLanguage }) {
   const [summary, setSummary] = useState(null)
-  const [dismissed, setDismissed] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -21,8 +20,14 @@ function IntroScreen({ lang, onLanguage, onEnter }) {
     { pregunta: tr('intro.q3'), respuesta: tr('intro.a3') },
   ], [lang]) // eslint-disable-line react-hooks/exhaustive-deps
   const findings = summary?.frases?.slice(0, 3) || fallback
-
-  if (dismissed) return null
+  const mapHref = useMemo(() => {
+    const params = new URLSearchParams(window.location.search)
+    params.set('intro', '0')
+    params.set('lang', lang)
+    params.set('tutorialPrompt', '1')
+    params.delete('tutorial')
+    return `${window.location.pathname}?${params.toString()}`
+  }, [lang])
 
   return <div className="fc-intro">
     <div className="fc-intro-frame">
@@ -42,7 +47,7 @@ function IntroScreen({ lang, onLanguage, onEnter }) {
           <header><div><span>01</span><p>{tr('intro.plainKicker')}</p></div><h2>{tr('intro.plainTitle')}</h2></header>
           <dl>{findings.map((finding) => <div key={finding.pregunta}><dt>{finding.pregunta}</dt><dd>{finding.respuesta}</dd></div>)}</dl>
         </section>
-        <footer className="fc-intro-action"><div><Database/><span><b>{tr('intro.ready')}</b><small>{tr('intro.readyNote')}</small></span></div><button onClick={() => { setDismissed(true); onEnter() }}>{tr('intro.cta')}<ArrowRight/></button></footer>
+        <footer className="fc-intro-action"><div><Database/><span><b>{tr('intro.ready')}</b><small>{tr('intro.readyNote')}</small></span></div><a href={mapHref}>{tr('intro.cta')}<ArrowRight/></a></footer>
       </main>
       <aside className="fc-intro-map" aria-hidden="true">
         <div className="fc-intro-map-card"><span>{tr('intro.mapKicker')}</span><b>{tr('intro.mapTitle')}</b><small>{tr('intro.mapNote')}</small></div>
