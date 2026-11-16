@@ -10,6 +10,7 @@ import './ambitos-dias.css'
 import './paneles.css'
 import './intro.css'
 import './snake.css'
+import './tutorial.css'
 import App from './FireMapApp.jsx'
 import { getLang, setLang } from './i18n.js'
 

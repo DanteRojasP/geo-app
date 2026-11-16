@@ -6,7 +6,7 @@ import { createElement, useCallback, useEffect, useMemo, useRef, useState } from
 import * as maplibregl from 'maplibre-gl'
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import {
-  ArrowLeftRight, CalendarDays, ChevronLeft, ChevronRight, Database, Download, FileText, Flame, Gauge, Landmark,
+  ArrowLeftRight, CalendarDays, ChevronLeft, ChevronRight, CircleHelp, Database, Download, FileText, Flame, Gauge, Landmark,
   Layers3, Map as MapIcon, MapPin, MessageCircleQuestion, Mountain, Pause, Play, Radio, Satellite, Scan, ShieldAlert,
   SlidersHorizontal,
   ThermometerSun, Trash2, X,
@@ -18,6 +18,7 @@ import { ChapterRail, SeasonRibbon } from './Narrativa.jsx'
 import { MAPA, NK, introActiva } from './diseno.js'
 import IntroNikal from './IntroNikal.jsx'
 import NikalSnake from './NikalSnake.jsx'
+import TutorialGuide from './TutorialGuide.jsx'
 import { IcoAjustes, IcoArea, IcoCalendario, IcoCapas, IcoComparar, IcoFocos, IcoHabitual, IcoHistorico, IcoPlano, IcoRelieve, IcoSatelite, IcoVivo } from './NkIcons.jsx'
 import ComparisonWorkspace from './ComparisonWorkspace.jsx'
 import { LANGS, getLang, locale, months, setLang, tr } from './i18n.js'
@@ -48,6 +49,9 @@ const I = NK
   : { focos: Flame, calendario: CalendarDays, area: Scan, ajustes: SlidersHorizontal, capas: Layers3, historico: CalendarDays, vivo: Radio, plano: MapIcon, relieve: Mountain, habitual: Gauge, satelite: Satellite }
 const FIRST_YEAR = 2000
 const LAST_YEAR = 2025
+const TUTORIAL_KEY = 'nikal.tutorial.seen.v1'
+const tutorialSeen = () => { try { return window.localStorage?.getItem(TUTORIAL_KEY) === '1' } catch { return false } }
+const markTutorialSeen = () => { try { window.localStorage?.setItem(TUTORIAL_KEY, '1') } catch { /* private mode */ } }
 const YEARS = Array.from({ length: LAST_YEAR - FIRST_YEAR + 1 }, (_, i) => FIRST_YEAR + i)
 // YlOrRd (ColorBrewer, apta para daltonismo) para los tramos con fuego; el 0 va en gris neutro.
 const YLORRD = ['#ffffb2', '#fecc5c', '#fd8d3c', '#f03b20', '#bd0026']
@@ -328,8 +332,16 @@ function FireMapApp() {
   const [lang, setLangState] = useState(getLang())
   const changeLang = (l) => { setLang(l); setLangState(l) }
   // Apertura de marca (cada vez que se entra) y juego oculto (tres clics en el logo).
-  const [intro, setIntro] = useState(() => NK && introActiva())
-  const cerrarIntro = useCallback(() => setIntro(false), [])
+  const forceTutorial = new URLSearchParams(window.location.search).get('tutorial') === '1'
+  const [intro, setIntro] = useState(() => NK && introActiva() && !forceTutorial)
+  const [tutorialPrompt, setTutorialPrompt] = useState(false)
+  const [tutorialOpen, setTutorialOpen] = useState(forceTutorial)
+  const cerrarIntro = useCallback(() => {
+    setIntro(false)
+    if (!tutorialSeen()) setTutorialPrompt(true)
+  }, [])
+  const startTutorial = () => { setTutorialPrompt(false); setTutorialOpen(true); setDetailsOpen(false); setSimpleOpen(false); setCompareOpen(false); setAmbitosOpen(false); setToolsOpen(false) }
+  const closeTutorial = () => { markTutorialSeen(); setTutorialPrompt(false); setTutorialOpen(false) }
   const [snake, setSnake] = useState(null)
   const clicsLogo = useRef([])
   const tocarLogo = (e) => {
@@ -806,6 +818,7 @@ function FireMapApp() {
         </nav>}
         {NK && <button className={`fc-menu-toggle nk-compare-btn ${compareOpen ? 'is-open' : ''}`} aria-label={tr('nk.ch.compare')} aria-pressed={compareOpen} onClick={() => openChapter('compare')}><IcoComparar size={20}/>{NK && <span className="nk-tip"><b>{tr('nk.ch.compare')}</b><small>{tr('nk.ch.compare.sub')}</small></span>}</button>}
         {NK && <button className={`fc-menu-toggle nk-cal-btn ${calendarOpen ? 'is-open' : ''}`} aria-label={tr('rail.calendar')} aria-pressed={calendarOpen} onClick={() => { goHistoric(); setCalendarOpen((v) => !v) }}><I.calendario size={20}/>{NK && <span className="nk-tip"><b>{tr('rail.calendar')}</b><small>{tr('nk.tip.calendar.sub')}</small></span>}</button>}
+        {NK && <button className="fc-menu-toggle nk-tutorial-btn" aria-label={lang === 'es' ? 'Abrir tutorial' : 'Open tutorial'} onClick={startTutorial}><CircleHelp size={20}/><span className="nk-tip"><b>Tutorial</b><small>{lang === 'es' ? 'Recorrido guiado' : 'Guided tour'}</small></span></button>}
       </div>
       {detailsOpen && <aside className="fw-summary">
         <div className="fw-summary-head"><div><p>{selectedRegion.name.toUpperCase()} · {tr('summary.series')}</p><h1>{tr('filter.title')}</h1><span>{periodo.label}{!customPeriod && month?.calidad ? ` · ${calidadLabel(month.calidad)}` : ''}</span></div><button onClick={() => setDetailsOpen(false)} title={tr('btn.close')} aria-label={tr('btn.close')}><X size={17}/></button></div>
@@ -903,6 +916,7 @@ function FireMapApp() {
       </section>
       </>}
       {intro && <IntroNikal onDone={cerrarIntro}/>}
+      <TutorialGuide lang={lang} prompt={tutorialPrompt} open={tutorialOpen} onStart={startTutorial} onSkip={closeTutorial} onClose={closeTutorial}/>
       {snake && <NikalSnake origen={snake} onClose={() => setSnake(null)}/>}
     </div>
   )
