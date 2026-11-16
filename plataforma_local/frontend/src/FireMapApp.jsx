@@ -316,7 +316,10 @@ function FireMapApp() {
     const params = new URLSearchParams(window.location.search)
     return params.get('intro') !== '0' && params.get('tutorial') !== '1'
   })
-  const [tutorialPrompt, setTutorialPrompt] = useState(false)
+  const [tutorialPrompt, setTutorialPrompt] = useState(() => {
+    if (new URLSearchParams(window.location.search).get('tutorialPrompt') !== '1') return false
+    try { return window.localStorage?.getItem(TUTORIAL_KEY) !== '1' } catch { return true }
+  })
   const [tutorialOpen, setTutorialOpen] = useState(() => new URLSearchParams(window.location.search).get('tutorial') === '1')
   const [detailsOpen, setDetailsOpen] = useState(true)
   const [layersOpen, setLayersOpen] = useState(false)
@@ -331,12 +334,6 @@ function FireMapApp() {
     setIntroOpen(false)
     setDetailsOpen(false); setSimpleOpen(false); setCompareOpen(false); setAmbitosOpen(false); setToolsOpen(false)
     setTutorialPrompt(false); setTutorialOpen(true)
-  }
-  const finishIntro = () => {
-    setIntroOpen(false)
-    let seen = false
-    try { seen = window.localStorage?.getItem(TUTORIAL_KEY) === '1' } catch { /* modo privado */ }
-    if (!seen) setTutorialPrompt(true)
   }
   const skipTutorial = () => { markTutorialSeen(); setTutorialPrompt(false) }
   const closeTutorial = () => { markTutorialSeen(); setTutorialOpen(false) }
@@ -741,7 +738,7 @@ function FireMapApp() {
   return (
     <div className={`fw-app ${liveOn ? 'is-live' : ''}`}>
       <div ref={mapContainerRef} className="fw-map" aria-label={tr('map.aria')} />
-      {introOpen && <IntroScreen key={lang} lang={lang} onLanguage={changeLang} onEnter={finishIntro}/>}
+      {introOpen && <IntroScreen key={lang} lang={lang} onLanguage={changeLang}/>}
       <div className="fw-nubel-brand" aria-label="Nubel Team · FireCal Cusco"><img src="./nubel-team-logo.png" alt="Nubel Team"/></div>
       <div className="fc-mode" role="group" aria-label={tr('mode.label')}>
         <button className={!liveOn ? 'is-active' : ''} aria-pressed={!liveOn} title={tr('mode.historic')} onClick={goHistoric}><CalendarDays size={14}/><span>{tr('mode.historic')}</span></button>
