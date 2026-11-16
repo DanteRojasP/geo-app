@@ -301,6 +301,8 @@ function FireMapApp() {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [activeLayer, setActiveLayer] = useState('surface')
+  // Nikal: capas superponibles (densidad y puntos a la vez, o ninguna: solo Cusco).
+  const [capasNk, setCapasNk] = useState({ calor: true, puntos: false })
   const [showBoundary, setShowBoundary] = useState(false)
   const [baseMap, setBaseMap] = useState('relief')      // Dante (450cc43): relieve por defecto
   const [calendarMode, setCalendarMode] = useState('valor')
@@ -691,7 +693,7 @@ function FireMapApp() {
     if (!mapReadyRef.current || !map) return
     const visible = Boolean(peligro.on && !liveOn && unidadesPeligro?.nivel === peligro.nivel)
     if (visible && !map.getSource('peligro-unidades')) {
-      map.addSource('peligro-unidades', { type: 'geojson', data: unidadesPeligro.geojson })
+      map.addSource('peligro-unidades', { type: 'geojson', data: unidadesPeligro.geojson, promoteId: 'codigo' })
       const antes = map.getLayer('fire-heat') ? 'fire-heat' : undefined
       map.addLayer({ id: 'peligro-fill', type: 'fill', source: 'peligro-unidades', paint: { 'fill-color': ['get', 'color'], 'fill-opacity': 0.35 } }, antes)
       map.addLayer({ id: 'peligro-line', type: 'line', source: 'peligro-unidades', paint: { 'line-color': '#141210', 'line-width': 0.8, 'line-opacity': 0.7 } }, antes)
@@ -699,10 +701,16 @@ function FireMapApp() {
       map.getSource('peligro-unidades').setData(unidadesPeligro.geojson)
     }
     if (!map.getLayer('peligro-fill')) return
+    // Color = nivel de peligro de la unidad; intensidad = sus focos en el año, mes o día de la cinta.
+    if (visible && clasePeligro) {
+      ;(unidadesPeligro.geojson.features || []).forEach((f) => map.setFeatureState(
+        { source: 'peligro-unidades', id: f.properties.codigo }, { act: clasePeligro.actividad.get(f.properties.codigo) || 0 }))
+    }
+    const intensidad = ['interpolate', ['linear'], ['coalesce', ['feature-state', 'act'], 0], 0, 0.05, 1, 0.68]
     map.setPaintProperty('peligro-fill', 'fill-opacity', peligro.solo.length
-      ? ['case', ['in', ['get', 'nivel_peligro'], ['literal', peligro.solo]], 0.5, 0.06] : 0.35)
+      ? ['case', ['in', ['get', 'nivel_peligro'], ['literal', peligro.solo]], intensidad, 0.03] : intensidad)
     ;['peligro-fill', 'peligro-line'].forEach((id) => map.setLayoutProperty(id, 'visibility', visible ? 'visible' : 'none'))
-  }, [peligro, unidadesPeligro, liveOn])
+  }, [peligro, unidadesPeligro, liveOn, clasePeligro])
 
   // Al cerrar Herramientas se cierra también el panel de Capas.
   useEffect(() => { if (NK && !toolsOpen) setLayersOpen(false) }, [toolsOpen])
@@ -731,12 +739,12 @@ function FireMapApp() {
     if (!mapReadyRef.current || !map) return
     // Dos modos que no se mezclan: la serie histórica o las detecciones en vivo.
     const vis = (on) => (on ? 'visible' : 'none')
-    map.setLayoutProperty('fire-heat', 'visibility', vis(!liveOn && activeLayer === 'surface'))
-    map.setLayoutProperty('fire-points', 'visibility', vis(!liveOn && activeLayer === 'points'))
+    map.setLayoutProperty('fire-heat', 'visibility', vis(!liveOn && (NK ? capasNk.calor : activeLayer === 'surface')))
+    map.setLayoutProperty('fire-points', 'visibility', vis(!liveOn && (NK ? capasNk.puntos : activeLayer === 'points')))
     map.setLayoutProperty('selection-area-fill', 'visibility', vis(!liveOn))
     map.setLayoutProperty('selection-area-line', 'visibility', vis(!liveOn))
     map.setLayoutProperty('live-points', 'visibility', vis(liveOn))
-  }, [activeLayer, liveOn])
+  }, [activeLayer, liveOn, capasNk])
 
   useEffect(() => {
     const map = mapRef.current
@@ -883,10 +891,14 @@ function FireMapApp() {
         {notice && <p className="fc-notice">{notice}</p>}
       </aside>}
       {layersOpen && !selectionBounds && NK && <aside className="fw-layers nk-capas" style={{ top: capasTop }} aria-label={tr('layers.title')}>
-        <header className="nk-capas-head"><b>{tr('layers.title')}</b><small>{tr('nk.capas.sub')}</small></header>
+        <header className="nk-capas-head"><b>{tr('layers.title')}</b>
+          {(capasNk.calor || capasNk.puntos || showBoundary || peligro.on)
+            ? <button className="nk-capas-todas" onClick={() => { setCapasNk({ calor: false, puntos: false }); setShowBoundary(false); setPeligro((p) => ({ ...p, on: false, solo: [] })) }}>{tr('nk.capas.none')}</button>
+            : <button className="nk-capas-todas" onClick={() => setCapasNk({ calor: true, puntos: false })}>{tr('nk.capas.reset')}</button>}
+        </header>
         <div className="nk-capas-base">
-          <LayerButton active={activeLayer === 'surface'} icon={ThermometerSun} label={tr('layers.density')} tone="heat" onClick={() => setActiveLayer('surface')}/>
-          <LayerButton active={activeLayer === 'points'} icon={MapPin} label={tr('layers.points')} tone="points" onClick={() => setActiveLayer('points')}/>
+          <LayerButton active={capasNk.calor} icon={ThermometerSun} label={tr('layers.density')} tone="heat" onClick={() => setCapasNk((c) => ({ ...c, calor: !c.calor }))}/>
+          <LayerButton active={capasNk.puntos} icon={MapPin} label={tr('layers.points')} tone="points" onClick={() => setCapasNk((c) => ({ ...c, puntos: !c.puntos }))}/>
           <LayerButton active={showBoundary} icon={Layers3} label={tr('layers.boundary')} tone="boundary" onClick={() => setShowBoundary((v) => !v)}/>
         </div>
         <PeligroFiltro peligro={peligro} setPeligro={setPeligro} clase={clasePeligro}/>
@@ -903,7 +915,7 @@ function FireMapApp() {
           <button className={baseMap === 'relief' ? 'is-active' : ''} aria-pressed={baseMap === 'relief'} title={tr('basemap.relief')} onClick={() => setBaseMap('relief')}><I.relieve size={14}/><span>{tr('basemap.relief')}</span></button>
         </div>
         {liveOn ? <div className="fw-heat-legend fc-dock-points"><header><span>{tr('liveLayer.age')}</span></header><p><i style={{ background: '#ff1f4b' }}/>{'< 6 h'}</p><p><i style={{ background: '#ff7a1a' }}/>6–24 h</p><p><i style={{ background: '#ffc24b' }}/>{'> 24 h'}</p></div>
-          : activeLayer === 'points'
+          : (NK ? capasNk.puntos && !capasNk.calor : activeLayer === 'points')
           ? <div className="fw-heat-legend fc-dock-points"><header><span>{tr('layers.pointsLegend')}</span></header><p><i className="modis"/>MODIS</p><p><i className="viirs"/>VIIRS</p><p><i className="outside"/>{tr('layers.outside')}</p></div>
           : <div className="fw-heat-legend"><header><span>{tr('layers.scaleDensity')}</span></header><i/><div><span>{tr('scale.low')}</span><span>{tr('scale.mid')}</span><span>{tr('scale.high')}</span></div></div>}
       </aside>

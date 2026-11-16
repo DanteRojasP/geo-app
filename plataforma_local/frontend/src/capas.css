@@ -57,3 +57,6 @@
 .nk .nk-capas-base .fw-layer-button b{display:block!important;position:static!important;padding:0!important;background:none!important;box-shadow:none!important;
   font:600 10px var(--ph-cuerpo)!important;color:inherit!important;white-space:nowrap}
 .nk .nk-capas-base .fw-layer-button b{opacity:1!important;transform:none!important;visibility:visible!important}
+.nk-capas-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.nk .nk-capas .nk-capas-todas{padding:4px 9px!important;font:600 11px var(--ph-cuerpo)!important;border-radius:6px!important;cursor:pointer}
+.nk .nk-peligro .nk-peligro-tog{grid-template-columns:auto 1fr auto}

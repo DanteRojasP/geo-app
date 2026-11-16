@@ -17,7 +17,7 @@ function PeligroFiltro({ peligro, setPeligro, clase }) {
     <section className={`nk-peligro ${peligro.on ? 'is-on' : ''}`}>
       <button className="nk-peligro-tog" aria-pressed={peligro.on} onClick={() => setPeligro((p) => ({ ...p, on: !p.on, solo: [] }))}>
         <IcoPxPeligro size={22}/>
-        <span><b>{tr('nk.peligro.title')}</b><small>{tr('nk.peligro.sub')}</small></span>
+        <span><b>{tr('nk.peligro.title')}</b></span>
         <i className="nk-switch" aria-hidden="true"/>
       </button>
       {peligro.on && <>
@@ -38,7 +38,6 @@ function PeligroFiltro({ peligro, setPeligro, clase }) {
             })}
           </ul>
           {clase.parte.sin_unidad > 0.001 && <p className="nk-peligro-nota">{tr('nk.peligro.outside', { p: pct(clase.parte.sin_unidad) })}</p>}
-          <p className="nk-peligro-nota">{tr('nk.peligro.hint')}</p>
         </>}
       </>}
     </section>

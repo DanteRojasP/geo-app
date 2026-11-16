@@ -24,13 +24,14 @@ export function prepararUnidades(geojson) {
     const pols = anillos(f.geometry)
     let w = Infinity, s = Infinity, e = -Infinity, n = -Infinity
     pols.forEach((p) => p[0].forEach(([x, y]) => { w = Math.min(w, x); e = Math.max(e, x); s = Math.min(s, y); n = Math.max(n, y) }))
-    return { pols, caja: [w, s, e, n], nivel: f.properties.nivel_peligro }
+    return { pols, caja: [w, s, e, n], nivel: f.properties.nivel_peligro, codigo: f.properties.codigo, area: Number(f.properties.area_km2) || 0 }
   })
 }
 
 // Nivel de peligro de cada foco (mismo orden que las features) y parte de los focos armonizados por nivel.
 export function clasificar(focos, unidades) {
   const suma = { muy_alto: 0, alto: 0, medio: 0, bajo: 0, sin_clasificar: 0, sin_unidad: 0 }
+  const porUnidad = new Map()     // focos armonizados del periodo en cada unidad (para pintar el mapa)
   let total = 0
   const niveles = (focos?.features || []).map((f) => {
     const [x, y] = f.geometry.coordinates
@@ -38,9 +39,15 @@ export function clasificar(focos, unidades) {
     const nivel = u ? u.nivel : 'sin_unidad'
     const peso = Number(f.properties?.eq_foco) || 0
     suma[nivel] = (suma[nivel] || 0) + peso
+    if (u) porUnidad.set(u.codigo, (porUnidad.get(u.codigo) || 0) + peso)
     total += peso
     return nivel
   })
   const parte = Object.fromEntries(Object.entries(suma).map(([k, v]) => [k, total > 0 ? v / total : 0]))
-  return { niveles, parte, total }
+  // Actividad 0-1 de cada unidad en el periodo: densidad (focos por km²) frente a la unidad más activa,
+  // con raíz cuadrada para que las unidades con pocos focos también se distingan.
+  const dens = unidades.map((u) => [u.codigo, u.area > 0 ? (porUnidad.get(u.codigo) || 0) / u.area : 0])
+  const max = Math.max(0, ...dens.map(([, d]) => d))
+  const actividad = new Map(dens.map(([c, d]) => [c, max > 0 ? Math.sqrt(d / max) : 0]))
+  return { niveles, parte, total, actividad }
 }
